@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Scoring for Campaign ID: {{ campaign_id }}</h2>
+
+{% if scoring_data %}
+    <table>
+        <thead>
+            <tr>
+                <th>Candidate</th>
+                <th>Score</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for row in scoring_data %}
+            <tr>
+                <td>{{ row.candidate_name }}</td>
+                <td>{{ row.candidate_score }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <p>No scoring data found for this campaign.</p>
+{% endif %}
+{% endblock %}

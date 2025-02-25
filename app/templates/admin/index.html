@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Admin Dashboard</h2>
+<ul>
+    <li><a href="{{ url_for('admin_create_candidate') }}">Create Candidate</a></li>
+    <li><a href="{{ url_for('admin_create_admin') }}">Create Admin</a></li>
+    <li><a href="{{ url_for('admin_campaigns') }}">View Campaigns</a></li>
+</ul>
+{% endblock %}

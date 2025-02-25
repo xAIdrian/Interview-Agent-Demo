@@ -1,0 +1,121 @@
+@import url('https://fonts.googleapis.com/css2?family=Geist&display=swap');
+
+body {
+    font-family: 'Geist', sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f0f0f0;
+}
+
+header {
+    background: #171717;
+    color: white;
+    padding: 20px;
+    text-align: center;
+}
+
+nav {
+    background: #171717;
+    color: white;
+    padding: 10px;
+    text-align: center;
+}
+
+nav a {
+    color: white;
+    margin: 0 15px;
+    text-decoration: none;
+}
+
+.main-content {
+    display: flex;
+    justify-content: center;
+    padding: 20px;
+}
+
+.left-section, .right-section {
+    flex: 1;
+    padding: 20px;
+}
+
+.center-section {
+    width: 1080px;
+    background: white;
+    padding: 20px;
+    border-radius: 6px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+button {
+    border-radius: 6px;
+    padding: 10px 20px;
+    border: none;
+    cursor: pointer;
+}
+
+button.primary {
+    background: #171717;
+    color: white;
+}
+
+button.secondary {
+    background: white;
+    color: #171717;
+    border: 1px solid #171717;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+table, th, td {
+    border: 1px solid #ccc;
+}
+
+th, td {
+    padding: 10px;
+    text-align: left;
+}
+
+.hero-section {
+    background: linear-gradient(135deg, #f0f0f0, #e0e0e0);
+    padding: 40px;
+    text-align: center;
+}
+
+.section {
+    background: linear-gradient(135deg, #ffffff, #f9f9f9);
+    padding: 40px;
+    margin: 20px 20px;
+    border-radius: 6px;
+    border: 1px solid #eee;
+    width: calc(50% - 130px);
+    float: left;
+    transition: box-shadow 0.3s;
+}
+
+.section:hover {
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    transition: box-shadow 0.3s;
+}
+
+.section.full-width {
+    width: calc(100% - 120px);
+}
+
+blockquote {
+    background: #f9f9f9;
+    border-left: 10px solid #ccc;
+    margin: 20px 0;
+    padding: 20px;
+    font-style: italic;
+}
+
+footer {
+    background: #171717;
+    color: white;
+    text-align: center;
+    padding: 20px;
+    margin-top: 20px;
+}

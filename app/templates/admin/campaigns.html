@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Campaigns</h2>
+
+{% if campaigns %}
+    <ul>
+    {% for campaign in campaigns %}
+        <li>
+            <a href="{{ url_for('admin_campaign_scoring', campaign_id=campaign.id) }}">
+                {{ campaign.name }}
+            </a>
+        </li>
+    {% endfor %}
+    </ul>
+{% else %}
+    <p>No campaigns found.</p>
+{% endif %}
+{% endblock %}
