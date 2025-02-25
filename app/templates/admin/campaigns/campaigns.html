@@ -2,12 +2,16 @@
 {% block content %}
 <h2>Campaigns</h2>
 
+<a href="{{ url_for('admin_create_campaign') }}">
+    <button class="primary">Create New Campaign</button>
+</a>
+
 {% if campaigns %}
     <ul>
     {% for campaign in campaigns %}
         <li>
             <a href="{{ url_for('admin_campaign_scoring', campaign_id=campaign.id) }}">
-                {{ campaign.name }}
+                {{ campaign.title }}
             </a>
         </li>
     {% endfor %}

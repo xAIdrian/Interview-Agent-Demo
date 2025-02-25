@@ -23,9 +23,106 @@ def create_users_table():
     conn.commit()
     conn.close()
 
+def create_campaigns_table():
+    conn = get_db_connection()
+    with conn.cursor() as cursor:
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS campaigns (
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                title VARCHAR(255) NOT NULL,
+                max_user_submissions INT NOT NULL DEFAULT 1
+            )
+        """)
+    conn.commit()
+    conn.close()
+
+def create_questions_table():
+    conn = get_db_connection()
+    with conn.cursor() as cursor:
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS questions (
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                campaign_id INT NOT NULL,
+                title VARCHAR(255) NOT NULL,
+                body TEXT NOT NULL,
+                scoring_prompt TEXT NOT NULL,
+                FOREIGN KEY (campaign_id) REFERENCES campaigns(id)
+            )
+        """)
+    conn.commit()
+    conn.close()
+
+def create_submissions_table():
+    conn = get_db_connection()
+    with conn.cursor() as cursor:
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS submissions (
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                campaign_id INT NOT NULL,
+                user_id INT NOT NULL,
+                submission_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (campaign_id) REFERENCES campaigns(id)
+            )
+        """)
+    conn.commit()
+    conn.close()
+
+def create_submission_answers_table():
+    conn = get_db_connection()
+    with conn.cursor() as cursor:
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS submission_answers (
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                submission_id INT NOT NULL,
+                question_id INT NOT NULL,
+                answer TEXT NOT NULL,
+                FOREIGN KEY (submission_id) REFERENCES submissions(id),
+                FOREIGN KEY (question_id) REFERENCES questions(id)
+            )
+        """)
+    conn.commit()
+    conn.close()
+
+def create_candidates_table():
+    conn = get_db_connection()
+    with conn.cursor() as cursor:
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS candidates (
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                name VARCHAR(255) NOT NULL,
+                email VARCHAR(255) NOT NULL UNIQUE
+            )
+        """)
+    conn.commit()
+    conn.close()
+
+def create_scoring_table():
+    conn = get_db_connection()
+    with conn.cursor() as cursor:
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS scoring (
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                submission_id INT NOT NULL,
+                question_id INT NOT NULL,
+                score INT NOT NULL,
+                campaign_id INT NOT NULL,
+                FOREIGN KEY (submission_id) REFERENCES submissions(id),
+                FOREIGN KEY (question_id) REFERENCES questions(id),
+                FOREIGN KEY (campaign_id) REFERENCES campaigns(id)
+            )
+        """)
+    conn.commit()
+    conn.close()
+
 @app.before_first_request
 def initialize():
     create_users_table()
+    create_campaigns_table()
+    create_questions_table()
+    create_submissions_table()
+    create_submission_answers_table()
+    create_candidates_table()
+    create_scoring_table()  # Add this line to create the scoring table
 
 @app.route("/register", methods=["GET", "POST"])
 def register():
@@ -139,11 +236,45 @@ def admin_create_user():
 @admin_required
 def admin_campaigns():
     conn = get_db_connection()
-    with conn.cursor() as cursor:
+    with conn.cursor(dictionary=True) as cursor:
         cursor.execute("SELECT * FROM campaigns")
         campaigns = cursor.fetchall()
     conn.close()
-    return render_template("admin/campaigns.html", campaigns=campaigns)
+    return render_template("admin/campaigns/campaigns.html", campaigns=campaigns)
+
+@app.route("/admin/campaigns/create", methods=["GET", "POST"])
+@admin_required
+def admin_create_campaign():
+    if request.method == "POST":
+        title = request.form.get("title")
+        max_user_submissions = request.form.get("max_user_submissions")
+        questions = request.form.getlist("questions")
+
+        conn = get_db_connection()
+        with conn.cursor() as cursor:
+            # Insert the new campaign
+            sql_campaign = "INSERT INTO campaigns (title, max_user_submissions) VALUES (?, ?)"
+            cursor.execute(sql_campaign, (title, max_user_submissions))
+            campaign_id = cursor.lastrowid
+
+            # Insert the questions for the campaign
+            for i, question in enumerate(questions):
+                question_title = request.form.get(f"questions[{i}][title]")
+                question_body = request.form.get(f"questions[{i}][body]")
+                scoring_prompt = request.form.get(f"questions[{i}][scoring_prompt]")
+                sql_question = """
+                    INSERT INTO questions (campaign_id, title, body, scoring_prompt)
+                    VALUES (?, ?, ?, ?)
+                """
+                cursor.execute(sql_question, (campaign_id, question_title, question_body, scoring_prompt))
+
+        conn.commit()
+        conn.close()
+
+        flash("Campaign created successfully!", "success")
+        return redirect(url_for("admin_campaigns"))
+
+    return render_template("admin/campaigns/create_campaign.html")
 
 @app.route("/admin/campaigns/<int:campaign_id>/scoring")
 @admin_required
@@ -153,8 +284,9 @@ def admin_campaign_scoring(campaign_id):
         sql = """
         SELECT c.name as candidate_name, s.score as candidate_score
         FROM candidates c
-        JOIN scoring s ON c.id = s.candidate_id
-        WHERE s.campaign_id = ?
+        JOIN submissions sub ON c.id = sub.candidate_id
+        JOIN scoring s ON sub.id = s.submission_id
+        WHERE sub.campaign_id = ?
         """
         cursor.execute(sql, (campaign_id,))
         scoring_data = cursor.fetchall()

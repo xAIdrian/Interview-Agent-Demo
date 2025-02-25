@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Create New Campaign</h2>
+
+<form action="{{ url_for('admin_create_campaign') }}" method="post">
+    <div class="form-group">
+        <label for="title">Campaign Title</label>
+        <input type="text" class="form-control" id="title" name="title" required>
+    </div>
+    <div class="form-group">
+        <label for="max_user_submissions">Max User Submissions</label>
+        <input type="number" class="form-control" id="max_user_submissions" name="max_user_submissions" value="1" required>
+    </div>
+    
+    <h3>Questions</h3>
+    <div id="questions-container">
+        <div class="question">
+            <div class="form-group">
+                <label for="question_title_1">Question Title</label>
+                <input type="text" class="form-control" id="question_title_1" name="questions[0][title]" required>
+            </div>
+            <div class="form-group">
+                <label for="question_body_1">Question Body</label>
+                <textarea class="form-control" id="question_body_1" name="questions[0][body]" required></textarea>
+            </div>
+            <div class="form-group">
+                <label for="scoring_prompt_1">Scoring Prompt</label>
+                <textarea class="form-control" id="scoring_prompt_1" name="questions[0][scoring_prompt]" required></textarea>
+            </div>
+        </div>
+    </div>
+    <button type="button" class="secondary" onclick="addQuestion()">Add Another Question</button>
+    <button type="submit" class="primary">Create Campaign</button>
+</form>
+
+<script>
+let questionCount = 1;
+
+function addQuestion() {
+    questionCount++;
+    const questionsContainer = document.getElementById('questions-container');
+    const questionDiv = document.createElement('div');
+    questionDiv.classList.add('question');
+    questionDiv.innerHTML = `
+        <div class="form-group">
+            <label for="question_title_${questionCount}">Question Title</label>
+            <input type="text" class="form-control" id="question_title_${questionCount}" name="questions[${questionCount - 1}][title]" required>
+        </div>
+        <div class="form-group">
+            <label for="question_body_${questionCount}">Question Body</label>
+            <textarea class="form-control" id="question_body_${questionCount}" name="questions[${questionCount - 1}][body]" required></textarea>
+        </div>
+        <div class="form-group">
+            <label for="scoring_prompt_${questionCount}">Scoring Prompt</label>
+            <textarea class="form-control" id="scoring_prompt_${questionCount}" name="questions[${questionCount - 1}][scoring_prompt]" required></textarea>
+        </div>
+    `;
+    questionsContainer.appendChild(questionDiv);
+}
+</script>
+{% endblock %}
