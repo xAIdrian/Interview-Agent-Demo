@@ -3,6 +3,8 @@ from config import Config
 from database import get_db_connection
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
+import random
+import string
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -108,13 +110,17 @@ def admin_user_manager():
     conn.close()
     return render_template("admin/user_manager/user_manager.html", users=users)
 
+
 @app.route("/admin/user_manager/create", methods=["GET", "POST"])
 @admin_required
 def admin_create_user():
     if request.method == "POST":
         email = request.form.get("email")
-        password = request.form.get("password")
+        name = request.form.get("name")
         is_admin = request.form.get("is_admin") == "on"
+        
+        # Generate a random password
+        password = ''.join(random.choices(string.ascii_letters + string.digits, k=12))
         hashed_password = generate_password_hash(password, method='pbkdf2:sha256')
 
         conn = get_db_connection()
@@ -124,8 +130,8 @@ def admin_create_user():
         conn.commit()
         conn.close()
 
-        flash("User created successfully!", "success")
-        return redirect(url_for("user_manager"))
+        flash(f"User created successfully! The password is: {password}", "success")
+        return redirect(url_for("admin_user_manager"))
 
     return render_template("admin/user_manager/create_user.html")
 
