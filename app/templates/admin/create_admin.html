@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Create Admin User</h2>
+<form method="POST" action="{{ url_for('admin_create_admin') }}">
+    <label for="admin_name">Name:</label>
+    <input type="text" name="admin_name" id="admin_name" required>
+
+    <label for="admin_email">Email:</label>
+    <input type="email" name="admin_email" id="admin_email" required>
+
+    <button type="submit">Create Admin</button>
+</form>
+{% endblock %}

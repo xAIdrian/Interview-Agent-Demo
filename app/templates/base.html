@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>Gulpin: The AI Interview Platform for the Future of Hiring</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles/main.css') }}" />
+</head>
+<body>
+    <header>
+        <h1>Gulpin: The AI Interview Platform for the Future of Hiring</h1>
+    </header>
+    <nav>
+        <a href="{{ url_for('index') }}">Home</a>
+        <a href="{{ url_for('admin_create_candidate') }}">Create Candidate</a>
+        <a href="{{ url_for('admin_create_admin') }}">Create Admin</a>
+        <a href="{{ url_for('admin_campaigns') }}">View Campaigns</a>
+    </nav>
+    <div class="main-content">
+        <div class="left-section">
+            <!-- Left section content -->
+        </div>
+        <div class="center-section">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+              {% if messages %}
+                <ul class="flashes">
+                {% for category, message in messages %}
+                  <li class="{{ category }}">{{ message }}</li>
+                {% endfor %}
+                </ul>
+              {% endif %}
+            {% endwith %}
+            
+            {% block content %}{% endblock %}
+        </div>
+        <div class="right-section">
+            <!-- Right section content -->
+        </div>
+    </div>
+    <footer>
+        <p>© 2025 Gulpin</p>
+    </footer>
+</body>
+</html>
