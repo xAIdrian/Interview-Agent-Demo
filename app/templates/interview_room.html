@@ -76,7 +76,7 @@
       object-fit: cover;
     }
 
-    /* Overlay controls for Start/Stop buttons */
+    /* Overlay controls for Start/Stop/Next buttons */
     .overlayControls {
       position: absolute;
       top: 20px;
@@ -130,11 +130,7 @@
   /****************************************************
    * 1. QUESTIONS SETUP
    ****************************************************/
-  const questions = [
-    { id: 1, title: "Tell me about a project you're proud of." },
-    { id: 2, title: "Describe a situation where you had to lead a team." },
-    { id: 3, title: "Where do you see your career in five years?" }
-  ];
+  const questions = {{ questions | tojson }};
 
   let currentQuestionIndex = 0;
 
@@ -155,17 +151,21 @@
   let mediaRecorder = null;
   let recordedChunks = [];
 
+  // Generate a random submission_id when the page loads
+  const submissionId = {{ submission_id }};
+  console.log("Submission ID:", submissionId);
+
   /****************************************************
    * 2. LOAD FIRST QUESTION
    ****************************************************/
   function loadQuestion(index) {
     if (index < questions.length) {
-      questionBar.textContent = `Q${index + 1}: ${questions[index].title}`;
+      questionBar.textContent = `Q${index + 1}: ${questions[index].title} (question_id: ${questions[index].id} (submission_id: ${submissionId})`;
     } else {
       questionBar.textContent = "No more questions.";
     }
   }
-  loadQuestion(currentQuestionIndex);  // initial load
+  loadQuestion(currentQuestionIndex);
 
   /****************************************************
    * 3. RESIZE CANVAS TO MATCH PANEL
@@ -236,8 +236,9 @@
       mediaRecorder.onstop = async () => {
         // After stopping, we have a complete video in 'recordedChunks'
         const blob = new Blob(recordedChunks, { type: "video/webm" });
-        // Upload to S3
-        uploadToS3(blob, questions[currentQuestionIndex].id);
+        // Upload to /submit_answer
+        const questionId = questions[currentQuestionIndex].id;
+        await uploadAnswer(blob, submissionId, questionId);
       };
 
       mediaRecorder.start();
@@ -275,16 +276,18 @@
   }
 
   /****************************************************
-   * 7. UPLOAD THE BLOB TO S3 VIA BACKEND
+   * 7. UPLOAD THE BLOB TO /submit_answer
    ****************************************************/
-  async function uploadToS3(blob, questionId) {
+  async function uploadAnswer(blob, submissionId, questionId) {
     try {
       const formData = new FormData();
+      // Name the file with question ID for clarity
       formData.append("file", blob, `question_${questionId}.webm`);
+      formData.append("submission_id", submissionId);
       formData.append("question_id", questionId);
 
-      // POST to your backend endpoint that handles S3 upload
-      const response = await fetch("/upload", {
+      // POST to your backend endpoint that handles S3 upload + DB
+      const response = await fetch("/submit_answer", {
         method: "POST",
         body: formData
       });
@@ -296,9 +299,8 @@
 
       const result = await response.json();
       console.log("Upload success:", result);
-
-      // E.g., result might contain { s3_url: "...", transcript: "..." }
-      // You can handle transcript or other data here
+      // e.g. result might contain { "s3_url": "...", "transcript": "..." }
+      // you could display or store the transcript, if included
     } catch (err) {
       console.error("Error uploading video:", err);
     }
@@ -308,7 +310,6 @@
    * 8. NEXT QUESTION
    ****************************************************/
   function nextQuestion() {
-    // Advance index
     currentQuestionIndex++;
     if (currentQuestionIndex < questions.length) {
       loadQuestion(currentQuestionIndex);
