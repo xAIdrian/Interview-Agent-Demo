@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Interview Experience</title>
+  <style>
+    /* Basic Reset */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body, html {
+      width: 100%;
+      height: 100%;
+      font-family: sans-serif;
+      background: #f4f4f4;
+      overflow: hidden;
+    }
+
+    /* Top bar for the question */
+    header#questionBar {
+      width: 100%;
+      height: 60px;
+      background: #333;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      font-size: 1.2rem;
+      position: relative;
+      z-index: 2;
+    }
+
+    /* Main container for left/right panels */
+    main#container {
+      display: flex;
+      width: 100%;
+      height: calc(100% - 60px); /* subtract the height of the header */
+    }
+
+    /* Left panel for the voice visualizer */
+    section#leftPanel {
+      flex: 1;
+      background: #111;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+    }
+
+    /* Voice visualizer canvas */
+    #voiceVisualizer {
+      width: 100%;
+      height: 100%;
+      background: #111;
+      display: block;
+    }
+
+    /* Right panel for video */
+    section#rightPanel {
+      flex: 1;
+      background: #222;
+      position: relative;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    /* Candidate video element */
+    video#videoElement {
+      width: 80%;
+      max-height: 80%;
+      background: #000;
+      object-fit: cover;
+    }
+
+    /* Overlay controls for Start/Stop buttons */
+    .overlayControls {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .overlayControls button {
+      padding: 10px 20px;
+      font-size: 1rem;
+      border: none;
+      cursor: pointer;
+      color: #fff;
+      background: #3f51b5;
+      border-radius: 5px;
+      opacity: 0.9;
+      transition: opacity 0.2s ease;
+    }
+
+    .overlayControls button:hover {
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Top bar for the current question title -->
+<header id="questionBar"></header>
+
+<!-- Main container with left (voice visual) and right (video) -->
+<main id="container">
+  <!-- Left Panel: Voice Visualizer -->
+  <section id="leftPanel">
+    <canvas id="voiceVisualizer"></canvas>
+  </section>
+
+  <!-- Right Panel: Video feed + overlay controls -->
+  <section id="rightPanel">
+    <video id="videoElement" autoplay playsinline muted></video>
+    <div class="overlayControls">
+      <button id="startBtn">Start</button>
+      <button id="stopBtn">Stop</button>
+      <button id="nextQuestionBtn">Next</button>
+    </div>
+  </section>
+</main>
+
+<script>
+  /****************************************************
+   * 1. QUESTIONS SETUP
+   ****************************************************/
+  const questions = [
+    { id: 1, title: "Tell me about a project you're proud of." },
+    { id: 2, title: "Describe a situation where you had to lead a team." },
+    { id: 3, title: "Where do you see your career in five years?" }
+  ];
+
+  let currentQuestionIndex = 0;
+
+  // DOM References
+  const questionBar = document.getElementById('questionBar');
+  const startBtn = document.getElementById('startBtn');
+  const stopBtn = document.getElementById('stopBtn');
+  const nextQuestionBtn = document.getElementById('nextQuestionBtn');
+
+  const videoElement = document.getElementById('videoElement');
+  const voiceCanvas = document.getElementById('voiceVisualizer');
+  const leftPanel = document.getElementById('leftPanel');
+  const canvasCtx = voiceCanvas.getContext('2d');
+
+  // Media / Recording Variables
+  let audioContext, analyser, micSource;
+  let mediaStream = null;
+  let mediaRecorder = null;
+  let recordedChunks = [];
+
+  /****************************************************
+   * 2. LOAD FIRST QUESTION
+   ****************************************************/
+  function loadQuestion(index) {
+    if (index < questions.length) {
+      questionBar.textContent = `Q${index + 1}: ${questions[index].title}`;
+    } else {
+      questionBar.textContent = "No more questions.";
+    }
+  }
+  loadQuestion(currentQuestionIndex);  // initial load
+
+  /****************************************************
+   * 3. RESIZE CANVAS TO MATCH PANEL
+   ****************************************************/
+  function resizeCanvas() {
+    voiceCanvas.width = leftPanel.clientWidth;
+    voiceCanvas.height = leftPanel.clientHeight;
+  }
+  window.addEventListener('resize', resizeCanvas);
+  window.addEventListener('load', resizeCanvas);
+
+  /****************************************************
+   * 4. AUDIO VISUALIZATION
+   ****************************************************/
+  function drawVoiceCircle() {
+    if (!analyser) return;
+    requestAnimationFrame(drawVoiceCircle);
+
+    const dataArray = new Uint8Array(analyser.frequencyBinCount);
+    analyser.getByteTimeDomainData(dataArray);
+
+    let sum = 0;
+    for (let i = 0; i < dataArray.length; i++) {
+      const val = (dataArray[i] - 128) / 128;
+      sum += (val * val);
+    }
+    const amplitude = Math.sqrt(sum / dataArray.length);
+
+    canvasCtx.clearRect(0, 0, voiceCanvas.width, voiceCanvas.height);
+    const centerX = voiceCanvas.width / 2;
+    const centerY = voiceCanvas.height / 2;
+    const maxRadius = Math.min(centerX, centerY) - 20;
+    const radius = amplitude * maxRadius + 20;
+
+    canvasCtx.beginPath();
+    canvasCtx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+    canvasCtx.fillStyle = '#ff5722';
+    canvasCtx.fill();
+  }
+
+  /****************************************************
+   * 5. START INTERVIEW (MEDIA CAPTURE + RECORDING)
+   ****************************************************/
+  async function startInterview() {
+    try {
+      // Request audio + video from user
+      mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+      videoElement.srcObject = mediaStream;
+
+      // Audio visualization
+      audioContext = new AudioContext();
+      micSource = audioContext.createMediaStreamSource(mediaStream);
+      analyser = audioContext.createAnalyser();
+      analyser.fftSize = 256;
+      micSource.connect(analyser);
+      drawVoiceCircle();
+
+      // Prepare MediaRecorder to capture
+      mediaRecorder = new MediaRecorder(mediaStream, { mimeType: "video/webm; codecs=vp8" });
+      recordedChunks = [];
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          recordedChunks.push(e.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        // After stopping, we have a complete video in 'recordedChunks'
+        const blob = new Blob(recordedChunks, { type: "video/webm" });
+        // Upload to S3
+        uploadToS3(blob, questions[currentQuestionIndex].id);
+      };
+
+      mediaRecorder.start();
+      console.log("Recording started.");
+    } catch (err) {
+      console.error("Error starting media capture:", err);
+    }
+  }
+
+  /****************************************************
+   * 6. STOP INTERVIEW (STOP RECORDING)
+   ****************************************************/
+  function stopInterview() {
+    if (!mediaRecorder) return;
+
+    // Stop recording
+    mediaRecorder.stop();
+    console.log("Recording stopped.");
+
+    // Stop the stream
+    if (mediaStream) {
+      mediaStream.getTracks().forEach(track => track.stop());
+      mediaStream = null;
+    }
+
+    // Stop audio context
+    if (audioContext) {
+      audioContext.close();
+      audioContext = null;
+    }
+    analyser = null;
+
+    // Clear the video feed
+    videoElement.srcObject = null;
+  }
+
+  /****************************************************
+   * 7. UPLOAD THE BLOB TO S3 VIA BACKEND
+   ****************************************************/
+  async function uploadToS3(blob, questionId) {
+    try {
+      const formData = new FormData();
+      formData.append("file", blob, `question_${questionId}.webm`);
+      formData.append("question_id", questionId);
+
+      // POST to your backend endpoint that handles S3 upload
+      const response = await fetch("/upload", {
+        method: "POST",
+        body: formData
+      });
+
+      if (!response.ok) {
+        console.error("Upload failed:", response.statusText);
+        return;
+      }
+
+      const result = await response.json();
+      console.log("Upload success:", result);
+
+      // E.g., result might contain { s3_url: "...", transcript: "..." }
+      // You can handle transcript or other data here
+    } catch (err) {
+      console.error("Error uploading video:", err);
+    }
+  }
+
+  /****************************************************
+   * 8. NEXT QUESTION
+   ****************************************************/
+  function nextQuestion() {
+    // Advance index
+    currentQuestionIndex++;
+    if (currentQuestionIndex < questions.length) {
+      loadQuestion(currentQuestionIndex);
+    } else {
+      questionBar.textContent = "Interview Completed!";
+    }
+  }
+
+  /****************************************************
+   * 9. EVENT LISTENERS
+   ****************************************************/
+  startBtn.addEventListener('click', startInterview);
+  stopBtn.addEventListener('click', stopInterview);
+  nextQuestionBtn.addEventListener('click', nextQuestion);
+
+</script>
+</body>
+</html>

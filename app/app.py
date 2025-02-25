@@ -1,3 +1,11 @@
+import os
+import uuid
+import boto3
+import whisper
+import tempfile
+from flask import Flask, request, jsonify
+from botocore.exceptions import ClientError
+
 from flask import Flask, render_template, request, redirect, url_for, flash, session
 from config import Config
 from database import get_db_connection
@@ -293,26 +301,115 @@ def admin_campaign_scoring(campaign_id):
     conn.close()
     return render_template("admin/scoring.html", scoring_data=scoring_data, campaign_id=campaign_id)
 
-# Interview UI
-@app.route("/interview/<int:campaign_id>")
-@login_required
-def interview_page(campaign_id):
+@app.route("/")
+def index():
+    return render_template("index.html")
+
+
+# Mock: Example function to get campaign questions from DB
+def get_campaign_questions(campaign_id):
     conn = get_db_connection()
-    with conn.cursor() as cursor:
+    with conn.cursor(dictionary=True) as cursor:
         sql = """
-        SELECT q.id, q.question_text
-        FROM questions q
-        WHERE q.campaign_id = ?
+        SELECT id, title, body, scoring_prompt
+        FROM questions
+        WHERE campaign_id = ?
         """
         cursor.execute(sql, (campaign_id,))
         questions = cursor.fetchall()
     conn.close()
+    return questions
 
-    return render_template("interview/index.html", campaign_id=campaign_id, questions=questions)
+# Mock: Example function to generate LiveKit token
+def generate_livekit_token(campaign_id, candidate_id):
+    """
+    In real code, you'd use the LiveKit server SDK (or create your own JWT)
+    with your LiveKit API key and secret. For now, we return a placeholder.
+    """
+    return "PLACEHOLDER_LIVEKIT_TOKEN_FOR_DEMO"
 
-@app.route("/")
-def index():
-    return render_template("index.html")
+@app.route("/interview/<int:campaign_id>")
+def interview_room(campaign_id):
+    questions = get_campaign_questions(campaign_id)
+    
+    # This would typically come from session / login, but let's mock a candidate_id
+    candidate_id = random.randint(100, 999)
+    
+    # Generate or retrieve a LiveKit token for the candidate to join the room
+    livekit_token = generate_livekit_token(campaign_id, candidate_id)
+    
+    return render_template("interview_room.html",
+                           campaign_id=campaign_id,
+                           questions=questions,
+                           livekit_token=livekit_token,
+                           candidate_id=candidate_id)
+
+# Configure your S3 bucket name (already created)
+S3_BUCKET = "gulpin-interviews"
+
+# Initialize S3 client
+s3_client = boto3.client("s3")
+
+@app.route("/upload", methods=["POST"])
+def upload_interview():
+    """
+    Endpoint to receive interview audio/video from the client (e.g., MediaRecorder blob or LiveKit recording),
+    upload to S3, then transcribe its audio using Whisper.
+    """
+    if "file" not in request.files:
+        return jsonify({"error": "No file uploaded"}), 400
+
+    file = request.files["file"]
+    if file.filename == "":
+        return jsonify({"error": "Empty filename"}), 400
+
+    # Generate a unique filename for S3
+    extension = os.path.splitext(file.filename)[1].lower()
+    unique_id = str(uuid.uuid4())
+    s3_filename = f"interviews/{unique_id}{extension}"
+
+    # 1. Save file to a temporary location
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=extension) as tmp:
+            temp_file_path = tmp.name
+            file.save(temp_file_path)
+
+        # 2. Upload local temp file to S3
+        try:
+            s3_client.upload_file(temp_file_path, S3_BUCKET, s3_filename)
+            print(f"Uploaded to S3: {S3_BUCKET}/{s3_filename}")
+        except ClientError as e:
+            print(f"S3 upload failed: {e}")
+            return jsonify({"error": "S3 upload failed"}), 500
+
+        # 3. Run Whisper transcription on the local temp file
+        #    (Alternatively, you can re-download from S3 or pass the temp_file_path directly.)
+        try:
+            model = whisper.load_model("small")  # pick your desired model size
+            result = model.transcribe(temp_file_path, fp16=False)  # CPU-based
+            transcript_text = result["text"]
+            print("=== Whisper Transcript ===")
+            print(transcript_text)
+            print("=========================")
+        except Exception as e:
+            print(f"Whisper transcription error: {e}")
+            return jsonify({"error": "Transcription failed"}), 500
+
+        # 4. Clean up local temp file
+        if os.path.exists(temp_file_path):
+            os.remove(temp_file_path)
+
+        # 5. Return a success response (in reality, store transcript in DB, etc.)
+        return jsonify({
+            "message": "File uploaded and transcribed successfully!",
+            "s3_key": s3_filename,
+            "transcript": transcript_text
+        }), 200
+
+    except Exception as e:
+        print(f"Error handling file: {e}")
+        return jsonify({"error": "Internal server error"}), 500
+
 
 if __name__ == "__main__":
     app.run()
