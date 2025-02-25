@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Create New User</h1>
+<form method="POST">
+    <label for="email">Email:</label>
+    <input type="email" id="email" name="email" required>
+    <br>
+    <label for="password">Password:</label>
+    <input type="password" id="password" name="password" required>
+    <br>
+    <label for="is_admin">Admin:</label>
+    <input type="checkbox" id="is_admin" name="is_admin">
+    <br>
+    <button type="submit" class="primary">Create User</button>
+</form>
+{% endblock %}
