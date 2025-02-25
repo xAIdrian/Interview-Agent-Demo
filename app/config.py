@@ -1,14 +1,14 @@
 import os
 
 class Config:
-    SECRET_KEY = os.environ.get("SECRET_KEY", "change_this_in_production")
+    SECRET_KEY = os.environ.get("SECRET_KEY", "GulpinSecretKeyXOAISUD(*^@#&)")
     DEBUG = True
 
-    # Example: MariaDB connection info
+    # MariaDB connection info
     DB_HOST = os.environ.get("DB_HOST", "localhost")
     DB_USER = os.environ.get("DB_USER", "root")
-    DB_PASSWORD = os.environ.get("DB_PASSWORD", "")
-    DB_NAME = os.environ.get("DB_NAME", "interviews_db")
+    DB_PASSWORD = os.environ.get("DB_PASSWORD", "W2Mhouse/*")
+    DB_NAME = os.environ.get("DB_NAME", "gulpin")
     DB_PORT = int(os.environ.get("DB_PORT", 3306))
 
     # S3 Bucket for storing media or backups, if applicable

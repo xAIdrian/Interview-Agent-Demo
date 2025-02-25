@@ -11,9 +11,19 @@
     </header>
     <nav>
         <a href="{{ url_for('index') }}">Home</a>
-        <a href="{{ url_for('admin_create_candidate') }}">Create Candidate</a>
-        <a href="{{ url_for('admin_create_admin') }}">Create Admin</a>
-        <a href="{{ url_for('admin_campaigns') }}">View Campaigns</a>
+        {% if session.get('user_id') %}
+            {% if session.get('is_admin') %}
+                <a href="{{ url_for('admin_user_manager') }}">User Manager</a>
+                <a href="{{ url_for('admin_create_user') }}">Create User</a>
+                <a href="{{ url_for('admin_campaigns') }}">View Campaigns</a>
+            {% else %}
+                <a href="{{ url_for('interview_page', campaign_id=1) }}">Interview</a>
+            {% endif %}
+            <a href="{{ url_for('logout') }}">Logout</a>
+        {% else %}
+            <a href="{{ url_for('login') }}">Login</a>
+            <a href="{{ url_for('register') }}">Register</a>
+        {% endif %}
     </nav>
     <div class="main-content">
         <div class="left-section">
