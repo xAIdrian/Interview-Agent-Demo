@@ -68,7 +68,7 @@ def create_submissions_table():
                 id INT PRIMARY KEY AUTO_INCREMENT,
                 campaign_id INT NOT NULL,
                 user_id INT NOT NULL,
-                submission_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                creation_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (campaign_id) REFERENCES campaigns(id)
             )
         """)
@@ -154,24 +154,25 @@ def register():
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        email = request.form.get("email")
-        password = request.form.get("password")
-
+        email = request.form["email"]
+        password = request.form["password"]
+        
         conn = get_db_connection()
-        with conn.cursor() as cursor:
-            sql = "SELECT * FROM users WHERE email = ?"
+        with conn.cursor(dictionary=True) as cursor:
+            sql = "SELECT id, email, password FROM users WHERE email = ?"
             cursor.execute(sql, (email,))
             user = cursor.fetchone()
+        
         conn.close()
-
-        if user and check_password_hash(user[2], password):  # user[2] is the password field
-            session["user_id"] = user[0]  # user[0] is the id field
-            session["is_admin"] = user[3]  # user[3] is the is_admin field
+        
+        if user and check_password_hash(user["password"], password):
+            session["user_id"] = user["id"]
+            session["email"] = user["email"]
             flash("Login successful!", "success")
             return redirect(url_for("index"))
         else:
             flash("Invalid email or password", "danger")
-
+    
     return render_template("login.html")
 
 @app.route("/logout")
@@ -332,17 +333,33 @@ def generate_livekit_token(campaign_id, candidate_id):
 def interview_room(campaign_id):
     questions = get_campaign_questions(campaign_id)
     
-    # This would typically come from session / login, but let's mock a candidate_id
-    candidate_id = random.randint(100, 999)
+    # Get the real user_id from the session (assuming the user is logged in)
+    user_id = session.get('user_id')
+    if not user_id:
+        return redirect(url_for('login'))  # Redirect to login if not logged in
     
     # Generate or retrieve a LiveKit token for the candidate to join the room
-    livekit_token = generate_livekit_token(campaign_id, candidate_id)
+    livekit_token = generate_livekit_token(campaign_id, user_id)
+    
+    # Create a new submission in the database and get the submission_id
+    conn = get_db_connection()
+    with conn.cursor() as cursor:
+        sql = """
+        INSERT INTO submissions (campaign_id, user_id, creation_time)
+        VALUES (?, ?, NOW())
+        """
+        cursor.execute(sql, (campaign_id, user_id))
+        submission_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
     
     return render_template("interview_room.html",
                            campaign_id=campaign_id,
                            questions=questions,
                            livekit_token=livekit_token,
-                           candidate_id=candidate_id)
+                           user_id=user_id,
+                           submission_id=submission_id)
+
 
 # Configure your S3 bucket name (already created)
 S3_BUCKET = "gulpin-interviews"
@@ -350,7 +367,7 @@ S3_BUCKET = "gulpin-interviews"
 # Initialize S3 client
 s3_client = boto3.client("s3")
 
-@app.route("/upload", methods=["POST"])
+@app.route("/submit_answer", methods=["POST"])
 def upload_interview():
     """
     Endpoint to receive interview audio/video from the client (e.g., MediaRecorder blob or LiveKit recording),
@@ -362,6 +379,12 @@ def upload_interview():
     file = request.files["file"]
     if file.filename == "":
         return jsonify({"error": "Empty filename"}), 400
+
+    submission_id = request.form.get("submission_id")
+    question_id = request.form.get("question_id")
+
+    if not submission_id or not question_id:
+        return jsonify({"error": "submission_id and question_id are required"}), 400
 
     # Generate a unique filename for S3
     extension = os.path.splitext(file.filename)[1].lower()
@@ -387,7 +410,7 @@ def upload_interview():
         try:
             model = whisper.load_model("small")  # pick your desired model size
             result = model.transcribe(temp_file_path, fp16=False)  # CPU-based
-            transcript_text = result["text"]
+            transcript_text = result["text"].strip()
             print("=== Whisper Transcript ===")
             print(transcript_text)
             print("=========================")
@@ -395,11 +418,26 @@ def upload_interview():
             print(f"Whisper transcription error: {e}")
             return jsonify({"error": "Transcription failed"}), 500
 
-        # 4. Clean up local temp file
+        # 4. Insert the submission answer into the database
+        try:
+            conn = get_db_connection()
+            with conn.cursor() as cursor:
+                sql = """
+                INSERT INTO submission_answers (submission_id, question_id, answer, video_path, transcript)
+                VALUES (?, ?, ?, ?, ?)
+                """
+                cursor.execute(sql, (submission_id, question_id, "", s3_filename, transcript_text))
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            print(f"Database insertion error: {e}")
+            return jsonify({"error": "Database insertion failed"}), 500
+
+        # 5. Clean up local temp file
         if os.path.exists(temp_file_path):
             os.remove(temp_file_path)
 
-        # 5. Return a success response (in reality, store transcript in DB, etc.)
+        # 6. Return a success response
         return jsonify({
             "message": "File uploaded and transcribed successfully!",
             "s3_key": s3_filename,
@@ -409,7 +447,6 @@ def upload_interview():
     except Exception as e:
         print(f"Error handling file: {e}")
         return jsonify({"error": "Internal server error"}), 500
-
 
 if __name__ == "__main__":
     app.run()
