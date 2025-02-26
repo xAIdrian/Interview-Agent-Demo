@@ -124,6 +124,83 @@ def get_submission_answers():
         "transcript": answer[4]
     } for answer in submission_answers])
 
+# POST routes
+@api_bp.route('/users', methods=['POST'])
+@admin_required
+def create_user():
+    data = request.json
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO users (id, email, name, password_hash, is_admin)
+        VALUES (UUID_SHORT(), %s, %s, %s, %s)
+    """, (data['email'], data['name'], data['password_hash'], data['is_admin']))
+    conn.commit()
+    conn.close()
+    return jsonify({"message": "User created successfully"}), 201
+
+@api_bp.route('/campaigns', methods=['POST'])
+@admin_required
+def create_campaign():
+    data = request.json
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO campaigns (id, title, max_user_submissions, max_points, is_public)
+        VALUES (UUID_SHORT(), %s, %s, %s, %s)
+    """, (data['title'], data['max_user_submissions'], data['max_points'], data['is_public']))
+    campaign_id = cursor.lastrowid
+
+    for question in data['questions']:
+        cursor.execute("""
+            INSERT INTO questions (id, campaign_id, title, body, scoring_prompt, max_points)
+            VALUES (UUID_SHORT(), %s, %s, %s, %s, %s)
+        """, (campaign_id, question['title'], question['body'], question['scoring_prompt'], question['max_points']))
+
+    conn.commit()
+    conn.close()
+    return jsonify({"message": "Campaign and questions created successfully"}), 201
+
+@api_bp.route('/questions', methods=['POST'])
+@admin_required
+def create_question():
+    data = request.json
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO questions (id, campaign_id, title, body, scoring_prompt, max_points)
+        VALUES (UUID_SHORT(), %s, %s, %s, %s, %s)
+    """, (data['campaign_id'], data['title'], data['body'], data['scoring_prompt'], data['max_points']))
+    conn.commit()
+    conn.close()
+    return jsonify({"message": "Question created successfully"}), 201
+
+@api_bp.route('/submissions', methods=['POST'])
+def create_submission():
+    data = request.json
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO submissions (id, campaign_id, user_id, creation_time, completion_time, is_complete, total_points)
+        VALUES (UUID_SHORT(), %s, %s, %s, %s, %s, %s)
+    """, (data['campaign_id'], data['user_id'], data['creation_time'], data['completion_time'], data['is_complete'], data['total_points']))
+    conn.commit()
+    conn.close()
+    return jsonify({"message": "Submission created successfully"}), 201
+
+@api_bp.route('/submission_answers', methods=['POST'])
+def create_submission_answer():
+    data = request.json
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO submission_answers (id, submission_id, question_id, video_path, transcript)
+        VALUES (UUID_SHORT(), %s, %s, %s, %s)
+    """, (data['submission_id'], data['question_id'], data['video_path'], data['transcript']))
+    conn.commit()
+    conn.close()
+    return jsonify({"message": "Submission answer created successfully"}), 201
+
 # DELETE routes
 @api_bp.route('/users/<int:id>', methods=['DELETE'])
 @admin_required
