@@ -1,148 +1,40 @@
-import os
-import uuid
-import boto3
-import whisper
-import tempfile
-from flask import Flask, request, jsonify
 from botocore.exceptions import ClientError
-
-from flask import Flask, render_template, request, redirect, url_for, flash, session
 from config import Config
-from database import get_db_connection
-from werkzeug.security import generate_password_hash, check_password_hash
+from database import get_db_connection, create_tables
+from flask import Flask, render_template, request, redirect, url_for, flash, session
+from flask import Flask, request, jsonify
 from functools import wraps
+from werkzeug.security import generate_password_hash, check_password_hash
+import boto3
+import os
 import random
 import string
+import tempfile
+import uuid
+import whisper
+
+from api_routes import api_bp
 
 app = Flask(__name__)
 app.config.from_object(Config)
-
-def create_users_table():
-    conn = get_db_connection()
-    with conn.cursor() as cursor:
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS users (
-                id INT PRIMARY KEY AUTO_INCREMENT,
-                email VARCHAR(255) NOT NULL UNIQUE,
-                password VARCHAR(255) NOT NULL,
-                is_admin BOOLEAN NOT NULL DEFAULT FALSE
-            )
-        """)
-    conn.commit()
-    conn.close()
-
-def create_campaigns_table():
-    conn = get_db_connection()
-    with conn.cursor() as cursor:
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS campaigns (
-                id INT PRIMARY KEY AUTO_INCREMENT,
-                title VARCHAR(255) NOT NULL,
-                max_user_submissions INT NOT NULL DEFAULT 1
-            )
-        """)
-    conn.commit()
-    conn.close()
-
-def create_questions_table():
-    conn = get_db_connection()
-    with conn.cursor() as cursor:
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS questions (
-                id INT PRIMARY KEY AUTO_INCREMENT,
-                campaign_id INT NOT NULL,
-                title VARCHAR(255) NOT NULL,
-                body TEXT NOT NULL,
-                scoring_prompt TEXT NOT NULL,
-                FOREIGN KEY (campaign_id) REFERENCES campaigns(id)
-            )
-        """)
-    conn.commit()
-    conn.close()
-
-def create_submissions_table():
-    conn = get_db_connection()
-    with conn.cursor() as cursor:
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS submissions (
-                id INT PRIMARY KEY AUTO_INCREMENT,
-                campaign_id INT NOT NULL,
-                user_id INT NOT NULL,
-                creation_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (campaign_id) REFERENCES campaigns(id)
-            )
-        """)
-    conn.commit()
-    conn.close()
-
-def create_submission_answers_table():
-    conn = get_db_connection()
-    with conn.cursor() as cursor:
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS submission_answers (
-                id INT PRIMARY KEY AUTO_INCREMENT,
-                submission_id INT NOT NULL,
-                question_id INT NOT NULL,
-                answer TEXT NOT NULL,
-                FOREIGN KEY (submission_id) REFERENCES submissions(id),
-                FOREIGN KEY (question_id) REFERENCES questions(id)
-            )
-        """)
-    conn.commit()
-    conn.close()
-
-def create_candidates_table():
-    conn = get_db_connection()
-    with conn.cursor() as cursor:
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS candidates (
-                id INT PRIMARY KEY AUTO_INCREMENT,
-                name VARCHAR(255) NOT NULL,
-                email VARCHAR(255) NOT NULL UNIQUE
-            )
-        """)
-    conn.commit()
-    conn.close()
-
-def create_scoring_table():
-    conn = get_db_connection()
-    with conn.cursor() as cursor:
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS scoring (
-                id INT PRIMARY KEY AUTO_INCREMENT,
-                submission_id INT NOT NULL,
-                question_id INT NOT NULL,
-                score INT NOT NULL,
-                campaign_id INT NOT NULL,
-                FOREIGN KEY (submission_id) REFERENCES submissions(id),
-                FOREIGN KEY (question_id) REFERENCES questions(id),
-                FOREIGN KEY (campaign_id) REFERENCES campaigns(id)
-            )
-        """)
-    conn.commit()
-    conn.close()
+app.register_blueprint(api_bp, url_prefix='/api')
 
 @app.before_first_request
-def initialize():
-    create_users_table()
-    create_campaigns_table()
-    create_questions_table()
-    create_submissions_table()
-    create_submission_answers_table()
-    create_candidates_table()
-    create_scoring_table()  # Add this line to create the scoring table
+def create_tables_on_startup():
+    create_tables()
 
 @app.route("/register", methods=["GET", "POST"])
 def register():
     if request.method == "POST":
         email = request.form.get("email")
+        name = request.form.get("name") or ""
         password = request.form.get("password")
         hashed_password = generate_password_hash(password, method='pbkdf2:sha256')
 
         conn = get_db_connection()
         with conn.cursor() as cursor:
-            sql = "INSERT INTO users (email, password, is_admin) VALUES (?, ?, ?)"
-            cursor.execute(sql, (email, hashed_password, False))
+            sql = "INSERT INTO users (email, name, password_hash, is_admin) VALUES (?, ?, ?, ?)"
+            cursor.execute(sql, (email, name, hashed_password, False))
         conn.commit()
         conn.close()
 
@@ -159,15 +51,16 @@ def login():
         
         conn = get_db_connection()
         with conn.cursor(dictionary=True) as cursor:
-            sql = "SELECT id, email, password FROM users WHERE email = ?"
+            sql = "SELECT id, email, password_hash, is_admin FROM users WHERE email = ?"
             cursor.execute(sql, (email,))
             user = cursor.fetchone()
         
         conn.close()
         
-        if user and check_password_hash(user["password"], password):
+        if user and check_password_hash(user["password_hash"], password):
             session["user_id"] = user["id"]
             session["email"] = user["email"]
+            session["is_admin"] = user["is_admin"]
             flash("Login successful!", "success")
             return redirect(url_for("index"))
         else:
@@ -255,57 +148,124 @@ def admin_campaigns():
 @admin_required
 def admin_create_campaign():
     if request.method == "POST":
-        title = request.form.get("title")
-        max_user_submissions = request.form.get("max_user_submissions")
-        questions = request.form.getlist("questions")
+        data = request.get_json()
+        print("Data received:", data)
+        title = data.get("title")
+        is_public = data.get("is_public") == "on"
+        max_user_submissions = data.get("max_user_submissions")
+        questions = data.get("questions", [])
 
         conn = get_db_connection()
         with conn.cursor() as cursor:
             # Insert the new campaign
-            sql_campaign = "INSERT INTO campaigns (title, max_user_submissions) VALUES (?, ?)"
-            cursor.execute(sql_campaign, (title, max_user_submissions))
+            cursor.execute("INSERT INTO campaigns (title, max_user_submissions, max_points, is_public) VALUES (?, ?, ?, ?)", (title, max_user_submissions, 0, is_public))
             campaign_id = cursor.lastrowid
 
+            total_max_points = 0
+
             # Insert the questions for the campaign
-            for i, question in enumerate(questions):
-                question_title = request.form.get(f"questions[{i}][title]")
-                question_body = request.form.get(f"questions[{i}][body]")
-                scoring_prompt = request.form.get(f"questions[{i}][scoring_prompt]")
+            for question in questions:
+                question_title = question.get("title")
+                question_body = question.get("body")
+                scoring_prompt = question.get("scoring_prompt")
+                max_points = int(question.get("max_points"))
+                total_max_points += max_points
                 sql_question = """
-                    INSERT INTO questions (campaign_id, title, body, scoring_prompt)
-                    VALUES (?, ?, ?, ?)
+                    INSERT INTO questions (campaign_id, title, body, scoring_prompt, max_points)
+                    VALUES (%s, %s, %s, %s, %s)
                 """
-                cursor.execute(sql_question, (campaign_id, question_title, question_body, scoring_prompt))
+                cursor.execute(sql_question, (campaign_id, question_title, question_body, scoring_prompt, max_points))
+
+            # Update the campaign with the total max points
+            sql_update_campaign = "UPDATE campaigns SET max_points = %s WHERE id = %s"
+            cursor.execute(sql_update_campaign, (total_max_points, campaign_id))
 
         conn.commit()
         conn.close()
 
-        flash("Campaign created successfully!", "success")
-        return redirect(url_for("admin_campaigns"))
+        return jsonify({"success": True})
 
     return render_template("admin/campaigns/create_campaign.html")
 
-@app.route("/admin/campaigns/<int:campaign_id>/scoring")
+@app.route("/admin/campaigns/<int:campaign_id>")
 @admin_required
-def admin_campaign_scoring(campaign_id):
+def admin_campaign_details(campaign_id):
     conn = get_db_connection()
-    with conn.cursor() as cursor:
-        sql = """
-        SELECT c.name as candidate_name, s.score as candidate_score
-        FROM candidates c
-        JOIN submissions sub ON c.id = sub.candidate_id
-        JOIN scoring s ON sub.id = s.submission_id
-        WHERE sub.campaign_id = ?
-        """
-        cursor.execute(sql, (campaign_id,))
-        scoring_data = cursor.fetchall()
+    with conn.cursor(dictionary=True) as cursor:
+        # Get campaign details
+        cursor.execute("SELECT * FROM campaigns WHERE id = ?", (campaign_id,))
+        campaign = cursor.fetchone()
+        
+        # Get questions count
+        cursor.execute("SELECT COUNT(*) AS count FROM questions WHERE campaign_id = ?", (campaign_id,))
+        questions_count = cursor.fetchone()["count"]
+        
+        # Get submissions count
+        cursor.execute("SELECT COUNT(*) AS count FROM submissions WHERE campaign_id = ?", (campaign_id,))
+        submissions_count = cursor.fetchone()["count"]
+    
     conn.close()
-    return render_template("admin/scoring.html", scoring_data=scoring_data, campaign_id=campaign_id)
+    
+    return render_template("admin/campaign_details.html",
+                           campaign=campaign,
+                           questions_count=questions_count,
+                           submissions_count=submissions_count)
 
-@app.route("/")
-def index():
-    return render_template("index.html")
+@app.route("/admin/campaigns/<int:campaign_id>/submissions")
+@admin_required
+def admin_campaign_submissions(campaign_id):
+    conn = get_db_connection()
+    with conn.cursor(dictionary=True) as cursor:
+        # Get campaign name
+        cursor.execute("SELECT title FROM campaigns WHERE id = ?", (campaign_id,))
+        campaign_name = cursor.fetchone()["title"]
+        
+        # Get submissions with user email
+        cursor.execute("""
+        SELECT submissions.id, users.email, submissions.creation_time, submissions.completion_time, submissions.is_complete, submissions.total_points
+        FROM submissions
+        JOIN users ON submissions.user_id = users.id
+        WHERE submissions.campaign_id = ?
+        """, (campaign_id,))
+        submissions = cursor.fetchall()
+    
+    conn.close()
+    
+    return render_template("admin/campaign_submissions.html",
+                           campaign_id=campaign_id,
+                           campaign_name=campaign_name,
+                           submissions=submissions)
 
+@app.route("/admin/campaigns/<int:campaign_id>/submissions/<int:submission_id>")
+@admin_required
+def admin_submission_details(campaign_id, submission_id):
+    conn = get_db_connection()
+    with conn.cursor(dictionary=True) as cursor:
+        # Get submission details
+        cursor.execute("""
+        SELECT submissions.*, users.email, campaigns.title AS campaign_name
+        FROM submissions
+        JOIN users ON submissions.user_id = users.id
+        JOIN campaigns ON submissions.campaign_id = campaigns.id
+        WHERE submissions.id = ?
+        """, (submission_id,))
+        submission = cursor.fetchone()
+        
+        # Get submission answers
+        cursor.execute("""
+        SELECT submission_answers.*, questions.title AS question_title
+        FROM submission_answers
+        JOIN questions ON submission_answers.question_id = questions.id
+        WHERE submission_answers.submission_id = ?
+        """, (submission_id,))
+        submission_answers = cursor.fetchall()
+    
+    conn.close()
+    
+    return render_template("admin/submission_details.html",
+                           campaign_id=campaign_id,
+                           submission=submission,
+                           submission_answers=submission_answers)
 
 # Mock: Example function to get campaign questions from DB
 def get_campaign_questions(campaign_id):
@@ -345,21 +305,15 @@ def interview_room(campaign_id):
     conn = get_db_connection()
     with conn.cursor() as cursor:
         sql = """
-        INSERT INTO submissions (campaign_id, user_id, creation_time)
-        VALUES (?, ?, NOW())
+        INSERT INTO submissions (campaign_id, user_id, creation_time, total_points)
+        VALUES (%s, %s, NOW(), %s)
         """
-        cursor.execute(sql, (campaign_id, user_id))
+        cursor.execute(sql, (campaign_id, user_id, 0))  # Set total_points to 0 initially
         submission_id = cursor.lastrowid
     conn.commit()
     conn.close()
     
-    return render_template("interview_room.html",
-                           campaign_id=campaign_id,
-                           questions=questions,
-                           livekit_token=livekit_token,
-                           user_id=user_id,
-                           submission_id=submission_id)
-
+    return render_template("interview_room.html", questions=questions, livekit_token=livekit_token, submission_id=submission_id)
 
 # Configure your S3 bucket name (already created)
 S3_BUCKET = "gulpin-interviews"
@@ -447,6 +401,10 @@ def upload_interview():
     except Exception as e:
         print(f"Error handling file: {e}")
         return jsonify({"error": "Internal server error"}), 500
+
+@app.route("/")
+def index():
+    return render_template("index.html")
 
 if __name__ == "__main__":
     app.run()

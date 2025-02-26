@@ -10,7 +10,7 @@
     <ul>
     {% for campaign in campaigns %}
         <li>
-            <a href="{{ url_for('admin_campaign_scoring', campaign_id=campaign.id) }}">
+            <a href="{{ url_for('admin_campaign_details', campaign_id=campaign.id) }}">
                 {{ campaign.title }}
             </a>
         </li>

@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Submission Details</h1>
+<p>Submission ID: {{ submission.id }}</p>
+<p>Campaign: {{ submission.campaign_name }}</p>
+<p>User Email: {{ submission.email }}</p>
+<p>Creation Time: {{ submission.creation_time }}</p>
+<p>Completion Time: {{ submission.completion_time }}</p>
+<p>Is Complete: {{ submission.is_complete }}</p>
+<p>Total Points: {{ submission.total_points }}</p>
+
+<h2>Submission Answers</h2>
+<table id="submissionAnswersTable">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Question Title</th>
+            <th>Video Path</th>
+            <th>Transcript</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for answer in submission_answers %}
+        <tr>
+            <td>{{ answer.id }}</td>
+            <td>{{ answer.question_title }}</td>
+            <td>{{ answer.video_path }}</td>
+            <td>{{ answer.transcript }}</td>
+            <td><a href="{{ answer.video_path }}" target="_blank">View Video</a></td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+<script src="https://cdn.datatables.net/1.10.21/js/jquery.dataTables.min.js"></script>
+<script>
+    $(document).ready(function() {
+        $('#submissionAnswersTable').DataTable();
+    });
+</script>
+{% endblock %}

@@ -1,8 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
-<h2>Create New Campaign</h2>
-
-<form action="{{ url_for('admin_create_campaign') }}" method="post">
+<h3>Create New Campaign</h3>
+<form id="create-campaign-form">
     <div class="form-group">
         <label for="title">Campaign Title</label>
         <input type="text" class="form-control" id="title" name="title" required>
@@ -11,10 +10,14 @@
         <label for="max_user_submissions">Max User Submissions</label>
         <input type="number" class="form-control" id="max_user_submissions" name="max_user_submissions" value="1" required>
     </div>
+    <div class="form-group">
+        <label for="is_public">Publish Immediately</label>
+        <input type="checkbox" class="form-control" id="is_public" name="is_public">
+    </div>
     
     <h3>Questions</h3>
     <div id="questions-container">
-        <div class="question">
+        <div class="question form-section">
             <div class="form-group">
                 <label for="question_title_1">Question Title</label>
                 <input type="text" class="form-control" id="question_title_1" name="questions[0][title]" required>
@@ -27,12 +30,20 @@
                 <label for="scoring_prompt_1">Scoring Prompt</label>
                 <textarea class="form-control" id="scoring_prompt_1" name="questions[0][scoring_prompt]" required></textarea>
             </div>
+            <div class="form-group">
+                <label for="max_points_1">Max Points</label>
+                <input type="number" class="form-control" id="max_points_1" name="questions[0][max_points]" required>
+            </div>
         </div>
     </div>
-    <button type="button" class="secondary" onclick="addQuestion()">Add Another Question</button>
-    <button type="submit" class="primary">Create Campaign</button>
+    <button type="button" class="btn btn-secondary" onclick="addQuestion()">Add Another Question</button>
+    <button type="submit" class="btn btn-primary">Create Campaign</button>
 </form>
+</div>
 
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/select2/3.3.2/select2.js"></script>
+<script src="{{ url_for('static', filename='js/cloneData.js') }}"></script>
 <script>
 let questionCount = 1;
 
@@ -40,7 +51,7 @@ function addQuestion() {
     questionCount++;
     const questionsContainer = document.getElementById('questions-container');
     const questionDiv = document.createElement('div');
-    questionDiv.classList.add('question');
+    questionDiv.classList.add('question', 'form-section');
     questionDiv.innerHTML = `
         <div class="form-group">
             <label for="question_title_${questionCount}">Question Title</label>
@@ -54,8 +65,47 @@ function addQuestion() {
             <label for="scoring_prompt_${questionCount}">Scoring Prompt</label>
             <textarea class="form-control" id="scoring_prompt_${questionCount}" name="questions[${questionCount - 1}][scoring_prompt]" required></textarea>
         </div>
+        <div class="form-group">
+            <label for="max_points_${questionCount}">Max Points</label>
+            <input type="number" class="form-control" id="max_points_${questionCount}" name="questions[${questionCount - 1}][max_points]" required>
+        </div>
     `;
     questionsContainer.appendChild(questionDiv);
 }
+
+document.getElementById('create-campaign-form').addEventListener('submit', function(event) {
+    event.preventDefault();
+    const formData = new FormData(event.target);
+    const data = {};
+    formData.forEach((value, key) => {
+        if (key.includes('questions')) {
+            const [_, index, field] = key.match(/questions\[(\d+)\]\[(\w+)\]/);
+            if (!data.questions) data.questions = [];
+            if (!data.questions[index]) data.questions[index] = {};
+            data.questions[index][field] = value;
+        } else {
+            data[key] = value;
+        }
+    });
+
+    fetch('{{ url_for("admin_create_campaign") }}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            window.location.href = '{{ url_for("admin_campaigns") }}';
+        } else {
+            alert('Error creating campaign: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+    });
+});
 </script>
 {% endblock %}
