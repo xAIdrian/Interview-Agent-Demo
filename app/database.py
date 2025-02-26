@@ -28,7 +28,7 @@ def create_users_table():
     with conn.cursor() as cursor:
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS users (
-                id INT PRIMARY KEY AUTO_INCREMENT,
+                id BIGINT UNSIGNED PRIMARY KEY,
                 email VARCHAR(255) NOT NULL UNIQUE,
                 name VARCHAR(255) NOT NULL,
                 password_hash VARCHAR(255) NOT NULL,
@@ -43,7 +43,7 @@ def create_campaigns_table():
     with conn.cursor() as cursor:
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS campaigns (
-                id INT PRIMARY KEY AUTO_INCREMENT,
+                id BIGINT UNSIGNED PRIMARY KEY,
                 title VARCHAR(255) NOT NULL,
                 max_user_submissions INT NOT NULL DEFAULT 1,
                 max_points INT NOT NULL,
@@ -58,8 +58,8 @@ def create_questions_table():
     with conn.cursor() as cursor:
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS questions (
-                id INT PRIMARY KEY AUTO_INCREMENT,
-                campaign_id INT NOT NULL,
+                id BIGINT UNSIGNED PRIMARY KEY,
+                campaign_id BIGINT UNSIGNED NOT NULL,
                 title VARCHAR(255) NOT NULL,
                 body TEXT NOT NULL,
                 scoring_prompt TEXT NOT NULL,
@@ -74,9 +74,9 @@ def create_submissions_table():
     with conn.cursor() as cursor:
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS submissions (
-                id INT PRIMARY KEY AUTO_INCREMENT,
-                campaign_id INT NOT NULL,
-                user_id INT NOT NULL,
+                id BIGINT UNSIGNED PRIMARY KEY,
+                campaign_id BIGINT UNSIGNED NOT NULL,
+                user_id BIGINT UNSIGNED NOT NULL,
                 creation_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 completion_time TIMESTAMP DEFAULT NULL,
                 is_complete BOOLEAN NOT NULL DEFAULT FALSE,
@@ -93,9 +93,9 @@ def create_submission_answers_table():
     with conn.cursor() as cursor:
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS submission_answers (
-                id INT PRIMARY KEY AUTO_INCREMENT,
-                submission_id INT NOT NULL,
-                question_id INT NOT NULL,
+                id BIGINT UNSIGNED PRIMARY KEY,
+                submission_id BIGINT UNSIGNED NOT NULL,
+                question_id BIGINT UNSIGNED NOT NULL,
                 video_path VARCHAR(255) NOT NULL,
                 transcript TEXT NOT NULL,
                 FOREIGN KEY (submission_id) REFERENCES submissions(id),

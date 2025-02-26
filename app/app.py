@@ -33,7 +33,7 @@ def register():
 
         conn = get_db_connection()
         with conn.cursor() as cursor:
-            sql = "INSERT INTO users (email, name, password_hash, is_admin) VALUES (?, ?, ?, ?)"
+            sql = "INSERT INTO users (id, email, name, password_hash, is_admin) VALUES (UUID_SHORT(), ?, ?, ?, ?)"
             cursor.execute(sql, (email, name, hashed_password, False))
         conn.commit()
         conn.close()
@@ -124,7 +124,7 @@ def admin_create_user():
 
         conn = get_db_connection()
         with conn.cursor() as cursor:
-            sql = "INSERT INTO users (email, password, is_admin) VALUES (?, ?, ?)"
+            sql = "INSERT INTO users (id, email, password, is_admin) VALUES (UUID_SHORT(), ?, ?, ?)"
             cursor.execute(sql, (email, hashed_password, is_admin))
         conn.commit()
         conn.close()
@@ -158,7 +158,7 @@ def admin_create_campaign():
         conn = get_db_connection()
         with conn.cursor() as cursor:
             # Insert the new campaign
-            cursor.execute("INSERT INTO campaigns (title, max_user_submissions, max_points, is_public) VALUES (?, ?, ?, ?)", (title, max_user_submissions, 0, is_public))
+            cursor.execute("INSERT INTO campaigns (id, title, max_user_submissions, max_points, is_public) VALUES (UUID_SHORT(), ?, ?, ?, ?)", (title, max_user_submissions, 0, is_public))
             campaign_id = cursor.lastrowid
 
             total_max_points = 0
@@ -171,13 +171,13 @@ def admin_create_campaign():
                 max_points = int(question.get("max_points"))
                 total_max_points += max_points
                 sql_question = """
-                    INSERT INTO questions (campaign_id, title, body, scoring_prompt, max_points)
-                    VALUES (%s, %s, %s, %s, %s)
+                    INSERT INTO questions (id, campaign_id, title, body, scoring_prompt, max_points)
+                    VALUES (UUID_SHORT(), ?, ?, ?, ?, ?)
                 """
                 cursor.execute(sql_question, (campaign_id, question_title, question_body, scoring_prompt, max_points))
 
             # Update the campaign with the total max points
-            sql_update_campaign = "UPDATE campaigns SET max_points = %s WHERE id = %s"
+            sql_update_campaign = "UPDATE campaigns SET max_points = ? WHERE id = ?"
             cursor.execute(sql_update_campaign, (total_max_points, campaign_id))
 
         conn.commit()
@@ -305,8 +305,8 @@ def interview_room(campaign_id):
     conn = get_db_connection()
     with conn.cursor() as cursor:
         sql = """
-        INSERT INTO submissions (campaign_id, user_id, creation_time, total_points)
-        VALUES (%s, %s, NOW(), %s)
+        INSERT INTO submissions (id, campaign_id, user_id, creation_time, total_points)
+        VALUES (UUID_SHORT(), ?, ?, NOW(), ?)
         """
         cursor.execute(sql, (campaign_id, user_id, 0))  # Set total_points to 0 initially
         submission_id = cursor.lastrowid
@@ -377,8 +377,8 @@ def upload_interview():
             conn = get_db_connection()
             with conn.cursor() as cursor:
                 sql = """
-                INSERT INTO submission_answers (submission_id, question_id, answer, video_path, transcript)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO submission_answers (id, submission_id, question_id, answer, video_path, transcript)
+                VALUES (UUID_SHORT(), ?, ?, ?, ?, ?)
                 """
                 cursor.execute(sql, (submission_id, question_id, "", s3_filename, transcript_text))
             conn.commit()
