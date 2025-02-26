@@ -1,36 +1,40 @@
-# candidates
+# campaigns
 
+id (PK)
+title
+max_user_submissions
+max_points
+is_public (bool) default: false
+
+# questions
+id (pk)
+campaign_id (fk)
+title
+body
+scoring_prompt
+max_points
+
+# submissions
+
+id (PK)
+campaign_id (fk)
+user_id (fk)
+creation_time (default current timestamp)
+completion_time (defaul null)
+is_complete (bool)
+total_points
+
+# submission_answers
+id (pk)
+submission_id (fk)
+question_id (fk)
+video_path
+transcript
+
+
+# users
 id (PK)
 email
-password_hash (if you store credentials)
 name
-created_at
-
-# interviews
-
-id (PK)
-candidate_id (FK to candidates)
-status (e.g., “scheduled”, “in-progress”, “completed”)
-video_url (S3 link)
-created_at
-
-# transcripts
-
-id (PK)
-interview_id (FK to interviews)
-transcript_text (TEXT)
-
-# scores
-
-id (PK)
-candidate_id (FK to candidates)
-interview_id (FK to interviews)
-score_value (numeric)
-strengths_weaknesses (TEXT or JSON for storing feedback)
-
-# campaigns (if separate from interviews)
-
-id (PK)
-name
-description
-created_at
+password_hash
+is_admin (bool)

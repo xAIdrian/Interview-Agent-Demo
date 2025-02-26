@@ -119,3 +119,10 @@ footer {
     padding: 20px;
     margin-top: 20px;
 }
+
+.form-section {
+    border: 1px solid #eee;
+    padding: 20px 0;
+    border-left: none;
+    border-right: none;
+}

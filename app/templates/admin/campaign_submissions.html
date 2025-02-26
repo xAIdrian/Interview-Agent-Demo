@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Submissions for Campaign: {{ campaign_name }}</h1>
+<table id="submissionsTable">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>User Email</th>
+            <th>Creation Time</th>
+            <th>Completion Time</th>
+            <th>Is Complete</th>
+            <th>Total Points</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for submission in submissions %}
+        <tr>
+            <td>{{ submission.id }}</td>
+            <td>{{ submission.email }}</td>
+            <td>{{ submission.creation_time }}</td>
+            <td>{{ submission.completion_time }}</td>
+            <td>{{ submission.is_complete }}</td>
+            <td>{{ submission.total_points }}</td>
+            <td><a href="{{ url_for('admin_submission_details', campaign_id=campaign_id, submission_id=submission.id) }}">View</a></td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+<script src="https://cdn.datatables.net/1.10.21/js/jquery.dataTables.min.js"></script>
+<script>
+    $(document).ready(function() {
+        $('#submissionsTable').DataTable();
+    });
+</script>
+{% endblock %}
