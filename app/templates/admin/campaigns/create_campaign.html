@@ -76,19 +76,24 @@ function addQuestion() {
 document.getElementById('create-campaign-form').addEventListener('submit', function(event) {
     event.preventDefault();
     const formData = new FormData(event.target);
-    const data = {};
-    formData.forEach((value, key) => {
-        if (key.includes('questions')) {
-            const [_, index, field] = key.match(/questions\[(\d+)\]\[(\w+)\]/);
-            if (!data.questions) data.questions = [];
-            if (!data.questions[index]) data.questions[index] = {};
-            data.questions[index][field] = value;
-        } else {
-            data[key] = value;
-        }
-    });
+    
+    const data = {
+        title: formData.get('title'),
+        max_user_submissions: Number(formData.get('max_user_submissions')),
+        is_public: formData.get('is_public') === 'on',
+        questions: []
+    };
 
-    fetch('{{ url_for("admin_create_campaign") }}', {
+    for (let i = 0; i < questionCount; i++) {
+        data.questions.push({
+            title: formData.get(`questions[${i}][title]`),
+            body: formData.get(`questions[${i}][body]`),
+            scoring_prompt: formData.get(`questions[${i}][scoring_prompt]`),
+            max_points: Number(formData.get(`questions[${i}][max_points]`))
+        });
+    }
+
+    fetch('/api/campaigns', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
@@ -97,8 +102,8 @@ document.getElementById('create-campaign-form').addEventListener('submit', funct
     })
     .then(response => response.json())
     .then(data => {
-        if (data.success) {
-            window.location.href = '{{ url_for("admin_campaigns") }}';
+        if (data.message) {
+            window.location.href = '/admin/campaigns';
         } else {
             alert('Error creating campaign: ' + data.error);
         }

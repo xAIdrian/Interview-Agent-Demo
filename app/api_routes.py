@@ -1,7 +1,8 @@
+from database import get_db_connection, build_filter_query
 from flask import Blueprint, request, jsonify, session, redirect, url_for, render_template
 from functools import wraps
 import boto3
-from database import get_db_connection, build_filter_query
+import uuid
 
 # Create a Blueprint for the API routes
 api_bp = Blueprint('api', __name__)
@@ -145,11 +146,14 @@ def create_campaign():
     data = request.json
     conn = get_db_connection()
     cursor = conn.cursor()
+    
+    total_max_points = sum(question['max_points'] for question in data['questions'])
+    campaign_id = uuid.uuid4().int >> 64
+    
     cursor.execute("""
         INSERT INTO campaigns (id, title, max_user_submissions, max_points, is_public)
-        VALUES (UUID_SHORT(), %s, %s, %s, %s)
-    """, (data['title'], data['max_user_submissions'], data['max_points'], data['is_public']))
-    campaign_id = cursor.lastrowid
+        VALUES (%s, %s, %s, %s, %s)
+    """, (campaign_id, data['title'], data['max_user_submissions'], total_max_points, data['is_public']))
 
     for question in data['questions']:
         cursor.execute("""

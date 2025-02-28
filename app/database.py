@@ -63,6 +63,7 @@ def create_questions_table():
                 title VARCHAR(255) NOT NULL,
                 body TEXT NOT NULL,
                 scoring_prompt TEXT NOT NULL,
+                max_points INT NOT NULL,
                 FOREIGN KEY (campaign_id) REFERENCES campaigns(id)
             )
         """)
