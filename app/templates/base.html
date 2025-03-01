@@ -16,8 +16,6 @@
                 <a href="{{ url_for('admin_users') }}" class="hover:bg-blue-700 p-2 rounded">User Manager</a>
                 <a href="{{ url_for('admin_create_user') }}" class="hover:bg-blue-700 p-2 rounded">Create User</a>
                 <a href="{{ url_for('admin_campaigns') }}" class="hover:bg-blue-700 p-2 rounded">View Campaigns</a>
-            {% else %}
-                <a href="{{ url_for('interview_room', campaign_id=1) }}" class="hover:bg-blue-700 p-2 rounded">Interview</a>
             {% endif %}
             <a href="{{ url_for('logout') }}" class="hover:bg-blue-700 p-2 rounded">Logout</a>
         {% else %}

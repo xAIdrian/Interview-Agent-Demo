@@ -391,7 +391,10 @@ def upload_interview():
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    if session.get("is_admin"):
+        return redirect(url_for("admin_index"))
+    else:
+        return render_template("candidate_index.html")
 
 if __name__ == "__main__":
     app.run()
