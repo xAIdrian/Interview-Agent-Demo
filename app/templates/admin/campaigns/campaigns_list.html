@@ -1,12 +1,10 @@
 {% extends "base.html" %}
 {% block content %}
-<h2>Campaigns</h2>
+<h2 class="text-2xl font-bold mb-4">Campaigns</h2>
 
-<div id="campaigns-table"></div>
+<div id="campaigns-table" class="mb-4"></div>
 
-<a href="{{ url_for('admin_create_campaign') }}">
-    <button class="primary">Create New Campaign</button>
-</a>
+<a href="{{ url_for('admin_create_campaign') }}" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700">Create New Campaign</a>
 
 <script src="https://unpkg.com/tabulator-tables@5.0.7/dist/js/tabulator.min.js"></script>
 <link href="https://unpkg.com/tabulator-tables@5.0.7/dist/css/tabulator.min.css" rel="stylesheet">

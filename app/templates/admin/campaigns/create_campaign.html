@@ -1,45 +1,44 @@
 {% extends "base.html" %}
 {% block content %}
-<h3>Create New Campaign</h3>
-<form id="create-campaign-form">
+<h3 class="text-2xl font-bold mb-4">Create New Campaign</h3>
+<form id="create-campaign-form" class="space-y-4">
     <div class="form-group">
-        <label for="title">Campaign Title</label>
-        <input type="text" class="form-control" id="title" name="title" required>
+        <label for="title" class="block text-sm font-medium text-gray-700">Campaign Title</label>
+        <input type="text" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" id="title" name="title" required>
     </div>
     <div class="form-group">
-        <label for="max_user_submissions">Max User Submissions</label>
-        <input type="number" class="form-control" id="max_user_submissions" name="max_user_submissions" value="1" required>
+        <label for="max_user_submissions" class="block text-sm font-medium text-gray-700">Max User Submissions</label>
+        <input type="number" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" id="max_user_submissions" name="max_user_submissions" value="1" required>
     </div>
     <div class="form-group">
-        <label for="is_public">Publish Immediately</label>
-        <input type="checkbox" class="form-control" id="is_public" name="is_public">
+        <label for="is_public" class="block text-sm font-medium text-gray-700">Publish Immediately</label>
+        <input type="checkbox" class="mt-1" id="is_public" name="is_public">
     </div>
     
-    <h3>Questions</h3>
-    <div id="questions-container">
+    <h3 class="text-xl font-bold mb-4">Questions</h3>
+    <div id="questions-container" class="space-y-4">
         <div class="question form-section">
             <div class="form-group">
-                <label for="question_title_1">Question Title</label>
-                <input type="text" class="form-control" id="question_title_1" name="questions[0][title]" required>
+                <label for="question_title_1" class="block text-sm font-medium text-gray-700">Question Title</label>
+                <input type="text" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" id="question_title_1" name="questions[0][title]" required>
             </div>
             <div class="form-group">
-                <label for="question_body_1">Question Body</label>
-                <textarea class="form-control" id="question_body_1" name="questions[0][body]" required></textarea>
+                <label for="question_body_1" class="block text-sm font-medium text-gray-700">Question Body</label>
+                <textarea class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" id="question_body_1" name="questions[0][body]" required></textarea>
             </div>
             <div class="form-group">
-                <label for="scoring_prompt_1">Scoring Prompt</label>
-                <textarea class="form-control" id="scoring_prompt_1" name="questions[0][scoring_prompt]" required></textarea>
+                <label for="scoring_prompt_1" class="block text-sm font-medium text-gray-700">Scoring Prompt</label>
+                <textarea class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" id="scoring_prompt_1" name="questions[0][scoring_prompt]" required></textarea>
             </div>
             <div class="form-group">
-                <label for="max_points_1">Max Points</label>
-                <input type="number" class="form-control" id="max_points_1" name="questions[0][max_points]" required>
+                <label for="max_points_1" class="block text-sm font-medium text-gray-700">Max Points</label>
+                <input type="number" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" id="max_points_1" name="questions[0][max_points]" required>
             </div>
         </div>
     </div>
-    <button type="button" class="btn btn-secondary" onclick="addQuestion()">Add Another Question</button>
-    <button type="submit" class="btn btn-primary">Create Campaign</button>
+    <button type="button" class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-700" onclick="addQuestion()">Add Another Question</button>
+    <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700">Create Campaign</button>
 </form>
-</div>
 
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/3.3.2/select2.js"></script>
@@ -54,20 +53,20 @@ function addQuestion() {
     questionDiv.classList.add('question', 'form-section');
     questionDiv.innerHTML = `
         <div class="form-group">
-            <label for="question_title_${questionCount}">Question Title</label>
-            <input type="text" class="form-control" id="question_title_${questionCount}" name="questions[${questionCount - 1}][title]" required>
+            <label for="question_title_${questionCount}" class="block text-sm font-medium text-gray-700">Question Title</label>
+            <input type="text" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" id="question_title_${questionCount}" name="questions[${questionCount - 1}][title]" required>
         </div>
         <div class="form-group">
-            <label for="question_body_${questionCount}">Question Body</label>
-            <textarea class="form-control" id="question_body_${questionCount}" name="questions[${questionCount - 1}][body]" required></textarea>
+            <label for="question_body_${questionCount}" class="block text-sm font-medium text-gray-700">Question Body</label>
+            <textarea class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" id="question_body_${questionCount}" name="questions[${questionCount - 1}][body]" required></textarea>
         </div>
         <div class="form-group">
-            <label for="scoring_prompt_${questionCount}">Scoring Prompt</label>
-            <textarea class="form-control" id="scoring_prompt_${questionCount}" name="questions[${questionCount - 1}][scoring_prompt]" required></textarea>
+            <label for="scoring_prompt_${questionCount}" class="block text-sm font-medium text-gray-700">Scoring Prompt</label>
+            <textarea class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" id="scoring_prompt_${questionCount}" name="questions[${questionCount - 1}][scoring_prompt]" required></textarea>
         </div>
         <div class="form-group">
-            <label for="max_points_${questionCount}">Max Points</label>
-            <input type="number" class="form-control" id="max_points_${questionCount}" name="questions[${questionCount - 1}][max_points]" required>
+            <label for="max_points_${questionCount}" class="block text-sm font-medium text-gray-700">Max Points</label>
+            <input type="number" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" id="max_points_${questionCount}" name="questions[${questionCount - 1}][max_points]" required>
         </div>
     `;
     questionsContainer.appendChild(questionDiv);
