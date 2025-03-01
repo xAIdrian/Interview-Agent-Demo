@@ -1,13 +1,20 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h1>Submissions for Campaign: {{ campaign_name }}</h1>
+<h1>Campaign: {{ campaign.title }}</h1>
+<p>Max User Submissions: {{ campaign.max_user_submissions }}</p>
+<p>Max Points: {{ campaign.max_points }}</p>
+
+<h2>Questions: {{ questions_count }}</h2>
+
+<h2>Submissions: {{ submissions_count }}</h2>
 <div id="submissions-table"></div>
 <script src="https://unpkg.com/tabulator-tables@5.0.7/dist/js/tabulator.min.js"></script>
 <link href="https://unpkg.com/tabulator-tables@5.0.7/dist/css/tabulator.min.css" rel="stylesheet">
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        var campaignId = {{ campaign_id }};
+        var campaignId = "{{ campaign.id }}";
+        console.log(campaignId);
         var table = new Tabulator("#submissions-table", {
             ajaxURL: "/api/submissions",
             ajaxParams: { campaign_id: campaignId },
@@ -17,12 +24,14 @@
                 { title: "User Email", field: "email" },
                 { title: "Creation Time", field: "creation_time", editor: "input" },
                 { title: "Completion Time", field: "completion_time", editor: "input" },
-                { title: "Is Complete", field: "is_complete", editor: "tickCross" },
+                { title: "Is Complete", field: "is_complete", formatter: function(cell) {
+                    return cell.getValue() ? "Yes" : "No";
+                }, editor: "tickCross" },
                 { title: "Total Points", field: "total_points", editor: "input" },
                 { title: "Actions", formatter: "link", formatterParams: {
                     label: "View",
                     url: function(cell) {
-                        return "{{ url_for('admin_submission_details', campaign_id=campaign_id, submission_id=0) }}".replace('0', cell.getRow().getData().id);
+                        return "/admin/campaigns/" + campaignId + "/submissions/" + cell.getRow().getData().id;
                     }
                 }}
             ],
