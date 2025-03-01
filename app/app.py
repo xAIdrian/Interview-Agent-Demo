@@ -1,8 +1,7 @@
 from botocore.exceptions import ClientError
 from config import Config
 from database import get_db_connection, create_tables
-from flask import Flask, render_template, request, redirect, url_for, flash, session
-from flask import Flask, request, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
 import boto3
@@ -12,6 +11,7 @@ import string
 import tempfile
 import uuid
 import whisper
+import mariadb
 
 from api_routes import api_bp
 
@@ -279,12 +279,24 @@ def interview_room(campaign_id):
     # Create a new submission in the database and get the submission_id
     conn = get_db_connection()
     with conn.cursor() as cursor:
+        # Check if campaign_id exists
+        cursor.execute("SELECT id FROM campaigns WHERE id = ?", (campaign_id,))
+        campaign = cursor.fetchone()
+        if not campaign:
+            return jsonify({"error": "Invalid campaign_id"}), 400
+
+        submission_id = uuid.uuid4().int >> 64
+
         sql = """
         INSERT INTO submissions (id, campaign_id, user_id, creation_time, total_points)
-        VALUES (UUID_SHORT(), ?, ?, NOW(), ?)
+        VALUES (?, ?, ?, NOW(), ?)
         """
-        cursor.execute(sql, (campaign_id, user_id, 0))  # Set total_points to 0 initially
-        submission_id = cursor.lastrowid
+        try:
+            cursor.execute(sql, (submission_id, campaign_id, user_id, 0))  # Set total_points to 0 initially
+            
+        except mariadb.IntegrityError as e:
+            return jsonify({"error": str(e)}), 400
+
     conn.commit()
     conn.close()
     
