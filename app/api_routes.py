@@ -31,12 +31,31 @@ def get_users():
     users = cursor.fetchall()
     conn.close()
     return jsonify([{
-        "id": user[0],
+        "id": str(user[0]),
         "email": user[1],
         "name": user[2],
         "password_hash": user[3],
         "is_admin": user[4]
     } for user in users])
+
+@api_bp.route('/users/<int:id>', methods=['GET'])
+@admin_required
+def get_user(id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM users WHERE id = %s", (id,))
+    user = cursor.fetchone()
+    conn.close()
+    if user:
+        return jsonify({
+            "id": str(user[0]),
+            "email": user[1],
+            "name": user[2],
+            "password_hash": user[3],
+            "is_admin": user[4]
+        })
+    else:
+        return jsonify({"error": "User not found"}), 404
 
 @api_bp.route('/campaigns', methods=['GET'])
 @admin_required
@@ -47,7 +66,7 @@ def get_campaigns():
     campaigns = cursor.fetchall()
     conn.close()
     return jsonify([{
-        "id": campaign[0],
+        "id": str(campaign[0]),
         "title": campaign[1],
         "max_user_submissions": campaign[2],
         "max_points": campaign[3],
@@ -66,7 +85,7 @@ def get_campaign(id):
     conn.close()
     if campaign:
         return jsonify({
-            "id": campaign[0],
+            "id": str(campaign[0]),
             "title": campaign[1],
             "max_user_submissions": campaign[2],
             "max_points": campaign[3],
@@ -84,8 +103,8 @@ def get_questions():
     questions = cursor.fetchall()
     conn.close()
     return jsonify([{
-        "id": question[0],
-        "campaign_id": question[1],
+        "id": str(question[0]),
+        "campaign_id": str(question[1]),
         "title": question[2],
         "body": question[3],
         "scoring_prompt": question[4]
@@ -96,17 +115,23 @@ def get_questions():
 def get_submissions():
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM submissions")
+    cursor.execute("""
+        SELECT submissions.id, submissions.campaign_id, submissions.user_id, submissions.creation_time, 
+               submissions.completion_time, submissions.is_complete, submissions.total_points, users.email
+        FROM submissions
+        JOIN users ON submissions.user_id = users.id
+    """)
     submissions = cursor.fetchall()
     conn.close()
     return jsonify([{
-        "id": submission[0],
-        "campaign_id": submission[1],
-        "user_id": submission[2],
+        "id": str(submission[0]),
+        "campaign_id": str(submission[1]),
+        "user_id": str(submission[2]),
         "creation_time": submission[3],
         "completion_time": submission[4],
         "is_complete": submission[5],
-        "total_points": submission[6]
+        "total_points": submission[6],
+        "email": submission[7]
     } for submission in submissions])
 
 @api_bp.route('/submission_answers', methods=['GET'])
@@ -118,9 +143,9 @@ def get_submission_answers():
     submission_answers = cursor.fetchall()
     conn.close()
     return jsonify([{
-        "id": answer[0],
-        "submission_id": answer[1],
-        "question_id": answer[2],
+        "id": str(answer[0]),
+        "submission_id": str(answer[1]),
+        "question_id": str(answer[2]),
         "video_path": answer[3],
         "transcript": answer[4]
     } for answer in submission_answers])

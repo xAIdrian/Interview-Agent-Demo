@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>User Manager</h1>
+<div id="users-table"></div>
+<script src="https://unpkg.com/tabulator-tables@5.0.7/dist/js/tabulator.min.js"></script>
+<link href="https://unpkg.com/tabulator-tables@5.0.7/dist/css/tabulator.min.css" rel="stylesheet">
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var table = new Tabulator("#users-table", {
+            ajaxURL: "/api/users",
+            layout: "fitColumns",
+            columns: [
+                { title: "ID", field: "id" },
+                { title: "Email", field: "email" },
+                { title: "Type", field: "is_admin", formatter: function(cell) {
+                    return cell.getValue() ? "Admin" : "Candidate";
+                }},
+                { title: "Actions", formatter: "link", formatterParams: {
+                    label: "View",
+                    url: function(cell) {
+                        return "/admin/user_manager/" + cell.getRow().getData().id;
+                    }
+                }}
+            ]
+        });
+    });
+</script>
+<a href="{{ url_for('admin_create_user') }}"><button class="primary">Create a New User</button></a>
+{% endblock %}

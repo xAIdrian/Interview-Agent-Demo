@@ -99,18 +99,18 @@ def admin_required(f):
 def admin_index():
     return render_template("admin/index.html")
 
-@app.route("/admin/user_manager", methods=["GET"])
+@app.route("/admin/users", methods=["GET"])
 @admin_required
-def admin_user_manager():
+def admin_users():
     conn = get_db_connection()
     with conn.cursor() as cursor:
         cursor.execute("SELECT id, email, is_admin FROM users")
         users = cursor.fetchall()
     conn.close()
-    return render_template("admin/user_manager/user_manager.html", users=users)
+    return render_template("admin/users/users.html", users=users)
 
 
-@app.route("/admin/user_manager/create", methods=["GET", "POST"])
+@app.route("/admin/users/create", methods=["GET", "POST"])
 @admin_required
 def admin_create_user():
     if request.method == "POST":
@@ -130,9 +130,9 @@ def admin_create_user():
         conn.close()
 
         flash(f"User created successfully! The password is: {password}", "success")
-        return redirect(url_for("admin_user_manager"))
+        return redirect(url_for("admin_users"))
 
-    return render_template("admin/user_manager/create_user.html")
+    return render_template("admin/users/create_user.html")
 
 @app.route("/admin/campaigns")
 @admin_required
@@ -142,7 +142,7 @@ def admin_campaigns():
         cursor.execute("SELECT * FROM campaigns")
         campaigns = cursor.fetchall()
     conn.close()
-    return render_template("admin/campaigns/campaigns.html", campaigns=campaigns)
+    return render_template("admin/campaigns/campaigns_list.html", campaigns=campaigns)
 
 @app.route("/admin/campaigns/create", methods=["GET", "POST"])
 @admin_required
@@ -206,35 +206,10 @@ def admin_campaign_details(campaign_id):
     
     conn.close()
     
-    return render_template("admin/campaign_details.html",
+    return render_template("admin/campaigns/campaign.html",
                            campaign=campaign,
                            questions_count=questions_count,
                            submissions_count=submissions_count)
-
-@app.route("/admin/campaigns/<int:campaign_id>/submissions")
-@admin_required
-def admin_campaign_submissions(campaign_id):
-    conn = get_db_connection()
-    with conn.cursor(dictionary=True) as cursor:
-        # Get campaign name
-        cursor.execute("SELECT title FROM campaigns WHERE id = ?", (campaign_id,))
-        campaign_name = cursor.fetchone()["title"]
-        
-        # Get submissions with user email
-        cursor.execute("""
-        SELECT submissions.id, users.email, submissions.creation_time, submissions.completion_time, submissions.is_complete, submissions.total_points
-        FROM submissions
-        JOIN users ON submissions.user_id = users.id
-        WHERE submissions.campaign_id = ?
-        """, (campaign_id,))
-        submissions = cursor.fetchall()
-    
-    conn.close()
-    
-    return render_template("admin/campaign_submissions.html",
-                           campaign_id=campaign_id,
-                           campaign_name=campaign_name,
-                           submissions=submissions)
 
 @app.route("/admin/campaigns/<int:campaign_id>/submissions/<int:submission_id>")
 @admin_required
@@ -262,7 +237,7 @@ def admin_submission_details(campaign_id, submission_id):
     
     conn.close()
     
-    return render_template("admin/submission_details.html",
+    return render_template("admin/campaigns/submission.html",
                            campaign_id=campaign_id,
                            submission=submission,
                            submission_answers=submission_answers)

@@ -13,7 +13,7 @@
         <a href="{{ url_for('index') }}">Home</a>
         {% if session.get('user_id') %}
             {% if session.get('is_admin') %}
-                <a href="{{ url_for('admin_user_manager') }}">User Manager</a>
+                <a href="{{ url_for('admin_users') }}">User Manager</a>
                 <a href="{{ url_for('admin_create_user') }}">Create User</a>
                 <a href="{{ url_for('admin_campaigns') }}">View Campaigns</a>
             {% else %}
