@@ -150,6 +150,21 @@ def get_submission_answers():
         "transcript": answer[4]
     } for answer in submission_answers])
 
+@api_bp.route('/public_campaigns', methods=['GET'])
+def get_public_campaigns():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM campaigns WHERE is_public = TRUE")
+    campaigns = cursor.fetchall()
+    conn.close()
+    return jsonify([{
+        "id": str(campaign[0]),
+        "title": campaign[1],
+        "max_user_submissions": campaign[2],
+        "max_points": campaign[3],
+        "is_public": campaign[4]
+    } for campaign in campaigns])
+
 # POST routes
 @api_bp.route('/users', methods=['POST'])
 @admin_required
@@ -229,6 +244,52 @@ def create_submission_answer():
     conn.commit()
     conn.close()
     return jsonify({"message": "Submission answer created successfully"}), 201
+
+def update_table(table, id, data):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    set_clause = ", ".join([f"{key} = %s" for key in data.keys()])
+    values = list(data.values()) + [id]
+    sql = f"UPDATE {table} SET {set_clause} WHERE id = %s"
+    cursor.execute(sql, values)
+    conn.commit()
+    conn.close()
+
+# PUT routes
+@api_bp.route('/users/<int:id>', methods=['PUT'])
+@admin_required
+def update_user(id):
+    data = request.json
+    update_table("users", id, data)
+    return jsonify({"message": "User updated successfully"}), 200
+
+@api_bp.route('/campaigns/<int:id>', methods=['PUT'])
+@admin_required
+def update_campaign(id):
+    data = request.json
+    update_table("campaigns", id, data)
+    return jsonify({"message": "Campaign updated successfully"}), 200
+
+@api_bp.route('/questions/<int:id>', methods=['PUT'])
+@admin_required
+def update_question(id):
+    data = request.json
+    update_table("questions", id, data)
+    return jsonify({"message": "Question updated successfully"}), 200
+
+@api_bp.route('/submissions/<int:id>', methods=['PUT'])
+@admin_required
+def update_submission(id):
+    data = request.json
+    update_table("submissions", id, data)
+    return jsonify({"message": "Submission updated successfully"}), 200
+
+@api_bp.route('/submission_answers/<int:id>', methods=['PUT'])
+@admin_required
+def update_submission_answer(id):
+    data = request.json
+    update_table("submission_answers", id, data)
+    return jsonify({"message": "Submission answer updated successfully"}), 200
 
 # DELETE routes
 @api_bp.route('/users/<int:id>', methods=['DELETE'])
