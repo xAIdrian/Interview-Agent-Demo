@@ -1,14 +1,14 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h1>Campaign: {{ campaign.title }}</h1>
-<p>Max User Submissions: {{ campaign.max_user_submissions }}</p>
-<p>Max Points: {{ campaign.max_points }}</p>
+<h1 class="text-2xl font-bold mb-4">Campaign: {{ campaign.title }}</h1>
+<p class="mb-2">Max User Submissions: {{ campaign.max_user_submissions }}</p>
+<p class="mb-4">Max Points: {{ campaign.max_points }}</p>
 
-<h2>Questions: {{ questions_count }}</h2>
+<h2 class="text-xl font-bold mb-4">Questions: {{ questions_count }}</h2>
 
-<h2>Submissions: {{ submissions_count }}</h2>
-<div id="submissions-table"></div>
+<h2 class="text-xl font-bold mb-4">Submissions: {{ submissions_count }}</h2>
+<div id="submissions-table" class="mb-4"></div>
 <script src="https://unpkg.com/tabulator-tables@5.0.7/dist/js/tabulator.min.js"></script>
 <link href="https://unpkg.com/tabulator-tables@5.0.7/dist/css/tabulator.min.css" rel="stylesheet">
 <script>
