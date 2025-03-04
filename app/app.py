@@ -14,6 +14,7 @@ import whisper
 import mariadb
 
 from api_routes import api_bp
+from scoring_agent import generate_submission_scoring
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -406,6 +407,74 @@ def watch_video(filename):
     except ClientError as e:
         print(f"Error generating presigned URL: {e}")
         return jsonify({"error": "Failed to generate video URL"}), 500
+
+@app.route('/finalize_submission/<int:submission_id>', methods=['POST'])
+def finalize_submission(submission_id):
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    
+    # Get submission details
+    cursor.execute("SELECT campaign_id FROM submissions WHERE id = ?", (submission_id,))
+    submission = cursor.fetchone()
+    if not submission:
+        return jsonify({"error": "Submission not found"}), 404
+    
+    campaign_id = submission['campaign_id']
+    
+    # Get campaign details
+    cursor.execute("SELECT * FROM campaigns WHERE id = ?", (campaign_id,))
+    campaign = cursor.fetchone()
+    if not campaign:
+        return jsonify({"error": "Campaign not found"}), 404
+    
+    # Get questions for the campaign
+    cursor.execute("SELECT * FROM questions WHERE campaign_id = ?", (campaign_id,))
+    questions = cursor.fetchall()
+    
+    # Get submission answers
+    cursor.execute("""
+        SELECT * FROM submission_answers
+        WHERE submission_answers.submission_id = ?
+    """, (submission_id,))
+    answers = cursor.fetchall()
+    
+    conn.close()
+    
+    # Generate scores
+    print("Campaign:", campaign)
+    print("Questions:", questions)
+    print("Answers:", answers)
+    
+    scores = generate_submission_scoring(campaign, questions, answers)
+    
+    # Update scores and rationales in the database
+    total_score = 0
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    for question, score_data in zip(questions, scores):
+        answer = next((a for a in answers if a['question_id'] == question['id']), None)
+        if answer:
+            cursor.execute("""
+                UPDATE submission_answers
+                SET score = ?, score_rationale = ?
+                WHERE id = ?
+            """, (score_data['score'], score_data['rationale'], answer['id']))
+            total_score += score_data['score']
+    
+    # Update total score in the submissions table
+    cursor.execute("""
+        UPDATE submissions
+        SET total_points = ?
+        WHERE id = ?
+    """, (total_score, submission_id))
+    
+    conn.commit()
+    conn.close()
+    
+    # Print scores
+    print(scores)
+    
+    return jsonify({"message": "Submission finalized and scores generated"}), 200
 
 @app.route("/")
 def index():

@@ -31,7 +31,8 @@ submission_id (fk)
 question_id (fk)
 video_path
 transcript
-
+score (int) default NULL
+score_rationale (varchar(1000)) default NULL
 
 # users
 id (PK)

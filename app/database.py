@@ -47,7 +47,8 @@ def create_campaigns_table():
                 title VARCHAR(255) NOT NULL,
                 max_user_submissions INT NOT NULL DEFAULT 1,
                 max_points INT NOT NULL,
-                is_public BOOLEAN NOT NULL DEFAULT FALSE
+                is_public BOOLEAN NOT NULL DEFAULT FALSE,
+                campaign_context TEXT
             )
         """)
     conn.commit()
@@ -99,6 +100,8 @@ def create_submission_answers_table():
                 question_id BIGINT UNSIGNED NOT NULL,
                 video_path VARCHAR(255) NOT NULL,
                 transcript TEXT NOT NULL,
+                score INT DEFAULT NULL,
+                score_rationale VARCHAR(1000) DEFAULT NULL,
                 FOREIGN KEY (submission_id) REFERENCES submissions(id),
                 FOREIGN KEY (question_id) REFERENCES questions(id)
             )

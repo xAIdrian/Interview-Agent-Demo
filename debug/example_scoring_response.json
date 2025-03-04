@@ -1,0 +1,14 @@
+[
+    {
+        "question": "What is your name?",
+        "response": "My name is Anthony.",
+        "rationale": "The candidate provided his real name, which meets the scoring criteria for this question.",
+        "score": 5
+    },
+    {
+        "question": "What project are you most proud of?",
+        "response": "I am most proud of the project where I led a team to develop a new software application that increased our company's efficiency by 30%.",
+        "rationale": "The candidate's response includes a specific project where he took a leadership role, leading a team and achieving a quantifiable result (30% efficiency increase). This indicates his capability to manage and inspire a team, which is essential for the Chief Marketing Officer role. However, more details about the nature of the project, the challenges faced, and how creative direction was applied would enhance the response. Overall, the response partially meets the expectations but lacks sufficient detail.",
+        "score": 4
+    }
+]
