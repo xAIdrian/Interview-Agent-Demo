@@ -12,5 +12,5 @@ class Config:
     DB_PORT = int(os.environ.get("DB_PORT", 3306))
 
     # S3 Bucket for storing media or backups, if applicable
-    S3_BUCKET_NAME = os.environ.get("S3_BUCKET_NAME", "my-ai-platform-bucket")
+    S3_BUCKET_NAME = os.environ.get("S3_BUCKET_NAME", "gulpin-interviews")
     S3_REGION = os.environ.get("S3_REGION", "us-east-1")

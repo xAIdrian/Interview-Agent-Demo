@@ -3,12 +3,13 @@ from flask import Blueprint, request, jsonify, session, redirect, url_for, rende
 from functools import wraps
 import boto3
 import uuid
+from config import Config
 
 # Create a Blueprint for the API routes
 api_bp = Blueprint('api', __name__)
 
 # Configure your S3 bucket name (already created)
-S3_BUCKET = "gulpin-interviews"
+S3_BUCKET = Config.S3_BUCKET_NAME
 
 # Initialize S3 client
 s3_client = boto3.client("s3")
@@ -244,6 +245,26 @@ def create_submission_answer():
     conn.commit()
     conn.close()
     return jsonify({"message": "Submission answer created successfully"}), 201
+
+@api_bp.route('/finalize_submission/<int:submission_id>', methods=['POST'])
+def finalize_submission(submission_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT questions.title, submission_answers.transcript
+        FROM submission_answers
+        JOIN questions ON submission_answers.question_id = questions.id
+        WHERE submission_answers.submission_id = %s
+    """, (submission_id,))
+    answers = cursor.fetchall()
+    conn.close()
+
+    for question, transcript in answers:
+        print(f"Question: {question}")
+        print(f"Transcript: {transcript}")
+        print("-----")
+
+    return jsonify({"message": "Submission finalized and transcripts printed"}), 200
 
 def update_table(table, id, data):
     conn = get_db_connection()

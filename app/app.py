@@ -254,6 +254,9 @@ def get_campaign_questions(campaign_id):
         cursor.execute(sql, (campaign_id,))
         questions = cursor.fetchall()
     conn.close()
+    # Convert id to string
+    for question in questions:
+        question['id'] = str(question['id'])
     return questions
 
 # Mock: Example function to generate LiveKit token
@@ -364,10 +367,10 @@ def upload_interview():
             conn = get_db_connection()
             with conn.cursor() as cursor:
                 sql = """
-                INSERT INTO submission_answers (id, submission_id, question_id, answer, video_path, transcript)
-                VALUES (UUID_SHORT(), ?, ?, ?, ?, ?)
+                INSERT INTO submission_answers (id, submission_id, question_id, video_path, transcript)
+                VALUES (UUID_SHORT(), ?, ?, ?, ?)
                 """
-                cursor.execute(sql, (submission_id, question_id, "", s3_filename, transcript_text))
+                cursor.execute(sql, (submission_id, question_id, s3_filename, transcript_text))
             conn.commit()
             conn.close()
         except Exception as e:
@@ -391,6 +394,9 @@ def upload_interview():
 
 @app.route("/")
 def index():
+    if not session.get("user_id"):
+        return redirect(url_for("login"))
+    
     if session.get("is_admin"):
         return redirect(url_for("admin_index"))
     else:
