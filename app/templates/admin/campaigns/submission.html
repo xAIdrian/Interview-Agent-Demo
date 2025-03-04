@@ -1,42 +1,40 @@
 {% extends "base.html" %}
-
 {% block content %}
-<h1>Submission Details</h1>
-<p>Submission ID: {{ submission.id }}</p>
-<p>Campaign: {{ submission.campaign_name }}</p>
-<p>User Email: {{ submission.email }}</p>
-<p>Creation Time: {{ submission.creation_time }}</p>
-<p>Completion Time: {{ submission.completion_time }}</p>
-<p>Is Complete: {{ submission.is_complete }}</p>
-<p>Total Points: {{ submission.total_points }}</p>
+<h2 class="text-2xl font-bold mb-4">Submission Details</h2>
 
-<h2>Submission Answers</h2>
-<table id="submissionAnswersTable">
-    <thead>
-        <tr>
-            <th>ID</th>
-            <th>Question Title</th>
-            <th>Video Path</th>
-            <th>Transcript</th>
-            <th>Actions</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for answer in submission_answers %}
-        <tr>
-            <td>{{ answer.id }}</td>
-            <td>{{ answer.question_title }}</td>
-            <td>{{ answer.video_path }}</td>
-            <td>{{ answer.transcript }}</td>
-            <td><a href="{{ answer.video_path }}" target="_blank">View Video</a></td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
-<script src="https://cdn.datatables.net/1.10.21/js/jquery.dataTables.min.js"></script>
+<h2></h2>
+<div id="answers-table" class="mb-4"></div>
+
+<a href="{{ url_for('admin_create_campaign') }}" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700">Create New Campaign</a>
+
+<script src="https://unpkg.com/tabulator-tables@5.0.7/dist/js/tabulator.min.js"></script>
+<link href="https://unpkg.com/tabulator-tables@5.0.7/dist/css/tabulator.min.css" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/big-integer/1.6.48/BigInteger.min.js"></script>
+
 <script>
-    $(document).ready(function() {
-        $('#submissionAnswersTable').DataTable();
+    document.addEventListener('DOMContentLoaded', function() {
+        var submissionId = "{{ submission_id }}";
+
+        var table = new Tabulator("#answers-table", {
+            ajaxURL: "/api/submission_answers",
+            layout: "fitColumns",
+            columns: [
+                { title: "ID", field: "id" },
+                { title: "Transcript", field: "transcript", formatter: "textarea"},
+                { title: "Video Path", formatter: "link", formatterParams: {
+                    label: "View",
+                    url: function(cell) {
+                        var rowData = cell.getRow().getData();
+                        console.log(rowData);  // Debugging: Log the row data
+                        return rowData.video_path;
+                    }
+                }}
+            ],
+            ajaxResponse: function(url, params, response) {
+                console.log(response);  // Debugging: Log the API response
+                return response;
+            }
+        });
     });
 </script>
 {% endblock %}
