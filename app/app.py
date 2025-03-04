@@ -392,6 +392,21 @@ def upload_interview():
         print(f"Error handling file: {e}")
         return jsonify({"error": "Internal server error"}), 500
 
+@app.route("/admin/watch_video/<filename>")
+@admin_required
+def watch_video(filename):
+    try:
+        s3_key = f"interviews/{filename}"
+        video_url = s3_client.generate_presigned_url(
+            'get_object',
+            Params={'Bucket': S3_BUCKET, 'Key': s3_key},
+            ExpiresIn=3600  # URL expiration time in seconds
+        )
+        return render_template("admin/campaigns/watch_video.html", video_url=video_url)
+    except ClientError as e:
+        print(f"Error generating presigned URL: {e}")
+        return jsonify({"error": "Failed to generate video URL"}), 500
+
 @app.route("/")
 def index():
     if not session.get("user_id"):
