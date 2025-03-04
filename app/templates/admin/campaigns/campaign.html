@@ -19,15 +19,18 @@
             ajaxURL: "/api/submissions",
             ajaxParams: { campaign_id: campaignId },
             layout: "fitColumns",
+            initialSort: [
+                { column: "total_points", dir: "desc" }  // Sort by total points in descending order
+            ],
             columns: [
-                { title: "ID", field: "id" },
+                //{ title: "ID", field: "id" },
                 { title: "User Email", field: "email" },
                 { title: "Creation Time", field: "creation_time", editor: "input" },
                 { title: "Completion Time", field: "completion_time", editor: "input" },
                 { title: "Is Complete", field: "is_complete", formatter: function(cell) {
                     return cell.getValue() ? "Yes" : "No";
                 }, editor: "tickCross" },
-                { title: "Total Points", field: "total_points", editor: "input" },
+                { title: "Total Points", field: "total_points", editor: "input"},
                 { title: "Actions", formatter: "link", formatterParams: {
                     label: "View",
                     url: function(cell) {

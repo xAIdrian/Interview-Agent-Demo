@@ -2,7 +2,11 @@
 {% block content %}
 <h2 class="text-2xl font-bold mb-4">Submission Details</h2>
 
-<h2></h2>
+<a href="{{ url_for('admin_submission_report', submission_id = submission.id) }}">
+    <button class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700">Download Submission Report with Strengths/Weaknesses</button>
+</a><br><br>
+
+<h2 class="text-xl font-semibold mb-4">Answers</h2>
 <div id="answers-table" class="mb-4"></div>
 
 <a href="{{ url_for('admin_create_campaign') }}" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700">Create New Campaign</a>
@@ -13,13 +17,14 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        var submissionId = "{{ submission_id }}";
+        var submissionId = "{{ submission.id }}";
+        console.log(submissionId);  // Debugging: Log the submission ID
 
         var table = new Tabulator("#answers-table", {
             ajaxURL: "/api/submission_answers",
+            ajaxParams:{"submission_id": submissionId}, //ajax parameters
             layout: "fitColumns",
             columns: [
-                { title: "ID", field: "id" },
                 { title: "Transcript", field: "transcript", formatter: "textarea"},
                 { title: "Video Response", formatter: "link", formatterParams: {
                     label: "View",
@@ -28,7 +33,9 @@
                         console.log(rowData);  // Debugging: Log the row data
                         return "/admin/watch_video/" + rowData.video_path.split("/")[1];
                     }
-                }}
+                }},
+                { title: "Score", field: "score"},
+                { title: "Rationale", field: "score_rationale", formatter: "textarea"},
             ],
             ajaxResponse: function(url, params, response) {
                 console.log(response);  // Debugging: Log the API response
