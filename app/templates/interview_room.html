@@ -11,12 +11,17 @@
     .recording .recording-icon {
       display: block;
     }
+    button:disabled {
+      background-color: #d1d5db; /* Tailwind gray-300 */
+      color: #666a70;
+      cursor: not-allowed;
+    }
   </style>
 </head>
 <body class="bg-gray-100 h-screen flex flex-col">
 
 <!-- Top bar for the current question title -->
-<header id="questionBar" class="bg-gray-800 text-white p-4 text-lg"></header>
+<header id="questionBar" class="bg-gray-800 text-white p-4 font-semibold text-3xl text-center"></header>
 
 <!-- Main container with left (voice visual) and right (video) -->
 <main id="container" class="flex flex-1">
@@ -32,12 +37,14 @@
     <div class="absolute bottom-4 right-4 flex flex-col space-y-4">
       <button id="startBtn" class="bg-blue-500 text-white py-3 px-6 rounded text-lg">Start</button>
       <button id="stopBtn" class="bg-red-500 text-white py-3 px-6 rounded text-lg">Stop</button>
-      <button id="nextQuestionBtn" class="bg-green-500 text-white py-3 px-6 rounded text-lg">Next</button>
+      <button id="nextQuestionBtn" class="bg-green-500 text-white py-3 px-6 rounded text-lg" disabled>Next</button>
     </div>
+    <div id="statusContainer" class="absolute bottom-4 left-4 bg-white px-5 py-5 rounded"></div>
   </section>
 </main>
 
 <script>
+  console.log("v2");
   /****************************************************
    * 1. QUESTIONS SETUP
    ****************************************************/
@@ -50,6 +57,7 @@
   const startBtn = document.getElementById('startBtn');
   const stopBtn = document.getElementById('stopBtn');
   const nextQuestionBtn = document.getElementById('nextQuestionBtn');
+  const statusContainer = document.getElementById('statusContainer');
 
   const videoElement = document.getElementById('videoElement');
   const voiceCanvas = document.getElementById('voiceVisualizer');
@@ -64,15 +72,19 @@
   let recordedChunks = [];
 
   // Generate a random submission_id when the page loads
-  const submissionId = {{ submission_id }};
+  const submissionId = "{{ submission_id }}";
   console.log("Submission ID:", submissionId);
 
   /****************************************************
    * 2. LOAD FIRST QUESTION
    ****************************************************/
   function loadQuestion(index) {
+    console.log("Question:", questions[index]);
     if (index < questions.length) {
-      questionBar.textContent = `Q${index + 1}: ${questions[index].title} (question_id: ${questions[index].id} (submission_id: ${submissionId})`;
+      questionBar.textContent = `Q${index + 1}: ${questions[index].title}`;
+      if (index == questions.length - 1) {
+        nextQuestionBtn.textContent = "Submit";
+      }
     } else {
       questionBar.textContent = "No more questions.";
     }
@@ -158,6 +170,7 @@
 
     // Stop recording
     mediaRecorder.stop();
+    rightPanel.classList.remove('recording');
     console.log("Recording stopped.");
   }
 
@@ -165,6 +178,7 @@
    * 7. UPLOAD THE BLOB TO /submit_answer
    ****************************************************/
   async function uploadAnswer(blob, submissionId, questionId) {
+    statusContainer.textContent = "Uploading your answer. Please wait.";
     try {
       const formData = new FormData();
       // Name the file with question ID for clarity
@@ -179,40 +193,71 @@
       });
 
       if (!response.ok) {
-        console.error("Upload failed:", response.statusText);
-        return;
+        const errorText = await response.text();
+        throw new Error(errorText);
       }
 
       const result = await response.json();
       console.log("Upload success:", result);
       // e.g. result might contain { "s3_url": "...", "transcript": "..." }
       // you could display or store the transcript, if included
+
+      // Enable the next button
+      nextQuestionBtn.disabled = false;
+      statusContainer.textContent = "Your answer has been uploaded. Please continue.";
     } catch (err) {
       console.error("Error uploading video:", err);
+      statusContainer.textContent = `Error: ${err.message}`;
     }
   }
 
   /****************************************************
-   * 8. NEXT QUESTION
+   * 8. NEXT QUESTION OR SUBMIT
    ****************************************************/
-  function nextQuestion() {
-    currentQuestionIndex++;
-    if (currentQuestionIndex < questions.length) {
+  async function nextQuestionOrSubmit() {
+    if (currentQuestionIndex < questions.length - 1) {
+      currentQuestionIndex++;
       loadQuestion(currentQuestionIndex);
+      nextQuestionBtn.disabled = true;
     } else {
       questionBar.textContent = "Interview Completed!";
+      nextQuestionBtn.disabled = true;
+      await finalizeSubmission();
     }
   }
 
   /****************************************************
-   * 9. EVENT LISTENERS
+   * 9. FINALIZE SUBMISSION
+   ****************************************************/
+  async function finalizeSubmission() {
+    try {
+      const response = await fetch(`/api/finalize_submission/${submissionId}`, {
+        method: "POST"
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText);
+      }
+
+      const result = await response.json();
+      console.log("Finalization success:", result);
+      statusContainer.textContent = "Your interview has been submitted. Thank you! You may now close this tab.";
+    } catch (err) {
+      console.error("Error finalizing submission:", err);
+      statusContainer.textContent = `Error: ${err.message}`;
+    }
+  }
+
+  /****************************************************
+   * 10. EVENT LISTENERS
    ****************************************************/
   startBtn.addEventListener('click', startInterview);
   stopBtn.addEventListener('click', stopInterview);
-  nextQuestionBtn.addEventListener('click', nextQuestion);
+  nextQuestionBtn.addEventListener('click', nextQuestionOrSubmit);
 
   /****************************************************
-   * 10. INITIALIZE VIDEO STREAM
+   * 11. INITIALIZE VIDEO STREAM
    ****************************************************/
   async function initializeVideoStream() {
     try {

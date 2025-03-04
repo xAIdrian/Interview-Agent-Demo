@@ -1,1 +1,4 @@
 app/__pycache__/*
+debug/.venv/*
+debug/.env
+app/.env

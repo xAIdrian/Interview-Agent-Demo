@@ -1,9 +1,104 @@
 {% extends "base.html" %}
 {% block content %}
-<h2>Admin Dashboard</h2>
-<ul>
-    <li><a href="{{ url_for('admin_create_candidate') }}">Create Candidate</a></li>
-    <li><a href="{{ url_for('admin_create_admin') }}">Create Admin</a></li>
-    <li><a href="{{ url_for('admin_campaigns') }}">View Campaigns</a></li>
-</ul>
+<div class="bg-white p-6 rounded-lg shadow-md">
+    <p class="text-lg">Used by innovative teams worldwide, Gulpin helps you save time, reduce bias, and connect with the best candidates—fast. Our AI-driven technology automates screening, personalizes interview questions, and delivers data-backed scoring to streamline your hiring process from start to finish.</p>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
+    <div class="bg-white p-6 rounded-lg shadow-md" id="whats-inside">
+        <h2 class="text-xl font-bold">What’s inside Gulpin?</h2>
+        <p>Everything you need to build a next-generation hiring experience.</p>
+    </div>
+
+    <div class="bg-white p-6 rounded-lg shadow-md" id="automated-screening">
+        <h3 class="text-lg font-bold">Automated Screening & Scheduling</h3>
+        <p>Save Time and Resources</p>
+        <ul class="list-disc list-inside">
+            <li>Set up campaigns that automatically invite candidates to complete interviews at their convenience, reducing scheduling conflicts and manual coordination.</li>
+        </ul>
+    </div>
+
+    <div class="bg-white p-6 rounded-lg shadow-md" id="adaptive-question">
+        <h3 class="text-lg font-bold">Adaptive Question Generation</h3>
+        <p>Future of Hiring</p>
+        <ul class="list-disc list-inside">
+            <li>Leverage dynamic prompts that respond in real time to candidate answers, ensuring you only ask the most relevant follow-up questions.</li>
+        </ul>
+    </div>
+
+    <div class="bg-white p-6 rounded-lg shadow-md" id="data-driven-scoring">
+        <h3 class="text-lg font-bold">Data-Driven Scoring</h3>
+        <p>Reduce Bias, Increase Fairness</p>
+        <ul class="list-disc list-inside">
+            <li>Our AI-driven scoring framework identifies top candidates based on objective metrics, delivering a transparent, unbiased evaluation process.</li>
+        </ul>
+    </div>
+
+    <div class="bg-white p-6 rounded-lg shadow-md" id="comprehensive-analytics">
+        <h3 class="text-lg font-bold">Comprehensive Analytics</h3>
+        <p>Actionable Insights for Better Decisions</p>
+        <ul class="list-disc list-inside">
+            <li>Dive into dashboards that track completion rates, candidate performance, and hiring funnels—empowering you to make data-backed decisions every step of the way.</li>
+        </ul>
+    </div>
+
+    <div class="bg-white p-6 rounded-lg shadow-md" id="video-audio-recording">
+        <h3 class="text-lg font-bold">Built-in Video & Audio Recording</h3>
+        <p>Humanize the Interview</p>
+        <ul class="list-disc list-inside">
+            <li>Capture and store interview recordings securely on your preferred cloud platform (AWS S3, Azure, or on-prem), so your team can revisit and assess responses anytime.</li>
+        </ul>
+    </div>
+
+    <div class="bg-white p-6 rounded-lg shadow-md" id="flexible-integration">
+        <h3 class="text-lg font-bold">Flexible Integration</h3>
+        <p>Works Standalone or Within Your Ecosystem</p>
+        <ul class="list-disc list-inside">
+            <li>Start with Gulpin as a pilot, or seamlessly connect to your existing tools and databases once you’re ready to scale.</li>
+        </ul>
+    </div>
+
+    <div class="bg-white p-6 rounded-lg shadow-md" id="ready-to-streamline">
+        <h3 class="text-lg font-bold">Ready to Streamline Your Hiring Process?</h3>
+        <p>Create Your First Campaign:</p>
+        <ul class="list-disc list-inside">
+            <li>Add job descriptions, tailor your questions, and invite candidates all in one place.</li>
+        </ul>
+        <p>Review & Hire:</p>
+        <ul class="list-disc list-inside">
+            <li>Access unified scoring, interview replays, and advanced analytics to find the perfect match.</li>
+        </ul>
+    </div>
+
+    <div class="bg-white p-6 rounded-lg shadow-md" id="trusted-by">
+        <h3 class="text-lg font-bold">Trusted by Leading Recruitment Teams</h3>
+        <blockquote class="border-l-4 border-blue-500 pl-4">
+            <p>“Gulpin has revolutionized our hiring process. We cut our screening time by 50% while maintaining an excellent candidate experience!”</p>
+            <footer class="text-sm text-gray-500">— Taylor Murphy, Recruitment Manager</footer>
+        </blockquote>
+        <blockquote class="border-l-4 border-blue-500 pl-4 mt-4">
+            <p>“We love how the adaptive questions automatically dig deeper into candidate responses. It’s like having an entire hiring team in one platform.”</p>
+            <footer class="text-sm text-gray-500">— Rahul Singh, Head of Talent Acquisition</footer>
+        </blockquote>
+    </div>
+
+    <div class="bg-white p-6 rounded-lg shadow-md" id="resources-community">
+        <h3 class="text-lg font-bold">Resources & Community</h3>
+        <ul class="list-disc list-inside">
+            <li>Documentation: Learn everything from setting up your first campaign to customizing advanced AI scoring.</li>
+            <li>Showcase: See real-world examples of Gulpin in action.</li>
+            <li>Blog: Tips, updates, and deep dives into AI hiring best practices.</li>
+            <li>Enterprise: Need custom features or dedicated support? Contact us.</li>
+        </ul>
+    </div>
+
+    <div class="bg-white p-6 rounded-lg shadow-md col-span-1 md:col-span-2 lg:col-span-3" id="join-future">
+        <h3 class="text-lg font-bold">Join the Future of Hiring</h3>
+        <p>Stop wasting time on outdated processes—let Gulpin empower your team with a streamlined, data-driven interview experience that puts people first.</p>
+        <div class="mt-4">
+            <button class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700">Get started</button>
+            <button class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-700 ml-2">Sign up for a demo</button>
+        </div>
+    </div>
+</div>
 {% endblock %}
