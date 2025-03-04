@@ -108,7 +108,8 @@ def get_questions():
         "campaign_id": str(question[1]),
         "title": question[2],
         "body": question[3],
-        "scoring_prompt": question[4]
+        "scoring_prompt": question[4],
+        "max_points": question[5]
     } for question in questions])
 
 @api_bp.route('/submissions', methods=['GET'])

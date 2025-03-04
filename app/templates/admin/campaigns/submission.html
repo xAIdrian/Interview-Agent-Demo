@@ -21,12 +21,12 @@
             columns: [
                 { title: "ID", field: "id" },
                 { title: "Transcript", field: "transcript", formatter: "textarea"},
-                { title: "Video Path", formatter: "link", formatterParams: {
+                { title: "Video Response", formatter: "link", formatterParams: {
                     label: "View",
                     url: function(cell) {
                         var rowData = cell.getRow().getData();
                         console.log(rowData);  // Debugging: Log the row data
-                        return rowData.video_path;
+                        return "/admin/watch_video/" + rowData.video_path.split("/")[1];
                     }
                 }}
             ],
