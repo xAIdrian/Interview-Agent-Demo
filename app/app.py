@@ -1,7 +1,7 @@
 from botocore.exceptions import ClientError
 from config import Config
 from database import get_db_connection, create_tables
-from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, send_file
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
 import boto3
@@ -12,6 +12,7 @@ import tempfile
 import uuid
 import whisper
 import mariadb
+from fpdf import FPDF
 
 from api_routes import api_bp
 from scoring_agent import generate_submission_scoring
@@ -475,6 +476,73 @@ def finalize_submission(submission_id):
     print(scores)
     
     return jsonify({"message": "Submission finalized and scores generated"}), 200
+
+@app.route("/admin/submission_report/<int:submission_id>")
+@admin_required
+def admin_submission_report(submission_id):
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    
+    # Get submission details
+    cursor.execute("""
+        SELECT submissions.*, users.email, campaigns.title AS campaign_name, campaigns.campaign_context
+        FROM submissions
+        JOIN users ON submissions.user_id = users.id
+        JOIN campaigns ON submissions.campaign_id = campaigns.id
+        WHERE submissions.id = ?
+    """, (submission_id,))
+    submission = cursor.fetchone()
+    
+    if not submission:
+        return jsonify({"error": "Submission not found"}), 404
+    
+    campaign_id = submission['campaign_id']
+    
+    # Get questions for the campaign
+    cursor.execute("SELECT * FROM questions WHERE campaign_id = ?", (campaign_id,))
+    questions = cursor.fetchall()
+    
+    # Get submission answers
+    cursor.execute("""
+        SELECT submission_answers.*, questions.title AS question_title, questions.body AS question_body, 
+               questions.scoring_prompt, questions.max_points
+        FROM submission_answers
+        JOIN questions ON submission_answers.question_id = questions.id
+        WHERE submission_answers.submission_id = ?
+    """, (submission_id,))
+    answers = cursor.fetchall()
+    
+    conn.close()
+    
+    # Generate PDF report
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=10)
+    
+    # Add campaign details
+    pdf.cell(200, 10, txt=f"Campaign: {submission['campaign_name']}", ln=True, align='C')
+    pdf.cell(200, 10, txt=f"Context: {submission['campaign_context']}", ln=True, align='C')
+    pdf.ln(10)
+    
+    # Add questions and answers
+    for question in questions:
+        answer = next((a for a in answers if a['question_id'] == question['id']), None)
+        if answer:
+            pdf.set_font("Arial", style='B', size=10)
+            pdf.cell(200, 10, txt=f"Question: {question['title']}", ln=True)
+            pdf.set_font("Arial", size=10)
+            pdf.multi_cell(200, 10, txt=f"Body: {question['body']}")
+            pdf.multi_cell(200, 10, txt=f"Scoring Prompt: {question['scoring_prompt']}")
+            pdf.multi_cell(200, 10, txt=f"Transcript: {answer['transcript']}")
+            pdf.cell(200, 10, txt=f"Score: {answer['score']} / {question['max_points']}", ln=True)
+            pdf.ln(10)
+    
+    # Save PDF to a temporary file
+    pdf_output = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
+    pdf.output(pdf_output.name)
+    
+    # Return the PDF file
+    return send_file(pdf_output.name, as_attachment=True, download_name=f"submission_report_{submission_id}.pdf")
 
 @app.route("/")
 def index():

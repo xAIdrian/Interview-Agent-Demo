@@ -22,13 +22,27 @@ def admin_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+def build_filter_query(args):
+    filter_clauses = []
+    filter_values = []
+    for key, value in args.items():
+        filter_clauses.append(f"{key} = %s")
+        filter_values.append(value)
+    filter_query = " AND ".join(filter_clauses)
+    if filter_query:
+        filter_query = "WHERE " + filter_query
+    return filter_query, filter_values
+
 # GET routes
 @api_bp.route('/users', methods=['GET'])
 @admin_required
 def get_users():
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM users")
+    
+    filter_query, filter_values = build_filter_query(request.args)
+    cursor.execute(f"SELECT * FROM users {filter_query}", filter_values)
+    
     users = cursor.fetchall()
     conn.close()
     return jsonify([{
@@ -63,7 +77,10 @@ def get_user(id):
 def get_campaigns():
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM campaigns")
+    
+    filter_query, filter_values = build_filter_query(request.args)
+    cursor.execute(f"SELECT * FROM campaigns {filter_query}", filter_values)
+    
     campaigns = cursor.fetchall()
     conn.close()
     return jsonify([{
@@ -102,7 +119,10 @@ def get_campaign(id):
 def get_questions():
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM questions")
+    
+    filter_query, filter_values = build_filter_query(request.args)
+    cursor.execute(f"SELECT * FROM questions {filter_query}", filter_values)
+    
     questions = cursor.fetchall()
     conn.close()
     return jsonify([{
@@ -119,12 +139,16 @@ def get_questions():
 def get_submissions():
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("""
+    
+    filter_query, filter_values = build_filter_query(request.args)
+    cursor.execute(f"""
         SELECT submissions.id, submissions.campaign_id, submissions.user_id, submissions.creation_time, 
                submissions.completion_time, submissions.is_complete, submissions.total_points, users.email
         FROM submissions
         JOIN users ON submissions.user_id = users.id
-    """)
+        {filter_query}
+    """, filter_values)
+    
     submissions = cursor.fetchall()
     conn.close()
     return jsonify([{
@@ -143,7 +167,10 @@ def get_submissions():
 def get_submission_answers():
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM submission_answers")
+    
+    filter_query, filter_values = build_filter_query(request.args)
+    cursor.execute(f"SELECT * FROM submission_answers {filter_query}", filter_values)
+    
     submission_answers = cursor.fetchall()
     conn.close()
     return jsonify([{
