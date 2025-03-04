@@ -231,7 +231,7 @@
    ****************************************************/
   async function finalizeSubmission() {
     try {
-      const response = await fetch(`/api/finalize_submission/${submissionId}`, {
+      const response = await fetch(`/finalize_submission/${submissionId}`, {
         method: "POST"
       });
 

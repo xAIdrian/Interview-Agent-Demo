@@ -71,7 +71,8 @@ def get_campaigns():
         "title": campaign[1],
         "max_user_submissions": campaign[2],
         "max_points": campaign[3],
-        "is_public": campaign[4]
+        "is_public": campaign[4],
+        "campaign_context": campaign[5]
     } for campaign in campaigns])
 
 @api_bp.route('/campaigns/<int:id>', methods=['GET'])
@@ -90,7 +91,8 @@ def get_campaign(id):
             "title": campaign[1],
             "max_user_submissions": campaign[2],
             "max_points": campaign[3],
-            "is_public": campaign[4]
+            "is_public": campaign[4],
+            "campaign_context": campaign[5]
         })
     else:
         return jsonify({"error": "Campaign not found or not accessible"}), 404
@@ -149,7 +151,9 @@ def get_submission_answers():
         "submission_id": str(answer[1]),
         "question_id": str(answer[2]),
         "video_path": answer[3],
-        "transcript": answer[4]
+        "transcript": answer[4],
+        "score": answer[5],
+        "score_rationale": answer[6]
     } for answer in submission_answers])
 
 @api_bp.route('/public_campaigns', methods=['GET'])
@@ -193,9 +197,9 @@ def create_campaign():
     campaign_id = uuid.uuid4().int >> 64
     
     cursor.execute("""
-        INSERT INTO campaigns (id, title, max_user_submissions, max_points, is_public)
-        VALUES (%s, %s, %s, %s, %s)
-    """, (campaign_id, data['title'], data['max_user_submissions'], total_max_points, data['is_public']))
+        INSERT INTO campaigns (id, title, max_user_submissions, max_points, is_public, campaign_context)
+        VALUES (%s, %s, %s, %s, %s, %s)
+    """, (campaign_id, data['title'], data['max_user_submissions'], total_max_points, data['is_public'], data['campaign_context']))
 
     for question in data['questions']:
         cursor.execute("""
@@ -247,25 +251,6 @@ def create_submission_answer():
     conn.close()
     return jsonify({"message": "Submission answer created successfully"}), 201
 
-@api_bp.route('/finalize_submission/<int:submission_id>', methods=['POST'])
-def finalize_submission(submission_id):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT questions.title, submission_answers.transcript
-        FROM submission_answers
-        JOIN questions ON submission_answers.question_id = questions.id
-        WHERE submission_answers.submission_id = %s
-    """, (submission_id,))
-    answers = cursor.fetchall()
-    conn.close()
-
-    for question, transcript in answers:
-        print(f"Question: {question}")
-        print(f"Transcript: {transcript}")
-        print("-----")
-
-    return jsonify({"message": "Submission finalized and transcripts printed"}), 200
 
 def update_table(table, id, data):
     conn = get_db_connection()
