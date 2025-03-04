@@ -5,6 +5,7 @@ title
 max_user_submissions
 max_points
 is_public (bool) default: false
+campaign_context: Context for the AI to use to understand the goals of HR.
 
 # questions
 id (pk)
