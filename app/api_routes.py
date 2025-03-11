@@ -4,6 +4,7 @@ from functools import wraps
 import boto3
 import uuid
 from config import Config
+from scoring_agent import optimize_with_ai
 
 # Create a Blueprint for the API routes
 api_bp = Blueprint('api', __name__)
@@ -380,3 +381,23 @@ def delete_submission_answer(id):
     conn.commit()
     conn.close()
     return jsonify({"message": "Submission answer deleted successfully"}), 200
+
+
+@api_bp.route("/optimize_prompt", methods=["POST"])
+@admin_required
+def optimize_prompt_api():
+    data = request.json
+    campaign_name = data.get("campaign_name", "")
+    campaign_context = data.get("campaign_context", "")
+    question = data.get("question", "")
+    original_prompt = data.get("prompt", "")
+    
+    if not original_prompt:
+        return jsonify({"error": "No prompt provided"}), 400
+    
+    try:
+        optimized_prompt = optimize_with_ai(campaign_name, campaign_context, question, original_prompt)
+        return jsonify({"optimized_prompt": optimized_prompt})
+    except Exception as e:
+        print(f"Error optimizing prompt: {e}")
+        return jsonify({"error": str(e)}), 500
