@@ -93,7 +93,7 @@ def create_submissions_table():
                 user_id BIGINT UNSIGNED NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                completion_time TIMESTAMP DEFAULT NULL,
+                completed_at TIMESTAMP DEFAULT NULL,
                 is_complete BOOLEAN NOT NULL DEFAULT FALSE,
                 total_points INT NOT NULL DEFAULT 0,
                 FOREIGN KEY (campaign_id) REFERENCES campaigns(id),
