@@ -333,41 +333,110 @@ def update_submission_answer(id):
 @api_bp.route('/users/<int:id>', methods=['DELETE'])
 @admin_required
 def delete_user(id):
+    """
+    Delete a user and all related submissions and submission answers.
+    """
     conn = get_db_connection()
     cursor = conn.cursor()
+    
+    # First get all submissions by this user
+    cursor.execute("SELECT id FROM submissions WHERE user_id = %s", (id,))
+    submissions = cursor.fetchall()
+    
+    # Delete all submission answers for each submission
+    for submission in submissions:
+        submission_id = submission[0]
+        cursor.execute("DELETE FROM submission_answers WHERE submission_id = %s", (submission_id,))
+    
+    # Delete all submissions by this user
+    cursor.execute("DELETE FROM submissions WHERE user_id = %s", (id,))
+    
+    # Finally, delete the user
     cursor.execute("DELETE FROM users WHERE id = %s", (id,))
+    
     conn.commit()
     conn.close()
-    return jsonify({"message": "User deleted successfully"}), 200
+    return jsonify({"message": "User and all related data deleted successfully"}), 200
 
 @api_bp.route('/campaigns/<int:id>', methods=['DELETE'])
 @admin_required
 def delete_campaign(id):
+    """
+    Delete a campaign and all associated questions, submissions, and submission answers.
+    """
     conn = get_db_connection()
     cursor = conn.cursor()
+    
+    # First get all submissions for this campaign
+    cursor.execute("SELECT id FROM submissions WHERE campaign_id = %s", (id,))
+    submissions = cursor.fetchall()
+    
+    # Delete all submission answers for each submission
+    for submission in submissions:
+        submission_id = submission[0]
+        cursor.execute("DELETE FROM submission_answers WHERE submission_id = %s", (submission_id,))
+    
+    # Delete all submissions for this campaign
+    cursor.execute("DELETE FROM submissions WHERE campaign_id = %s", (id,))
+    
+    # Delete all questions for this campaign
     cursor.execute("DELETE FROM questions WHERE campaign_id = %s", (id,))
+    
+    # Finally, delete the campaign
     cursor.execute("DELETE FROM campaigns WHERE id = %s", (id,))
+    
     conn.commit()
     conn.close()
-    return jsonify({"message": "Campaign and its questions deleted successfully"}), 200
+    return jsonify({"message": "Campaign and all related data deleted successfully"}), 200
 
 @api_bp.route('/questions/<int:id>', methods=['DELETE'])
 @admin_required
 def delete_question(id):
+    """
+    Delete a question, all associated submission answers, and update the max_points of its campaign.
+    """
     conn = get_db_connection()
     cursor = conn.cursor()
+    
+    # First get the question's campaign_id and max_points
+    cursor.execute("SELECT campaign_id, max_points FROM questions WHERE id = %s", (id,))
+    result = cursor.fetchone()
+    
+    if not result:
+        conn.close()
+        return jsonify({"error": "Question not found"}), 404
+        
+    campaign_id, question_max_points = result
+    
+    # Delete all submission answers for this question
+    cursor.execute("DELETE FROM submission_answers WHERE question_id = %s", (id,))
+    
+    # Delete the question
     cursor.execute("DELETE FROM questions WHERE id = %s", (id,))
+    
+    # Update the campaign's max_points
+    cursor.execute("UPDATE campaigns SET max_points = max_points - %s WHERE id = %s", 
+                  (question_max_points, campaign_id))
+    
     conn.commit()
     conn.close()
-    return jsonify({"message": "Question deleted successfully"}), 200
+    return jsonify({"message": "Question deleted successfully and campaign max_points updated"}), 200
 
 @api_bp.route('/submissions/<int:id>', methods=['DELETE'])
 @admin_required
 def delete_submission(id):
+    """
+    Delete a submission and all its associated submission answers.
+    """
     conn = get_db_connection()
     cursor = conn.cursor()
+    
+    # Delete all submission answers for this submission
     cursor.execute("DELETE FROM submission_answers WHERE submission_id = %s", (id,))
+    
+    # Delete the submission
     cursor.execute("DELETE FROM submissions WHERE id = %s", (id,))
+    
     conn.commit()
     conn.close()
     return jsonify({"message": "Submission and its answers deleted successfully"}), 200

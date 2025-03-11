@@ -1,16 +1,84 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>{{ user.email }}</h1>
-<h2 class="text-2xl font-bold mb-4">Submission Details</h2>
+<div class="flex justify-between mb-4">
+    <h1 class="text-2xl font-bold">Submission Details</h1>
+    <div class="space-x-2">
+        <a href="{{ url_for('admin_submission_report', submission_id=submission.id) }}" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700">Generate Report</a>
+        <button id="delete-submission-btn" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-700">Delete Submission</button>
+    </div>
+</div>
 
-<a href="{{ url_for('admin_submission_report', submission_id = submission.id) }}">
-    <button class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700">Download Submission Report with Strengths/Weaknesses</button>
-</a><br><br>
+<div class="bg-white shadow overflow-hidden sm:rounded-lg mb-6">
+    <div class="px-4 py-5 sm:px-6">
+        <h2 class="text-lg leading-6 font-medium text-gray-900">Submission Information</h2>
+    </div>
+    <div class="border-t border-gray-200">
+        <dl>
+            <div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                <dt class="text-sm font-medium text-gray-500">Campaign</dt>
+                <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{{ submission.campaign_name }}</dd>
+            </div>
+            <div class="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                <dt class="text-sm font-medium text-gray-500">Candidate</dt>
+                <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{{ submission.email }}</dd>
+            </div>
+            <div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                <dt class="text-sm font-medium text-gray-500">Creation Time</dt>
+                <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{{ submission.creation_time }}</dd>
+            </div>
+            <div class="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                <dt class="text-sm font-medium text-gray-500">Completion Time</dt>
+                <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{{ submission.completion_time or 'Not completed' }}</dd>
+            </div>
+            <div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                <dt class="text-sm font-medium text-gray-500">Is Complete</dt>
+                <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{{ "Yes" if submission.is_complete else "No" }}</dd>
+            </div>
+            <div class="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                <dt class="text-sm font-medium text-gray-500">Total Score</dt>
+                <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{{ submission.total_points }}</dd>
+            </div>
+        </dl>
+    </div>
+</div>
 
-<h2 class="text-xl font-semibold mb-4">Answers</h2>
-<div id="answers-table" class="mb-4"></div>
+<h2 class="text-xl font-bold mb-4">Answers</h2>
 
-<a href="{{ url_for('admin_create_campaign') }}" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700">Create New Campaign</a>
+{% for answer in submission_answers %}
+<div class="bg-white shadow overflow-hidden sm:rounded-lg mb-4">
+    <div class="px-4 py-5 sm:px-6">
+        <h3 class="text-lg leading-6 font-medium text-gray-900">{{ answer.question_title }}</h3>
+    </div>
+    <div class="border-t border-gray-200">
+        <dl>
+            <div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                <dt class="text-sm font-medium text-gray-500">Video</dt>
+                <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                    <a href="{{ url_for('watch_video', filename=answer.video_path.split('/')[-1]) }}" class="text-blue-600 hover:text-blue-900" target="_blank">Watch Video</a>
+                </dd>
+            </div>
+            <div class="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                <dt class="text-sm font-medium text-gray-500">Transcript</dt>
+                <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{{ answer.transcript }}</dd>
+            </div>
+            <div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                <dt class="text-sm font-medium text-gray-500">Score</dt>
+                <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{{ answer.score if answer.score is not none else 'Not scored yet' }}</dd>
+            </div>
+            <div class="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                <dt class="text-sm font-medium text-gray-500">Score Rationale</dt>
+                <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{{ answer.score_rationale or 'No rationale provided' }}</dd>
+            </div>
+        </dl>
+    </div>
+</div>
+{% endfor %}
+
+{% if not submission.is_complete %}
+<div class="mt-6">
+    <button id="score-submission" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-700">Score Submission</button>
+</div>
+{% endif %}
 
 <script src="https://unpkg.com/tabulator-tables@5.0.7/dist/js/tabulator.min.js"></script>
 <link href="https://unpkg.com/tabulator-tables@5.0.7/dist/css/tabulator.min.css" rel="stylesheet">
@@ -41,6 +109,61 @@
             ajaxResponse: function(url, params, response) {
                 console.log(response);  // Debugging: Log the API response
                 return response;
+            }
+        });
+
+        // Score submission button handler
+        const scoreBtn = document.getElementById('score-submission');
+        if (scoreBtn) {
+            scoreBtn.addEventListener('click', function() {
+                if (confirm('Are you sure you want to score this submission? This will generate AI-based scores for all answers.')) {
+                    scoreBtn.textContent = 'Scoring...';
+                    scoreBtn.disabled = true;
+                    
+                    fetch(`/finalize_submission/{{ submission.id }}`, {
+                        method: 'POST'
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.message) {
+                            alert(data.message);
+                            window.location.reload();
+                        } else {
+                            alert('Error: ' + data.error);
+                            scoreBtn.textContent = 'Score Submission';
+                            scoreBtn.disabled = false;
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert('An error occurred while scoring');
+                        scoreBtn.textContent = 'Score Submission';
+                        scoreBtn.disabled = false;
+                    });
+                }
+            });
+        }
+        
+        // Delete submission button handler
+        document.getElementById('delete-submission-btn').addEventListener('click', function() {
+            if (confirm("Are you sure you want to delete this submission? This will also delete all submission answers.")) {
+                fetch(`/api/submissions/{{ submission.id }}`, {
+                    method: 'DELETE'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.message) {
+                        alert(data.message);
+                        // Redirect to campaign page
+                        window.location.href = '/admin/campaigns/{{ campaign_id }}';
+                    } else {
+                        alert('Error: ' + data.error);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred while deleting the submission');
+                });
             }
         });
     });
