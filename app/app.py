@@ -562,5 +562,22 @@ def index():
     else:
         return render_template("candidate_index.html")
 
+@app.route("/admin/users/<int:user_id>")
+@admin_required
+def admin_user_details(user_id):
+    conn = get_db_connection()
+    with conn.cursor(dictionary=True) as cursor:
+        # Get user details
+        cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
+        user = cursor.fetchone()
+        
+        if not user:
+            flash("User not found", "error")
+            return redirect(url_for("admin_users"))
+    
+    conn.close()
+    
+    return render_template("admin/users/user.html", user=user)
+
 if __name__ == "__main__":
     app.run()
