@@ -1,7 +1,8 @@
 app/__pycache__/*
 debug/.venv/*
 debug/.env
-app/.env
+frontend/src/app/.env.local
+
 frontend/node_modules
 backend/app/.env
 backend/venv
