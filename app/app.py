@@ -493,7 +493,8 @@ def admin_submission_report(submission_id):
     
     # Get submission details
     cursor.execute("""
-        SELECT submissions.*, users.email, campaigns.title AS campaign_name, campaigns.campaign_context
+        SELECT submissions.*, users.email, users.name AS user_name, 
+               campaigns.title AS campaign_name, campaigns.campaign_context
         FROM submissions
         JOIN users ON submissions.user_id = users.id
         JOIN campaigns ON submissions.campaign_id = campaigns.id
@@ -522,35 +523,117 @@ def admin_submission_report(submission_id):
     
     conn.close()
     
-    # Generate PDF report
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", size=10)
+    # Generate PDF report with improved formatting
+    class PDF(FPDF):
+        def header(self):
+            # Set font for header
+            self.set_font('Arial', 'B', 12)
+            # Title
+            self.cell(0, 10, f"Candidate Submission Report", 0, 1, 'C')
+            # Line break
+            self.ln(4)
+            
+        def footer(self):
+            # Position at 1.5 cm from bottom
+            self.set_y(-15)
+            # Set font for footer
+            self.set_font('Arial', 'I', 8)
+            # Page number
+            self.cell(0, 10, f'Page {self.page_no()}', 0, 0, 'C')
     
-    # Add campaign details
-    pdf.cell(200, 10, txt=f"Campaign: {submission['campaign_name']}", ln=True, align='C')
-    pdf.cell(200, 10, txt=f"Context: {submission['campaign_context']}", ln=True, align='C')
-    pdf.ln(10)
+    pdf = PDF()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.add_page()
+    
+    # Add submission details section
+    pdf.set_font('Arial', 'B', 11)
+    pdf.cell(0, 10, "Submission Details", 0, 1, 'L')
+    pdf.set_font('Arial', '', 10)
+    pdf.cell(40, 8, "Candidate:", 0, 0)
+    pdf.cell(0, 8, f"{submission['user_name']} ({submission['email']})", 0, 1)
+    pdf.cell(40, 8, "Campaign:", 0, 0)
+    pdf.cell(0, 8, f"{submission['campaign_name']}", 0, 1)
+    pdf.cell(40, 8, "Date:", 0, 0)
+    pdf.cell(0, 8, f"{submission['creation_time']}", 0, 1)
+    pdf.cell(40, 8, "Total Score:", 0, 0)
+    pdf.cell(0, 8, f"{submission['total_points']} points", 0, 1)
+    
+    # Add campaign context
+    pdf.ln(5)
+    pdf.set_font('Arial', 'B', 11)
+    pdf.cell(0, 10, "Campaign Context:", 0, 1, 'L')
+    pdf.set_font('Arial', '', 10)
+    pdf.multi_cell(0, 8, f"{submission['campaign_context']}")
     
     # Add questions and answers
-    for question in questions:
+    total_points = 0
+    max_total_points = 0
+    
+    for i, question in enumerate(questions):
         answer = next((a for a in answers if a['question_id'] == question['id']), None)
         if answer:
-            pdf.set_font("Arial", style='B', size=10)
-            pdf.cell(200, 10, txt=f"Question: {question['title']}", ln=True)
-            pdf.set_font("Arial", size=10)
-            pdf.multi_cell(200, 10, txt=f"Body: {question['body']}")
-            pdf.multi_cell(200, 10, txt=f"Scoring Prompt: {question['scoring_prompt']}")
-            pdf.multi_cell(200, 10, txt=f"Transcript: {answer['transcript']}")
-            pdf.cell(200, 10, txt=f"Score: {answer['score']} / {question['max_points']}", ln=True)
+            total_points += answer['score']
+            max_total_points += question['max_points']
+            
+            # Add question section
             pdf.ln(10)
+            pdf.set_font('Arial', 'B', 11)
+            pdf.cell(0, 10, f"Question {i+1}: {question['title']}", 0, 1, 'L')
+            
+            # Question body
+            pdf.set_font('Arial', 'B', 10)
+            pdf.cell(0, 8, "Question:", 0, 1)
+            pdf.set_font('Arial', '', 10)
+            pdf.multi_cell(0, 8, f"{question['body']}")
+            
+            # Scoring criteria
+            pdf.ln(5)
+            pdf.set_font('Arial', 'B', 10)
+            pdf.cell(0, 8, "Scoring Criteria:", 0, 1)
+            pdf.set_font('Arial', '', 10)
+            pdf.multi_cell(0, 8, f"{question['scoring_prompt']}")
+            
+            # Candidate's answer
+            pdf.ln(5)
+            pdf.set_font('Arial', 'B', 10)
+            pdf.cell(0, 8, "Candidate's Response:", 0, 1)
+            pdf.set_font('Arial', '', 10)
+            pdf.multi_cell(0, 8, f"{answer['transcript']}")
+            
+            # Score and rationale
+            pdf.ln(5)
+            pdf.set_font('Arial', 'B', 10)
+            pdf.cell(40, 8, "Score:", 0, 0)
+            pdf.set_font('Arial', '', 10)
+            pdf.cell(0, 8, f"{answer['score']} / {question['max_points']} points", 0, 1)
+            
+            pdf.set_font('Arial', 'B', 10)
+            pdf.cell(0, 8, "Score Rationale:", 0, 1)
+            pdf.set_font('Arial', '', 10)
+            pdf.multi_cell(0, 8, f"{answer['score_rationale']}")
+            
+            # Draw a separator line
+            pdf.ln(5)
+            pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+    
+    # Add summary at the end
+    pdf.ln(10)
+    pdf.set_font('Arial', 'B', 11)
+    pdf.cell(0, 10, "Summary", 0, 1, 'L')
+    pdf.set_font('Arial', '', 10)
+    pdf.cell(70, 8, "Total Score:", 0, 0)
+    pdf.cell(0, 8, f"{total_points} / {max_total_points} points", 0, 1)
+    pdf.cell(70, 8, "Percentage Score:", 0, 0)
+    percentage = (total_points / max_total_points * 100) if max_total_points > 0 else 0
+    pdf.cell(0, 8, f"{percentage:.1f}%", 0, 1)
     
     # Save PDF to a temporary file
     pdf_output = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
     pdf.output(pdf_output.name)
     
     # Return the PDF file
-    return send_file(pdf_output.name, as_attachment=True, download_name=f"submission_report_{submission_id}.pdf")
+    return send_file(pdf_output.name, as_attachment=True, 
+                    download_name=f"candidate_submission_report_{submission_id}.pdf")
 
 @app.route("/")
 def index():
