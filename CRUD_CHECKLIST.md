@@ -31,9 +31,9 @@ Answers to each candidate submission
 [X] Delete
 
 Users
-[ ] Create
+[X] Create
 [X] Read
-[ ] Update
+[X] Update
 [X] Delete
 
 Deleting a user deletes all associated submissions and submission answers

@@ -755,5 +755,54 @@ def admin_edit_user(user_id):
     conn.close()
     return render_template("admin/users/edit_user.html", user=user)
 
+@app.route("/profile")
+@login_required
+def profile():
+    conn = get_db_connection()
+    with conn.cursor(dictionary=True) as cursor:
+        cursor.execute("SELECT * FROM users WHERE id = ?", (session["user_id"],))
+        user = cursor.fetchone()
+    conn.close()
+    return render_template("profile.html", user=user)
+
+@app.route("/edit_profile", methods=["GET", "POST"])
+@login_required
+def edit_profile():
+    conn = get_db_connection()
+    with conn.cursor(dictionary=True) as cursor:
+        cursor.execute("SELECT * FROM users WHERE id = ?", (session["user_id"],))
+        user = cursor.fetchone()
+
+        if request.method == "POST":
+            name = request.form.get("name")
+            email = request.form.get("email")
+            current_password = request.form.get("current_password")
+            new_password = request.form.get("new_password")
+            confirm_password = request.form.get("confirm_password")
+
+            if not check_password_hash(user["password_hash"], current_password):
+                flash("Incorrect current password", "danger")
+                return render_template("edit_profile.html", user=user)
+
+            if new_password and new_password != confirm_password:
+                flash("New passwords do not match", "danger")
+                return render_template("edit_profile.html", user=user)
+
+            update_sql = "UPDATE users SET name = ?, email = ? WHERE id = ?"
+            update_values = [name, email, session["user_id"]]
+
+            if new_password:
+                hashed_password = generate_password_hash(new_password, method='pbkdf2:sha256')
+                update_sql = "UPDATE users SET name = ?, email = ?, password_hash = ? WHERE id = ?"
+                update_values = [name, email, hashed_password, session["user_id"]]
+
+            cursor.execute(update_sql, update_values)
+            conn.commit()
+            flash("Profile updated successfully!", "success")
+            return redirect(url_for("profile"))
+
+    conn.close()
+    return render_template("edit_profile.html", user=user)
+
 if __name__ == "__main__":
     app.run()
