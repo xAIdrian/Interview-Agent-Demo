@@ -143,8 +143,8 @@ def get_submissions():
     
     filter_query, filter_values = build_filter_query(request.args)
     cursor.execute(f"""
-        SELECT submissions.id, submissions.campaign_id, submissions.user_id, submissions.creation_time, 
-               submissions.completion_time, submissions.is_complete, submissions.total_points, 
+        SELECT submissions.id, submissions.campaign_id, submissions.user_id, submissions.created_at, 
+               submissions.completed_at, submissions.is_complete, submissions.total_points, 
                users.email, campaigns.title AS campaign_name
         FROM submissions
         JOIN users ON submissions.user_id = users.id
@@ -158,8 +158,8 @@ def get_submissions():
         "id": str(submission[0]),
         "campaign_id": str(submission[1]),
         "user_id": str(submission[2]),
-        "creation_time": submission[3],
-        "completion_time": submission[4],
+        "created_at": submission[3],
+        "completed_at": submission[4],
         "is_complete": submission[5],
         "total_points": submission[6],
         "email": submission[7],
@@ -262,9 +262,9 @@ def create_submission():
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
-        INSERT INTO submissions (id, campaign_id, user_id, creation_time, completion_time, is_complete, total_points)
+        INSERT INTO submissions (id, campaign_id, user_id, created_at, completed_at, is_complete, total_points)
         VALUES (UUID_SHORT(), %s, %s, %s, %s, %s, %s)
-    """, (data['campaign_id'], data['user_id'], data['creation_time'], data['completion_time'], data['is_complete'], data['total_points']))
+    """, (data['campaign_id'], data['user_id'], data['created_at'], data['completed_at'], data['is_complete'], data['total_points']))
     conn.commit()
     conn.close()
     return jsonify({"message": "Submission created successfully"}), 201

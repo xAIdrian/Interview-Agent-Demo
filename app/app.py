@@ -359,7 +359,7 @@ def interview_room(campaign_id):
         submission_id = uuid.uuid4().int >> 64
 
         sql = """
-        INSERT INTO submissions (id, campaign_id, user_id, creation_time, total_points)
+        INSERT INTO submissions (id, campaign_id, user_id, created_at, total_points)
         VALUES (?, ?, ?, NOW(), ?)
         """
         try:
@@ -612,7 +612,7 @@ def admin_submission_report(submission_id):
     pdf.cell(40, 8, "Campaign:", 0, 0)
     pdf.cell(0, 8, f"{submission['campaign_name']}", 0, 1)
     pdf.cell(40, 8, "Date:", 0, 0)
-    pdf.cell(0, 8, f"{submission['creation_time']}", 0, 1)
+    pdf.cell(0, 8, f"{submission['created_at']}", 0, 1)
     pdf.cell(40, 8, "Total Score:", 0, 0)
     pdf.cell(0, 8, f"{submission['total_points']} points", 0, 1)
     

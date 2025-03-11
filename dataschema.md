@@ -20,8 +20,8 @@ max_points
 id (PK)
 campaign_id (fk)
 user_id (fk)
-creation_time (default current timestamp)
-completion_time (defaul null)
+created_at (default current timestamp)
+completed_at (defaul null)
 is_complete (bool)
 total_points
 
