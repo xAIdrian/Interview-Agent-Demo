@@ -44,6 +44,7 @@
                 <label for="max_points_1" class="block text-sm font-medium text-gray-700">Max Points</label>
                 <input type="number" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" id="max_points_1" name="questions[0][max_points]" required>
             </div>
+            <button type="button" class="delete-question mt-2 bg-red-500 text-white px-4 py-1 rounded hover:bg-red-700 text-sm">Delete Question</button>
         </div>
     </div>
     <button type="button" class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-700" onclick="addQuestion()">Add Another Question</button>
@@ -83,6 +84,7 @@ function addQuestion() {
             <label for="max_points_${questionCount}" class="block text-sm font-medium text-gray-700">Max Points</label>
             <input type="number" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" id="max_points_${questionCount}" name="questions[${questionCount - 1}][max_points]" required>
         </div>
+        <button type="button" class="delete-question mt-2 bg-red-500 text-white px-4 py-1 rounded hover:bg-red-700 text-sm">Delete Question</button>
     `;
     questionsContainer.appendChild(questionDiv);
     
@@ -101,6 +103,60 @@ function addQuestion() {
     const newUseOriginalBtn = questionDiv.querySelector('.use-original-prompt');
     newUseOriginalBtn.addEventListener('click', function() {
         useOriginalPrompt(this);
+    });
+
+    const newDeleteBtn = questionDiv.querySelector('.delete-question');
+    newDeleteBtn.addEventListener('click', function() {
+        deleteQuestion(this);
+    });
+}
+
+function deleteQuestion(button) {
+    const questionDiv = button.closest('.question');
+    questionDiv.remove();
+    reorderQuestionIndexes();
+}
+
+function reorderQuestionIndexes() {
+    // Reindex the questions after deletion
+    const questionDivs = document.querySelectorAll('.question');
+    questionCount = questionDivs.length;
+    
+    questionDivs.forEach((div, index) => {
+        // Update the name attributes to have consecutive indexes
+        div.querySelectorAll('[name^="questions["]').forEach(input => {
+            const name = input.getAttribute('name');
+            const newName = name.replace(/questions\[\d+\]/, `questions[${index}]`);
+            input.setAttribute('name', newName);
+        });
+        
+        // Update IDs and labels
+        const questionInput = div.querySelector('input[id^="question_"]');
+        if (questionInput) {
+            const newId = `question_${index + 1}`;
+            questionInput.id = newId;
+            div.querySelector('label[for^="question_"]').setAttribute('for', newId);
+        }
+        
+        const scoringPromptInput = div.querySelector('textarea[id^="scoring_prompt_"]');
+        if (scoringPromptInput) {
+            const newId = `scoring_prompt_${index + 1}`;
+            scoringPromptInput.id = newId;
+            div.querySelector('label[for^="scoring_prompt_"]').setAttribute('for', newId);
+        }
+        
+        const maxPointsInput = div.querySelector('input[id^="max_points_"]');
+        if (maxPointsInput) {
+            const newId = `max_points_${index + 1}`;
+            maxPointsInput.id = newId;
+            div.querySelector('label[for^="max_points_"]').setAttribute('for', newId);
+        }
+        
+        // Update optimize button data-question-index
+        const optimizeBtn = div.querySelector('.optimize-button');
+        if (optimizeBtn) {
+            optimizeBtn.dataset.questionIndex = index;
+        }
     });
 }
 
@@ -123,6 +179,13 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.use-original-prompt').forEach(button => {
         button.addEventListener('click', function() {
             useOriginalPrompt(this);
+        });
+    });
+
+    // Add event listeners to all "delete question" buttons
+    document.querySelectorAll('.delete-question').forEach(button => {
+        button.addEventListener('click', function() {
+            deleteQuestion(this);
         });
     });
     
