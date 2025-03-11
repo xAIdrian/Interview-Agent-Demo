@@ -496,7 +496,7 @@ def finalize_submission(submission_id):
     # Update total score in the submissions table
     cursor.execute("""
         UPDATE submissions
-        SET total_points = ?
+        SET is_complete = TRUE, total_points = ?
         WHERE id = ?
     """, (total_score, submission_id))
     
