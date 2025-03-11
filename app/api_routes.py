@@ -143,9 +143,11 @@ def get_submissions():
     filter_query, filter_values = build_filter_query(request.args)
     cursor.execute(f"""
         SELECT submissions.id, submissions.campaign_id, submissions.user_id, submissions.creation_time, 
-               submissions.completion_time, submissions.is_complete, submissions.total_points, users.email
+               submissions.completion_time, submissions.is_complete, submissions.total_points, 
+               users.email, campaigns.title AS campaign_name
         FROM submissions
         JOIN users ON submissions.user_id = users.id
+        JOIN campaigns ON submissions.campaign_id = campaigns.id
         {filter_query}
     """, filter_values)
     
@@ -159,7 +161,8 @@ def get_submissions():
         "completion_time": submission[4],
         "is_complete": submission[5],
         "total_points": submission[6],
-        "email": submission[7]
+        "email": submission[7],
+        "campaign_name": submission[8]
     } for submission in submissions])
 
 @api_bp.route('/submission_answers', methods=['GET'])
