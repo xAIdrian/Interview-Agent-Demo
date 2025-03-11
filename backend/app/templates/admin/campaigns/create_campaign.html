@@ -68,6 +68,10 @@ function addQuestion() {
             <label for="max_points_${questionCount}" class="block text-sm font-medium text-gray-700">Max Points</label>
             <input type="number" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" id="max_points_${questionCount}" name="questions[${questionCount - 1}][max_points]" required>
         </div>
+        <div class="form-group">
+            <label for="campaign_context" class="block text-sm font-medium text-gray-700">Campaign Context</label>
+            <input type="text" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" id="campaign_context" name="campaign_context" required>
+        </div>
     `;
     questionsContainer.appendChild(questionDiv);
 }
@@ -80,6 +84,7 @@ document.getElementById('create-campaign-form').addEventListener('submit', funct
         title: formData.get('title'),
         max_user_submissions: Number(formData.get('max_user_submissions')),
         is_public: formData.get('is_public') === 'on',
+        campaign_context: formData.get('campaign_context'), 
         questions: []
     };
 

@@ -1,0 +1,11 @@
+Flask==2.2.2
+mariadb
+boto3
+whisper
+Werkzeug==2.2.2
+fpdf
+botocore
+openai
+python-dotenv
+numpy
+livekit

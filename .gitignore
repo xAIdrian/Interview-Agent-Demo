@@ -2,3 +2,7 @@ app/__pycache__/*
 debug/.venv/*
 debug/.env
 app/.env
+frontend/node_modules
+backend/app/.env
+backend/venv
+
