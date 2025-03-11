@@ -3,15 +3,15 @@
 Campaigns
 [X] Create
 [X] Read
-[ ] Update
-[ ] Delete
+[X] Update
+[X] Delete
 
 Deleting a campaign deletes all associated questions, submissions, and their associated submission answers.
 
 Questions (Inside Campaign)
 [X] Create
-[ ] Read
-[ ] Update
+[X] Read
+[X] Update
 [ ] Delete
 
 Deleting a question deletes all associated submission answers, and updates the max_points value for its associated campaign.
