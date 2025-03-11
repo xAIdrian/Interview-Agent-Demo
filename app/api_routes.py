@@ -308,6 +308,65 @@ def update_campaign(id):
     update_table("campaigns", id, data)
     return jsonify({"message": "Campaign updated successfully"}), 200
 
+@api_bp.route('/campaigns/<int:id>/update', methods=['POST'])
+@admin_required
+def update_campaign_with_questions(id):
+    """
+    Update a campaign and its questions (add, update, delete questions as needed)
+    """
+    data = request.json
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # Update campaign properties
+    cursor.execute("""
+        UPDATE campaigns
+        SET title = %s, max_user_submissions = %s, is_public = %s, campaign_context = %s
+        WHERE id = %s
+    """, (data['title'], data['max_user_submissions'], data['is_public'], data['campaign_context'], id))
+    
+    # Get existing questions for this campaign
+    cursor.execute("SELECT id FROM questions WHERE campaign_id = %s", (id,))
+    existing_question_ids = [row[0] for row in cursor.fetchall()]
+    
+    # Track which question IDs are still present in the updated data
+    updated_question_ids = []
+    
+    # Process each question from the form data
+    total_max_points = 0
+    for question in data['questions']:
+        if question['id']:  # Existing question - update it
+            question_id = int(question['id'])
+            updated_question_ids.append(question_id)
+            cursor.execute("""
+                UPDATE questions
+                SET title = %s, body = %s, scoring_prompt = %s, max_points = %s
+                WHERE id = %s AND campaign_id = %s
+            """, (question['title'], question['body'], question['scoring_prompt'], 
+                  question['max_points'], question_id, id))
+            total_max_points += question['max_points']
+        else:  # New question - insert it
+            cursor.execute("""
+                INSERT INTO questions (id, campaign_id, title, body, scoring_prompt, max_points)
+                VALUES (UUID_SHORT(), %s, %s, %s, %s, %s)
+            """, (id, question['title'], question['body'], question['scoring_prompt'], question['max_points']))
+            total_max_points += question['max_points']
+    
+    # Find questions that were deleted (in existing_question_ids but not in updated_question_ids)
+    for question_id in existing_question_ids:
+        if question_id not in updated_question_ids:
+            # Delete all submission answers for this question
+            cursor.execute("DELETE FROM submission_answers WHERE question_id = %s", (question_id,))
+            # Delete the question
+            cursor.execute("DELETE FROM questions WHERE id = %s", (question_id,))
+    
+    # Update the campaign's max_points
+    cursor.execute("UPDATE campaigns SET max_points = %s WHERE id = %s", (total_max_points, id))
+    
+    conn.commit()
+    conn.close()
+    return jsonify({"message": "Campaign and questions updated successfully"}), 200
+
 @api_bp.route('/questions/<int:id>', methods=['PUT'])
 @admin_required
 def update_question(id):
