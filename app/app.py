@@ -252,6 +252,37 @@ def admin_submission_details(campaign_id, submission_id):
                            user=user,
                            submission_answers=submission_answers)
 
+@app.route("/admin/campaigns/<int:campaign_id>/submissions/<int:submission_id>/edit")
+@admin_required
+def admin_edit_submission(campaign_id, submission_id):
+    conn = get_db_connection()
+    with conn.cursor(dictionary=True) as cursor:
+        # Get submission details
+        cursor.execute("""
+        SELECT submissions.*, users.email, campaigns.title AS campaign_name
+        FROM submissions
+        JOIN users ON submissions.user_id = users.id
+        JOIN campaigns ON submissions.campaign_id = campaigns.id
+        WHERE submissions.id = ?
+        """, (submission_id,))
+        submission = cursor.fetchone()
+
+        # Get submission answers
+        cursor.execute("""
+        SELECT submission_answers.*, questions.title AS question_title
+        FROM submission_answers
+        JOIN questions ON submission_answers.question_id = questions.id
+        WHERE submission_answers.submission_id = ?
+        """, (submission_id,))
+        submission_answers = cursor.fetchall()
+
+    conn.close()
+
+    return render_template("admin/campaigns/edit_submission.html",
+                           campaign_id=campaign_id,
+                           submission=submission,
+                           submission_answers=submission_answers)
+
 @app.route("/admin/campaigns/<int:campaign_id>/edit", methods=["GET"])
 @admin_required
 def admin_edit_campaign(campaign_id):

@@ -385,7 +385,37 @@ def update_submission(id):
 @admin_required
 def update_submission_answer(id):
     data = request.json
-    update_table("submission_answers", id, data)
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # Update the submission answer
+    cursor.execute("""
+        UPDATE submission_answers
+        SET transcript = %s, score = %s, score_rationale = %s
+        WHERE id = %s
+    """, (data.get('transcript'), data.get('score'), data.get('score_rationale'), id))
+
+    # Get the submission_id for the updated answer
+    cursor.execute("SELECT submission_id FROM submission_answers WHERE id = %s", (id,))
+    submission_id = cursor.fetchone()[0]
+
+    # Recalculate the total score for the submission
+    cursor.execute("""
+        SELECT SUM(score)
+        FROM submission_answers
+        WHERE submission_id = %s
+    """, (submission_id,))
+    total_score = cursor.fetchone()[0] or 0  # Use 0 if the sum is None
+
+    # Update the submission with the new total score
+    cursor.execute("""
+        UPDATE submissions
+        SET total_points = %s
+        WHERE id = %s
+    """, (total_score, submission_id))
+
+    conn.commit()
+    conn.close()
     return jsonify({"message": "Submission answer updated successfully"}), 200
 
 # DELETE routes

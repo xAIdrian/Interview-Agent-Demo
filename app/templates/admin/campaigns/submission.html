@@ -5,6 +5,7 @@
     <div class="space-x-2">
         <a href="{{ url_for('admin_submission_report', submission_id=submission.id) }}" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700">Generate Report</a>
         <button id="delete-submission-btn" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-700">Delete Submission</button>
+        <a href="{{ url_for('admin_edit_submission', submission_id=submission.id, campaign_id=campaign_id) }}" class="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-700">Edit Submission</a>
     </div>
 </div>
 
