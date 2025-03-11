@@ -5,14 +5,14 @@ title
 max_user_submissions
 max_points
 is_public (bool) default: false
-campaign_context: Context for the AI to use to understand the goals of HR.
+campaign_context text: Context for the AI to use to understand the goals of HR.
 
 # questions
 id (pk)
 campaign_id (fk)
 title
 body
-scoring_prompt
+scoring_prompt text
 max_points
 
 # submissions
@@ -32,7 +32,7 @@ question_id (fk)
 video_path
 transcript
 score (int) default NULL
-score_rationale (varchar(1000)) default NULL
+score_rationale text default NULL
 
 # users
 id (PK)
