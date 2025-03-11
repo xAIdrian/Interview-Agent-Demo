@@ -7,6 +7,11 @@
         <input type="text" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" id="title" name="title" required>
     </div>
     <div class="form-group">
+        <label for="campaign_context" class="block text-sm font-medium text-gray-700">Campaign Context</label>
+        <textarea class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" id="campaign_context" name="campaign_context" 
+                  placeholder="Provide context about this role to help guide AI scoring" rows="4"></textarea>
+    </div>
+    <div class="form-group">
         <label for="max_user_submissions" class="block text-sm font-medium text-gray-700">Max User Submissions</label>
         <input type="number" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" id="max_user_submissions" name="max_user_submissions" value="1" required>
     </div>
@@ -19,16 +24,21 @@
     <div id="questions-container" class="space-y-4">
         <div class="question form-section">
             <div class="form-group">
-                <label for="question_title_1" class="block text-sm font-medium text-gray-700">Question Title</label>
-                <input type="text" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" id="question_title_1" name="questions[0][title]" required>
-            </div>
-            <div class="form-group">
-                <label for="question_body_1" class="block text-sm font-medium text-gray-700">Question Body</label>
-                <textarea class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" id="question_body_1" name="questions[0][body]" required></textarea>
+                <label for="question_1" class="block text-sm font-medium text-gray-700">Question</label>
+                <input type="text" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" id="question_1" name="questions[0][title]" required>
             </div>
             <div class="form-group">
                 <label for="scoring_prompt_1" class="block text-sm font-medium text-gray-700">Scoring Prompt</label>
                 <textarea class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" id="scoring_prompt_1" name="questions[0][scoring_prompt]" required></textarea>
+                <button type="button" class="optimize-button mt-2 bg-green-500 text-white px-4 py-1 rounded hover:bg-green-700 text-sm" data-question-index="0">Optimize with AI</button>
+                <div class="optimized-prompt-container mt-3 hidden">
+                    <label class="block text-sm font-medium text-gray-700">AI Optimized Prompt:</label>
+                    <div class="optimized-prompt mt-2 p-3 bg-gray-100 border border-gray-300 rounded-md"></div>
+                    <div class="flex space-x-2 mt-2">
+                        <button type="button" class="use-optimized-prompt bg-blue-500 text-white px-4 py-1 rounded hover:bg-blue-700 text-sm">Use optimized</button>
+                        <button type="button" class="use-original-prompt bg-gray-500 text-white px-4 py-1 rounded hover:bg-gray-700 text-sm">Use original</button>
+                    </div>
+                </div>
             </div>
             <div class="form-group">
                 <label for="max_points_1" class="block text-sm font-medium text-gray-700">Max Points</label>
@@ -53,16 +63,21 @@ function addQuestion() {
     questionDiv.classList.add('question', 'form-section');
     questionDiv.innerHTML = `
         <div class="form-group">
-            <label for="question_title_${questionCount}" class="block text-sm font-medium text-gray-700">Question Title</label>
-            <input type="text" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" id="question_title_${questionCount}" name="questions[${questionCount - 1}][title]" required>
-        </div>
-        <div class="form-group">
-            <label for="question_body_${questionCount}" class="block text-sm font-medium text-gray-700">Question Body</label>
-            <textarea class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" id="question_body_${questionCount}" name="questions[${questionCount - 1}][body]" required></textarea>
+            <label for="question_${questionCount}" class="block text-sm font-medium text-gray-700">Question</label>
+            <input type="text" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" id="question_${questionCount}" name="questions[${questionCount - 1}][title]" required>
         </div>
         <div class="form-group">
             <label for="scoring_prompt_${questionCount}" class="block text-sm font-medium text-gray-700">Scoring Prompt</label>
             <textarea class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" id="scoring_prompt_${questionCount}" name="questions[${questionCount - 1}][scoring_prompt]" required></textarea>
+            <button type="button" class="optimize-button mt-2 bg-green-500 text-white px-4 py-1 rounded hover:bg-green-700 text-sm" data-question-index="${questionCount - 1}">Optimize with AI</button>
+            <div class="optimized-prompt-container mt-3 hidden">
+                <label class="block text-sm font-medium text-gray-700">AI Optimized Prompt:</label>
+                <div class="optimized-prompt mt-2 p-3 bg-gray-100 border border-gray-300 rounded-md"></div>
+                <div class="flex space-x-2 mt-2">
+                    <button type="button" class="use-optimized-prompt bg-blue-500 text-white px-4 py-1 rounded hover:bg-blue-700 text-sm">Use optimized</button>
+                    <button type="button" class="use-original-prompt bg-gray-500 text-white px-4 py-1 rounded hover:bg-gray-700 text-sm">Use original</button>
+                </div>
+            </div>
         </div>
         <div class="form-group">
             <label for="max_points_${questionCount}" class="block text-sm font-medium text-gray-700">Max Points</label>
@@ -70,46 +85,192 @@ function addQuestion() {
         </div>
     `;
     questionsContainer.appendChild(questionDiv);
+    
+    // Add event listener to the newly created optimize button
+    const newOptimizeBtn = questionDiv.querySelector('.optimize-button');
+    newOptimizeBtn.addEventListener('click', function() {
+        optimizePrompt(this);
+    });
+    
+    // Add event listeners to the newly created buttons
+    const newUseOptimizedBtn = questionDiv.querySelector('.use-optimized-prompt');
+    newUseOptimizedBtn.addEventListener('click', function() {
+        useOptimizedPrompt(this);
+    });
+    
+    const newUseOriginalBtn = questionDiv.querySelector('.use-original-prompt');
+    newUseOriginalBtn.addEventListener('click', function() {
+        useOriginalPrompt(this);
+    });
 }
 
-document.getElementById('create-campaign-form').addEventListener('submit', function(event) {
-    event.preventDefault();
-    const formData = new FormData(event.target);
-    
-    const data = {
-        title: formData.get('title'),
-        max_user_submissions: Number(formData.get('max_user_submissions')),
-        is_public: formData.get('is_public') === 'on',
-        questions: []
-    };
-
-    for (let i = 0; i < questionCount; i++) {
-        data.questions.push({
-            title: formData.get(`questions[${i}][title]`),
-            body: formData.get(`questions[${i}][body]`),
-            scoring_prompt: formData.get(`questions[${i}][scoring_prompt]`),
-            max_points: Number(formData.get(`questions[${i}][max_points]`))
+document.addEventListener('DOMContentLoaded', function() {
+    // Add event listeners to all optimize buttons
+    document.querySelectorAll('.optimize-button').forEach(button => {
+        button.addEventListener('click', function() {
+            optimizePrompt(this);
         });
-    }
+    });
+    
+    // Add event listeners to all "use optimized prompt" buttons
+    document.querySelectorAll('.use-optimized-prompt').forEach(button => {
+        button.addEventListener('click', function() {
+            useOptimizedPrompt(this);
+        });
+    });
+    
+    // Add event listeners to all "use original prompt" buttons
+    document.querySelectorAll('.use-original-prompt').forEach(button => {
+        button.addEventListener('click', function() {
+            useOriginalPrompt(this);
+        });
+    });
+    
+    document.getElementById('create-campaign-form').addEventListener('submit', function(event) {
+        event.preventDefault();
+        const formData = new FormData(event.target);
+        
+        const data = {
+            title: formData.get('title'),
+            campaign_context: formData.get('campaign_context') || '',
+            max_user_submissions: Number(formData.get('max_user_submissions')),
+            is_public: formData.get('is_public') === 'on',
+            questions: []
+        };
 
-    fetch('/api/campaigns', {
+        for (let i = 0; i < questionCount; i++) {
+            const title = formData.get(`questions[${i}][title]`);
+            data.questions.push({
+                title: title,
+                body: title, // Use question title as body
+                scoring_prompt: formData.get(`questions[${i}][scoring_prompt]`),
+                max_points: Number(formData.get(`questions[${i}][max_points]`))
+            });
+        }
+
+        fetch('/api/campaigns', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.message) {
+                window.location.href = '/admin/campaigns';
+            } else {
+                alert('Error creating campaign: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+        });
+    });
+});
+
+function optimizePrompt(button) {
+    // Get required field values
+    const campaignTitle = document.getElementById('title').value.trim();
+    const campaignContext = document.getElementById('campaign_context').value.trim();
+    
+    const questionIndex = button.dataset.questionIndex;
+    const questionInput = document.getElementById(`question_${parseInt(questionIndex) + 1}`);
+    const questionText = questionInput.value.trim();
+    const promptTextarea = document.getElementById(`scoring_prompt_${parseInt(questionIndex) + 1}`);
+    const originalPrompt = promptTextarea.value.trim();
+    
+    // Store the original prompt for the "use original" functionality
+    promptTextarea.dataset.originalPrompt = originalPrompt;
+    
+    // Validate all required fields are filled
+    if (!campaignTitle) {
+        alert('Please enter a campaign title before optimizing');
+        return;
+    }
+    
+    if (!campaignContext) {
+        alert('Please enter campaign context before optimizing');
+        return;
+    }
+    
+    if (!questionText) {
+        alert('Please enter a question before optimizing');
+        return;
+    }
+    
+    if (!originalPrompt) {
+        alert('Please enter a scoring prompt before optimizing');
+        return;
+    }
+    
+    // Show loading state
+    button.textContent = 'Optimizing...';
+    button.disabled = true;
+    
+    // Send prompt to server for optimization with all required fields
+    fetch('/api/optimize_prompt', {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(data)
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+            campaign_name: campaignTitle,
+            campaign_context: campaignContext,
+            question: questionText,
+            prompt: originalPrompt 
+        })
     })
     .then(response => response.json())
     .then(data => {
-        if (data.message) {
-            window.location.href = '/admin/campaigns';
-        } else {
-            alert('Error creating campaign: ' + data.error);
+        // Reset button
+        button.textContent = 'Optimize with AI';
+        button.disabled = false;
+        
+        if (data.error) {
+            alert('Error optimizing prompt: ' + data.error);
+            return;
         }
+        
+        // Display the optimized prompt
+        const container = button.nextElementSibling;
+        container.classList.remove('hidden');
+        const optimizedPromptDiv = container.querySelector('.optimized-prompt');
+        optimizedPromptDiv.textContent = data.optimized_prompt;
     })
     .catch(error => {
-        console.error('Error:', error);
+        // Reset button
+        button.textContent = 'Optimize with AI';
+        button.disabled = false;
+        alert('Error: ' + error);
     });
-});
+}
+
+function useOptimizedPrompt(button) {
+    const container = button.closest('.optimized-prompt-container');
+    const optimizedPrompt = container.querySelector('.optimized-prompt').textContent;
+    const questionContainer = container.closest('.question');
+    const questionIndex = Array.from(document.querySelectorAll('.question')).indexOf(questionContainer);
+    const promptTextarea = document.getElementById(`scoring_prompt_${questionIndex + 1}`);
+    
+    // Update the textarea with the optimized prompt
+    promptTextarea.value = optimizedPrompt;
+    
+    // Hide the optimized prompt container
+    container.classList.add('hidden');
+}
+
+function useOriginalPrompt(button) {
+    const container = button.closest('.optimized-prompt-container');
+    const questionContainer = container.closest('.question');
+    const questionIndex = Array.from(document.querySelectorAll('.question')).indexOf(questionContainer);
+    const promptTextarea = document.getElementById(`scoring_prompt_${questionIndex + 1}`);
+    
+    // Restore the original prompt from the dataset
+    if (promptTextarea.dataset.originalPrompt) {
+        promptTextarea.value = promptTextarea.dataset.originalPrompt;
+    }
+    
+    // Hide the optimized prompt container
+    container.classList.add('hidden');
+}
 </script>
 {% endblock %}
