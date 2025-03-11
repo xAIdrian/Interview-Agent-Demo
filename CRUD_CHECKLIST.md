@@ -19,7 +19,7 @@ Deleting a question deletes all associated submission answers, and updates the m
 Candidate Submissions
 [ ] Create
 [X] Read
-[ ] Update
+[X] Update
 [X] Delete
 
 Deleting a candidate submission deletes all associated submission answers.
@@ -27,7 +27,7 @@ Deleting a candidate submission deletes all associated submission answers.
 Answers to each candidate submission
 [ ] Create
 [X] Read
-[ ] Update
+[X] Update
 [X] Delete
 
 Users

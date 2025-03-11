@@ -126,13 +126,13 @@ def admin_create_user():
 
         conn = get_db_connection()
         with conn.cursor() as cursor:
-            sql = "INSERT INTO users (id, email, password, is_admin) VALUES (UUID_SHORT(), ?, ?, ?)"
-            cursor.execute(sql, (email, hashed_password, is_admin))
+            sql = "INSERT INTO users (id, email, name, password_hash, is_admin) VALUES (UUID_SHORT(), ?, ?, ?, ?)"
+            cursor.execute(sql, (email, name, hashed_password, is_admin))
         conn.commit()
         conn.close()
 
         flash(f"User created successfully! The password is: {password}", "success")
-        return redirect(url_for("admin_users"))
+        return render_template("admin/users/create_user_confirmation.html", password=password)
 
     return render_template("admin/users/create_user.html")
 
@@ -715,6 +715,45 @@ def admin_user_details(user_id):
     conn.close()
     
     return render_template("admin/users/user.html", user=user)
+
+@app.route("/admin/users/<int:user_id>/edit", methods=["GET", "POST"])
+@admin_required
+def admin_edit_user(user_id):
+    conn = get_db_connection()
+    with conn.cursor(dictionary=True) as cursor:
+        # Get user details
+        cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
+        user = cursor.fetchone()
+
+        if not user:
+            flash("User not found", "error")
+            return redirect(url_for("admin_users"))
+
+        if request.method == "POST":
+            email = request.form.get("email")
+            name = request.form.get("name")
+            is_admin = request.form.get("is_admin") == "on"
+            reset_password = request.form.get("reset_password") == "on"
+
+            update_sql = "UPDATE users SET email = ?, name = ?, is_admin = ? WHERE id = ?"
+            update_values = [email, name, is_admin, user_id]
+
+            if reset_password:
+                # Generate a new random password
+                password = ''.join(random.choices(string.ascii_letters + string.digits, k=12))
+                hashed_password = generate_password_hash(password, method='pbkdf2:sha256')
+                update_sql = "UPDATE users SET email = ?, name = ?, is_admin = ?, password_hash = ? WHERE id = ?"
+                update_values = [email, name, is_admin, hashed_password, user_id]
+                flash(f"User updated successfully! The new password is: {password}", "success")
+                return render_template("admin/users/edit_user_confirmation.html", password=password)
+
+            cursor.execute(update_sql, update_values)
+            conn.commit()
+            flash("User updated successfully!", "success")
+            return redirect(url_for("admin_user_details", user_id=user_id))
+
+    conn.close()
+    return render_template("admin/users/edit_user.html", user=user)
 
 if __name__ == "__main__":
     app.run()

@@ -3,7 +3,10 @@
 {% block content %}
 <div class="flex justify-between mb-4">
     <h1 class="text-2xl font-bold">User: {{ user.email }}</h1>
-    <button id="delete-user-btn" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-700">Delete User</button>
+    <div>
+        <a href="{{ url_for('admin_edit_user', user_id=user.id) }}" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700">Edit User</a>
+        <button id="delete-user-btn" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-700">Delete User</button>
+    </div>
 </div>
 <p class="mb-2">Name: {{ user.name }}</p>
 <p class="mb-4">Admin: {{ "Yes" if user.is_admin else "No" }}</p>
