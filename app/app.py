@@ -227,6 +227,13 @@ def admin_submission_details(campaign_id, submission_id):
         WHERE submissions.id = ?
         """, (submission_id,))
         submission = cursor.fetchone()
+
+        # Get user
+        cursor.execute("""
+        SELECT * FROM USERS
+        WHERE id = ?
+        """, (submission['user_id'],))
+        user = cursor.fetchone()
         
         # Get submission answers
         cursor.execute("""
@@ -242,6 +249,7 @@ def admin_submission_details(campaign_id, submission_id):
     return render_template("admin/campaigns/submission.html",
                            campaign_id=campaign_id,
                            submission=submission,
+                           user=user,
                            submission_answers=submission_answers)
 
 # Mock: Example function to get campaign questions from DB
