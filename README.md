@@ -18,6 +18,10 @@ pip install git+https://github.com/openai/whisper.git
 brew services start mariadb
 ```
 
+### Getting it running
+
+**1. Agent Service 2. Flask Service 3. Flask Frontend**
+
 Running our flask server with a work thread kicked off
 ```
 python3 app.py
@@ -36,3 +40,6 @@ Run our Next.js (frontend only) with our command:
 npm run dev
 ```
 
+[Learn about LiveKit agents](https://docs.livekit.io/agents-js/)
+
+[Don't forget that we need to get information from the session in progress](https://docs.livekit.io/agents/voice-agent/transcriptions/)
