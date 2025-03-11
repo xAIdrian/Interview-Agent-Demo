@@ -1,7 +1,12 @@
 from openai import OpenAI
 import json
+from dotenv import load_dotenv
+import os
 
-client = OpenAI()
+load_dotenv()
+
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
 
 def format_questions(questions, answers):
     prompt = "# QUESTIONS AND RESPONSES"
@@ -10,7 +15,7 @@ def format_questions(questions, answers):
         prompt += f"Question: {question['body']}\n"
         prompt += f"Scoring Criteria: {question['scoring_prompt']}\n"
         prompt += f"Maximum # of points: {question['max_points']}\n"
-        answer = next((a for a in answers if a['question_id'] == question['id']), None)
+        answer = next((a for a in answers if a["question_id"] == question["id"]), None)
         if answer:
             prompt += f"Response: {answer['transcript']}\n"
         else:
@@ -18,18 +23,17 @@ def format_questions(questions, answers):
         prompt += "\n"
     return prompt
 
+
 def openai_response(system_prompt, user_prompt):
     completion = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
             {"role": "system", "content": system_prompt},
-            {
-                "role": "user",
-                "content": user_prompt
-            }
-        ]
+            {"role": "user", "content": user_prompt},
+        ],
     )
     return completion.choices[0].message.content
+
 
 def generate_submission_scoring(campaign, questions, answers):
     campaign_title = campaign["title"]
