@@ -12,7 +12,7 @@ Questions (Inside Campaign)
 [X] Create
 [X] Read
 [X] Update
-[ ] Delete
+[X] Delete
 
 Deleting a question deletes all associated submission answers, and updates the max_points value for its associated campaign.
 
@@ -28,10 +28,10 @@ Answers to each candidate submission
 [ ] Create
 [X] Read
 [ ] Update
-[ ] Delete
+[X] Delete
 
 Users
-[X] Create
+[ ] Create
 [X] Read
 [ ] Update
 [X] Delete
