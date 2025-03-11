@@ -16,6 +16,10 @@ from fpdf import FPDF
 
 from api_routes import api_bp
 from scoring_agent import generate_submission_scoring
+import os
+import tempfile
+from create_campaign_from_doc import extract_text_from_file, generate_campaign_context, generate_interview_questions
+from utils.file_handling import SafeTemporaryFile, safe_delete
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -803,6 +807,82 @@ def edit_profile():
 
     conn.close()
     return render_template("edit_profile.html", user=user)
+
+@app.route("/admin/campaigns/create-from-doc", methods=["GET", "POST"])
+@admin_required
+def admin_create_campaign_from_doc():
+    if request.method == "POST":
+        title = request.form.get("title")
+        max_user_submissions = request.form.get("max_user_submissions", 1)
+        is_public = request.form.get("is_public") == "on"
+        
+        # Get the job description from either uploaded file or pasted text
+        job_description = ""
+        active_tab = request.form.get("active_tab", "upload")
+        
+        if active_tab == "upload" and "document" in request.files:
+            file = request.files["document"]
+            if file.filename:
+                # Use our safe temporary file handler instead
+                with SafeTemporaryFile(suffix=os.path.splitext(file.filename)[1]) as temp_file:
+                    file.save(temp_file.name)
+                    
+                    # Process the file
+                    try:
+                        job_description = extract_text_from_file(temp_file.name)
+                    except Exception as e:
+                        flash(f"Error processing file: {str(e)}", "error")
+                        return redirect(url_for("admin_create_campaign_from_doc"))
+        else:
+            # Use pasted text
+            job_description = request.form.get("job_description", "")
+        
+        if not job_description:
+            flash("Please provide a job description either by uploading a document or pasting text.", "error")
+            return redirect(url_for("admin_create_campaign_from_doc"))
+        
+        # Generate campaign context and questions using AI
+        campaign_context = generate_campaign_context(job_description)
+        questions = generate_interview_questions(job_description, campaign_context)
+
+
+        if not campaign_context or not questions:
+            flash("Failed to generate campaign content. Please try again or create a campaign manually.", "error")
+            return redirect(url_for("admin_create_campaign_from_doc"))
+
+        # Create campaign
+        total_points = sum(q["max_points"] for q in questions)
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        campaign_id = uuid.uuid4().int >> 64
+        cursor.execute("""
+            INSERT INTO campaigns (id, title, max_user_submissions, max_points, is_public, campaign_context)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """, (campaign_id, title, max_user_submissions, total_points, is_public, campaign_context))
+        conn.commit()
+        conn.close()
+
+        for question in questions:
+            title = question["question"]
+            body = question["question"]
+            scoring_prompt = question["scoring_prompt"]
+            max_points = question["max_points"]
+
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO questions (id, campaign_id, title, body, scoring_prompt, max_points)
+                VALUES (UUID_SHORT(), %s, %s, %s, %s, %s)
+            """, (campaign_id, title, body, scoring_prompt, max_points))
+        
+            conn.commit()
+            conn.close()
+        
+        # Pass the generated content to the result template for review
+        return redirect(url_for("admin_edit_campaign", campaign_id=campaign_id))
+    
+    return render_template("admin/campaigns/create_campaign_from_doc.html")
+
 
 if __name__ == "__main__":
     app.run()
