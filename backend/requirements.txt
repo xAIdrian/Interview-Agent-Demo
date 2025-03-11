@@ -10,3 +10,4 @@ python-dotenv
 numpy
 livekit
 livekit-agents
+livekit-plugins-deepgram
