@@ -252,6 +252,29 @@ def admin_submission_details(campaign_id, submission_id):
                            user=user,
                            submission_answers=submission_answers)
 
+@app.route("/admin/campaigns/<int:campaign_id>/edit", methods=["GET"])
+@admin_required
+def admin_edit_campaign(campaign_id):
+    conn = get_db_connection()
+    with conn.cursor(dictionary=True) as cursor:
+        # Get campaign details
+        cursor.execute("SELECT * FROM campaigns WHERE id = ?", (campaign_id,))
+        campaign = cursor.fetchone()
+        
+        if not campaign:
+            flash("Campaign not found", "error")
+            return redirect(url_for("admin_campaigns"))
+        
+        # Get campaign questions
+        cursor.execute("SELECT * FROM questions WHERE campaign_id = ?", (campaign_id,))
+        questions = cursor.fetchall()
+    
+    conn.close()
+    
+    return render_template("admin/campaigns/edit_campaign.html",
+                          campaign=campaign,
+                          questions=questions)
+
 # Mock: Example function to get campaign questions from DB
 def get_campaign_questions(campaign_id):
     conn = get_db_connection()

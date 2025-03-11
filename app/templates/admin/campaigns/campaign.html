@@ -3,7 +3,10 @@
 {% block content %}
 <div class="flex justify-between mb-4">
     <h1 class="text-2xl font-bold">Campaign: {{ campaign.title }}</h1>
-    <button id="delete-campaign-btn" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-700">Delete Campaign</button>
+    <div class="space-x-2">
+        <a href="{{ url_for('admin_edit_campaign', campaign_id=campaign.id) }}" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700">Edit Campaign</a>
+        <button id="delete-campaign-btn" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-700">Delete Campaign</button>
+    </div>
 </div>
 <p class="mb-2">Max User Submissions: {{ campaign.max_user_submissions }}</p>
 <p class="mb-4">Max Points: {{ campaign.max_points }}</p>
