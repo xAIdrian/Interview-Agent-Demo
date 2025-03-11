@@ -20,6 +20,9 @@ export type ConnectionDetails = {
   participantToken: string;
 };
 
+// dynamic session and token creation for the voice assistant.
+// creates a unique identity and room name for the voice assistant.
+// returns the connection details to the voice assistant.
 export async function GET() {
   try {
     if (LIVEKIT_URL === undefined) {
@@ -59,6 +62,8 @@ export async function GET() {
   }
 }
 
+//The createParticipantToken function wraps the complexity of token generation. 
+// It uses the LiveKit SDK to produce a JWT that includes a VideoGrant, which defines the participant’s permissions within a specific room.
 function createParticipantToken(
   userInfo: AccessTokenOptions,
   roomName: string

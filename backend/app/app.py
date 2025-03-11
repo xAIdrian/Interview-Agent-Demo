@@ -27,6 +27,7 @@ from fpdf import FPDF
 from api_routes import api_bp
 from scoring_agent import generate_submission_scoring
 
+
 app = Flask(__name__)
 app.config.from_object(Config)
 app.register_blueprint(api_bp, url_prefix="/api")
@@ -659,4 +660,4 @@ def index():
 
 
 if __name__ == "__main__":
-    app.run()
+    app.run(debug=True)

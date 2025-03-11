@@ -17,3 +17,22 @@ pip install git+https://github.com/openai/whisper.git
 ```
 brew services start mariadb
 ```
+
+Running our flask server with a work thread kicked off
+```
+python3 app.py
+python3 agent.py dev
+
+# options
+Commands:
+  connect         Connect to a specific room
+  dev             Start the worker in development mode
+  download-files  Download plugin dependency files
+  start           Start the worker in production mode.
+```
+
+Run our Next.js (frontend only) with our command:
+```
+npm run dev
+```
+
