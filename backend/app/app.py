@@ -27,7 +27,6 @@ from fpdf import FPDF
 from api_routes import api_bp
 from scoring_agent import generate_submission_scoring
 
-
 app = Flask(__name__)
 app.config.from_object(Config)
 app.register_blueprint(api_bp, url_prefix="/api")
@@ -356,7 +355,6 @@ def interview_room(campaign_id):
             cursor.execute(
                 sql, (submission_id, campaign_id, user_id, 0)
             )  # Set total_points to 0 initially
-
         except mariadb.IntegrityError as e:
             return jsonify({"error": str(e)}), 400
 
