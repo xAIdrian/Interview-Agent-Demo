@@ -15,11 +15,14 @@ from livekit.agents.multimodal import MultimodalAgent
 from livekit.plugins import openai
 from livekit.agents import stt, transcription
 from livekit.plugins.deepgram import STT
+import subprocess
 
 load_dotenv()
 logger = logging.getLogger("livekit-agent-worker")
 logger.setLevel(logging.INFO)
 
+prompting_questions = []
+global_ctx = None
 
 async def _forward_transcription(
     stt_stream: stt.SpeechStream,
@@ -38,6 +41,7 @@ async def _forward_transcription(
 async def entrypoint(ctx: JobContext):
     stt = STT()
     tasks = []
+    global_ctx = ctx
 
     async def transcribe_track(participant: rtc.RemoteParticipant, track: rtc.Track):
         audio_stream = stt.AudioStream(track)
@@ -73,6 +77,8 @@ async def entrypoint(ctx: JobContext):
 
 def run_multimodal_agent(ctx: JobContext, participant: rtc.RemoteParticipant):
     logger.info("starting multimodal agent")
+    
+    print("🚀 ~ prompting_questions:", prompting_questions)
 
     model = openai.realtime.RealtimeModel(
         instructions=(
@@ -100,7 +106,6 @@ def run_multimodal_agent(ctx: JobContext, participant: rtc.RemoteParticipant):
 
     # to enable the agent to speak first
     agent.generate_reply()
-
 
 if __name__ == "__main__":
     cli.run_app(

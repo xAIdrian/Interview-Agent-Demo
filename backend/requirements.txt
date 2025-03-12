@@ -11,3 +11,4 @@ numpy
 livekit
 livekit-agents
 livekit-plugins-deepgram
+livekit-plugins-openai
