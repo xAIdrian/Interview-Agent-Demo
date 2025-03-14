@@ -4,7 +4,10 @@
 
 <div id="campaigns-table" class="mb-4"></div>
 
-<a href="{{ url_for('admin_create_campaign') }}" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700">Create New Campaign</a>
+<div class="flex space-x-4 mt-4">
+    <a href="{{ url_for('admin_create_campaign') }}" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700">Create Campaign from Scratch</a>
+    <a href="{{ url_for('admin_create_campaign_from_doc') }}" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-700">Create Campaign from Document</a>
+</div>
 
 <script src="https://unpkg.com/tabulator-tables@5.0.7/dist/js/tabulator.min.js"></script>
 <link href="https://unpkg.com/tabulator-tables@5.0.7/dist/css/tabulator.min.css" rel="stylesheet">
