@@ -4,6 +4,7 @@ from functools import wraps
 import boto3
 import uuid
 from config import Config
+from scoring_agent import optimize_with_ai
 
 # Create a Blueprint for the API routes
 api_bp = Blueprint('api', __name__)
@@ -142,10 +143,12 @@ def get_submissions():
     
     filter_query, filter_values = build_filter_query(request.args)
     cursor.execute(f"""
-        SELECT submissions.id, submissions.campaign_id, submissions.user_id, submissions.creation_time, 
-               submissions.completion_time, submissions.is_complete, submissions.total_points, users.email
+        SELECT submissions.id, submissions.campaign_id, submissions.user_id, submissions.created_at, 
+               submissions.completed_at, submissions.is_complete, submissions.total_points, 
+               users.email, campaigns.title AS campaign_name
         FROM submissions
         JOIN users ON submissions.user_id = users.id
+        JOIN campaigns ON submissions.campaign_id = campaigns.id
         {filter_query}
     """, filter_values)
     
@@ -155,11 +158,12 @@ def get_submissions():
         "id": str(submission[0]),
         "campaign_id": str(submission[1]),
         "user_id": str(submission[2]),
-        "creation_time": submission[3],
-        "completion_time": submission[4],
+        "created_at": submission[3],
+        "completed_at": submission[4],
         "is_complete": submission[5],
         "total_points": submission[6],
-        "email": submission[7]
+        "email": submission[7],
+        "campaign_name": submission[8]
     } for submission in submissions])
 
 @api_bp.route('/submission_answers', methods=['GET'])
@@ -258,9 +262,9 @@ def create_submission():
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
-        INSERT INTO submissions (id, campaign_id, user_id, creation_time, completion_time, is_complete, total_points)
+        INSERT INTO submissions (id, campaign_id, user_id, created_at, completed_at, is_complete, total_points)
         VALUES (UUID_SHORT(), %s, %s, %s, %s, %s, %s)
-    """, (data['campaign_id'], data['user_id'], data['creation_time'], data['completion_time'], data['is_complete'], data['total_points']))
+    """, (data['campaign_id'], data['user_id'], data['created_at'], data['completed_at'], data['is_complete'], data['total_points']))
     conn.commit()
     conn.close()
     return jsonify({"message": "Submission created successfully"}), 201
@@ -304,6 +308,65 @@ def update_campaign(id):
     update_table("campaigns", id, data)
     return jsonify({"message": "Campaign updated successfully"}), 200
 
+@api_bp.route('/campaigns/<int:id>/update', methods=['POST'])
+@admin_required
+def update_campaign_with_questions(id):
+    """
+    Update a campaign and its questions (add, update, delete questions as needed)
+    """
+    data = request.json
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # Update campaign properties
+    cursor.execute("""
+        UPDATE campaigns
+        SET title = %s, max_user_submissions = %s, is_public = %s, campaign_context = %s
+        WHERE id = %s
+    """, (data['title'], data['max_user_submissions'], data['is_public'], data['campaign_context'], id))
+    
+    # Get existing questions for this campaign
+    cursor.execute("SELECT id FROM questions WHERE campaign_id = %s", (id,))
+    existing_question_ids = [row[0] for row in cursor.fetchall()]
+    
+    # Track which question IDs are still present in the updated data
+    updated_question_ids = []
+    
+    # Process each question from the form data
+    total_max_points = 0
+    for question in data['questions']:
+        if question['id']:  # Existing question - update it
+            question_id = int(question['id'])
+            updated_question_ids.append(question_id)
+            cursor.execute("""
+                UPDATE questions
+                SET title = %s, body = %s, scoring_prompt = %s, max_points = %s
+                WHERE id = %s AND campaign_id = %s
+            """, (question['title'], question['body'], question['scoring_prompt'], 
+                  question['max_points'], question_id, id))
+            total_max_points += question['max_points']
+        else:  # New question - insert it
+            cursor.execute("""
+                INSERT INTO questions (id, campaign_id, title, body, scoring_prompt, max_points)
+                VALUES (UUID_SHORT(), %s, %s, %s, %s, %s)
+            """, (id, question['title'], question['body'], question['scoring_prompt'], question['max_points']))
+            total_max_points += question['max_points']
+    
+    # Find questions that were deleted (in existing_question_ids but not in updated_question_ids)
+    for question_id in existing_question_ids:
+        if question_id not in updated_question_ids:
+            # Delete all submission answers for this question
+            cursor.execute("DELETE FROM submission_answers WHERE question_id = %s", (question_id,))
+            # Delete the question
+            cursor.execute("DELETE FROM questions WHERE id = %s", (question_id,))
+    
+    # Update the campaign's max_points
+    cursor.execute("UPDATE campaigns SET max_points = %s WHERE id = %s", (total_max_points, id))
+    
+    conn.commit()
+    conn.close()
+    return jsonify({"message": "Campaign and questions updated successfully"}), 200
+
 @api_bp.route('/questions/<int:id>', methods=['PUT'])
 @admin_required
 def update_question(id):
@@ -322,48 +385,147 @@ def update_submission(id):
 @admin_required
 def update_submission_answer(id):
     data = request.json
-    update_table("submission_answers", id, data)
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # Update the submission answer
+    cursor.execute("""
+        UPDATE submission_answers
+        SET transcript = %s, score = %s, score_rationale = %s
+        WHERE id = %s
+    """, (data.get('transcript'), data.get('score'), data.get('score_rationale'), id))
+
+    # Get the submission_id for the updated answer
+    cursor.execute("SELECT submission_id FROM submission_answers WHERE id = %s", (id,))
+    submission_id = cursor.fetchone()[0]
+
+    # Recalculate the total score for the submission
+    cursor.execute("""
+        SELECT SUM(score)
+        FROM submission_answers
+        WHERE submission_id = %s
+    """, (submission_id,))
+    total_score = cursor.fetchone()[0] or 0  # Use 0 if the sum is None
+
+    # Update the submission with the new total score
+    cursor.execute("""
+        UPDATE submissions
+        SET total_points = %s
+        WHERE id = %s
+    """, (total_score, submission_id))
+
+    conn.commit()
+    conn.close()
     return jsonify({"message": "Submission answer updated successfully"}), 200
 
 # DELETE routes
 @api_bp.route('/users/<int:id>', methods=['DELETE'])
 @admin_required
 def delete_user(id):
+    """
+    Delete a user and all related submissions and submission answers.
+    """
     conn = get_db_connection()
     cursor = conn.cursor()
+    
+    # First get all submissions by this user
+    cursor.execute("SELECT id FROM submissions WHERE user_id = %s", (id,))
+    submissions = cursor.fetchall()
+    
+    # Delete all submission answers for each submission
+    for submission in submissions:
+        submission_id = submission[0]
+        cursor.execute("DELETE FROM submission_answers WHERE submission_id = %s", (submission_id,))
+    
+    # Delete all submissions by this user
+    cursor.execute("DELETE FROM submissions WHERE user_id = %s", (id,))
+    
+    # Finally, delete the user
     cursor.execute("DELETE FROM users WHERE id = %s", (id,))
+    
     conn.commit()
     conn.close()
-    return jsonify({"message": "User deleted successfully"}), 200
+    return jsonify({"message": "User and all related data deleted successfully"}), 200
 
 @api_bp.route('/campaigns/<int:id>', methods=['DELETE'])
 @admin_required
 def delete_campaign(id):
+    """
+    Delete a campaign and all associated questions, submissions, and submission answers.
+    """
     conn = get_db_connection()
     cursor = conn.cursor()
+    
+    # First get all submissions for this campaign
+    cursor.execute("SELECT id FROM submissions WHERE campaign_id = %s", (id,))
+    submissions = cursor.fetchall()
+    
+    # Delete all submission answers for each submission
+    for submission in submissions:
+        submission_id = submission[0]
+        cursor.execute("DELETE FROM submission_answers WHERE submission_id = %s", (submission_id,))
+    
+    # Delete all submissions for this campaign
+    cursor.execute("DELETE FROM submissions WHERE campaign_id = %s", (id,))
+    
+    # Delete all questions for this campaign
     cursor.execute("DELETE FROM questions WHERE campaign_id = %s", (id,))
+    
+    # Finally, delete the campaign
     cursor.execute("DELETE FROM campaigns WHERE id = %s", (id,))
+    
     conn.commit()
     conn.close()
-    return jsonify({"message": "Campaign and its questions deleted successfully"}), 200
+    return jsonify({"message": "Campaign and all related data deleted successfully"}), 200
 
 @api_bp.route('/questions/<int:id>', methods=['DELETE'])
 @admin_required
 def delete_question(id):
+    """
+    Delete a question, all associated submission answers, and update the max_points of its campaign.
+    """
     conn = get_db_connection()
     cursor = conn.cursor()
+    
+    # First get the question's campaign_id and max_points
+    cursor.execute("SELECT campaign_id, max_points FROM questions WHERE id = %s", (id,))
+    result = cursor.fetchone()
+    
+    if not result:
+        conn.close()
+        return jsonify({"error": "Question not found"}), 404
+        
+    campaign_id, question_max_points = result
+    
+    # Delete all submission answers for this question
+    cursor.execute("DELETE FROM submission_answers WHERE question_id = %s", (id,))
+    
+    # Delete the question
     cursor.execute("DELETE FROM questions WHERE id = %s", (id,))
+    
+    # Update the campaign's max_points
+    cursor.execute("UPDATE campaigns SET max_points = max_points - %s WHERE id = %s", 
+                  (question_max_points, campaign_id))
+    
     conn.commit()
     conn.close()
-    return jsonify({"message": "Question deleted successfully"}), 200
+    return jsonify({"message": "Question deleted successfully and campaign max_points updated"}), 200
 
 @api_bp.route('/submissions/<int:id>', methods=['DELETE'])
 @admin_required
 def delete_submission(id):
+    """
+    Delete a submission and all its associated submission answers.
+    """
     conn = get_db_connection()
     cursor = conn.cursor()
+    
+    # Delete all submission answers for this submission
     cursor.execute("DELETE FROM submission_answers WHERE submission_id = %s", (id,))
+    
+    # Delete the submission
     cursor.execute("DELETE FROM submissions WHERE id = %s", (id,))
+    
     conn.commit()
     conn.close()
     return jsonify({"message": "Submission and its answers deleted successfully"}), 200
@@ -377,3 +539,23 @@ def delete_submission_answer(id):
     conn.commit()
     conn.close()
     return jsonify({"message": "Submission answer deleted successfully"}), 200
+
+
+@api_bp.route("/optimize_prompt", methods=["POST"])
+@admin_required
+def optimize_prompt_api():
+    data = request.json
+    campaign_name = data.get("campaign_name", "")
+    campaign_context = data.get("campaign_context", "")
+    question = data.get("question", "")
+    original_prompt = data.get("prompt", "")
+    
+    if not original_prompt:
+        return jsonify({"error": "No prompt provided"}), 400
+    
+    try:
+        optimized_prompt = optimize_with_ai(campaign_name, campaign_context, question, original_prompt)
+        return jsonify({"optimized_prompt": optimized_prompt})
+    except Exception as e:
+        print(f"Error optimizing prompt: {e}")
+        return jsonify({"error": str(e)}), 500
