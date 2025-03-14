@@ -1,12 +1,7 @@
 from openai import OpenAI
 import json
-from dotenv import load_dotenv
-import os
 
-load_dotenv()
-
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
+client = OpenAI()
 
 def format_questions(questions, answers):
     prompt = "# QUESTIONS AND RESPONSES"
@@ -15,7 +10,7 @@ def format_questions(questions, answers):
         prompt += f"Question: {question['body']}\n"
         prompt += f"Scoring Criteria: {question['scoring_prompt']}\n"
         prompt += f"Maximum # of points: {question['max_points']}\n"
-        answer = next((a for a in answers if a["question_id"] == question["id"]), None)
+        answer = next((a for a in answers if a['question_id'] == question['id']), None)
         if answer:
             prompt += f"Response: {answer['transcript']}\n"
         else:
@@ -23,17 +18,18 @@ def format_questions(questions, answers):
         prompt += "\n"
     return prompt
 
-
 def openai_response(system_prompt, user_prompt):
     completion = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
+            {
+                "role": "user",
+                "content": user_prompt
+            }
+        ]
     )
     return completion.choices[0].message.content
-
 
 def generate_submission_scoring(campaign, questions, answers):
     campaign_title = campaign["title"]
@@ -68,3 +64,36 @@ Provide only the JSON array in plaintext. Do not use any markdown functionality.
     scores = openai_response(system_prompt, user_prompt)
     scores_json = json.loads(scores)
     return scores_json
+
+
+scoring_prompt_optimization_system = """Optimize this scoring prompt created by an admin to score a candidate's response.
+
+Specify what criteria constitutes full points, half points, and no points. Be clear in your definition. Start your prompt with "Full points awarded with"
+
+Only output your updated scoring prompt
+
+--
+
+Hiring Campaign: {campaign_name}
+Role information: {campaign_context}
+Question: {question}
+Original scoring prompt: {scoring_prompt}
+
+"""
+
+def optimize_with_ai(campaign_name, campaign_context, question, scoring_prompt):
+    completion = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {
+                "role": "user",
+                "content": scoring_prompt_optimization_system.format(
+                    campaign_name=campaign_name,
+                    campaign_context=campaign_context,
+                    question=question,
+                    scoring_prompt=scoring_prompt
+                )
+            }
+        ]
+    )
+    return completion.choices[0].message.content

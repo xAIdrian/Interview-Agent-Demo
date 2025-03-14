@@ -1,7 +1,13 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h1 class="text-2xl font-bold mb-4">Campaign: {{ campaign.title }}</h1>
+<div class="flex justify-between mb-4">
+    <h1 class="text-2xl font-bold">Campaign: {{ campaign.title }}</h1>
+    <div class="space-x-2">
+        <a href="{{ url_for('admin_edit_campaign', campaign_id=campaign.id) }}" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700">Edit Campaign</a>
+        <button id="delete-campaign-btn" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-700">Delete Campaign</button>
+    </div>
+</div>
 <p class="mb-2">Max User Submissions: {{ campaign.max_user_submissions }}</p>
 <p class="mb-4">Max Points: {{ campaign.max_points }}</p>
 
@@ -55,21 +61,26 @@
             }
         });
 
-        // Add filters
-        document.getElementById('filter-user-id').addEventListener('input', function() {
-            table.setFilter("user_id", "like", this.value);
-        });
-        document.getElementById('filter-creation-time').addEventListener('input', function() {
-            table.setFilter("creation_time", "like", this.value);
-        });
-        document.getElementById('filter-completion-time').addEventListener('input', function() {
-            table.setFilter("completion_time", "like", this.value);
-        });
-        document.getElementById('filter-is-complete').addEventListener('change', function() {
-            table.setFilter("is_complete", "=", this.checked);
-        });
-        document.getElementById('filter-total-points').addEventListener('input', function() {
-            table.setFilter("total_points", "like", this.value);
+        // Delete campaign button handler
+        document.getElementById('delete-campaign-btn').addEventListener('click', function() {
+            if (confirm("Are you sure you want to delete this campaign? This will also delete all associated questions and submissions.")) {
+                fetch(`/api/campaigns/${campaignId}`, {
+                    method: 'DELETE'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.message) {
+                        alert(data.message);
+                        window.location.href = '/admin/campaigns';
+                    } else {
+                        alert('Error: ' + data.error);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred while deleting the campaign');
+                });
+            }
         });
     });
 </script>
