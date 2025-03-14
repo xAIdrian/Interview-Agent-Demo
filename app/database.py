@@ -32,7 +32,10 @@ def create_users_table():
                 email VARCHAR(255) NOT NULL UNIQUE,
                 name VARCHAR(255) NOT NULL,
                 password_hash VARCHAR(255) NOT NULL,
-                is_admin BOOLEAN NOT NULL DEFAULT FALSE
+                is_admin BOOLEAN NOT NULL DEFAULT FALSE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX (email)
             )
         """)
     conn.commit()
@@ -48,7 +51,12 @@ def create_campaigns_table():
                 max_user_submissions INT NOT NULL DEFAULT 1,
                 max_points INT NOT NULL,
                 is_public BOOLEAN NOT NULL DEFAULT FALSE,
-                campaign_context TEXT
+                campaign_context TEXT,
+                created_by BIGINT UNSIGNED,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                FOREIGN KEY (created_by) REFERENCES users(id),
+                INDEX (is_public)
             )
         """)
     conn.commit()
@@ -65,7 +73,11 @@ def create_questions_table():
                 body TEXT NOT NULL,
                 scoring_prompt TEXT NOT NULL,
                 max_points INT NOT NULL,
-                FOREIGN KEY (campaign_id) REFERENCES campaigns(id)
+                order_index INT NOT NULL DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                FOREIGN KEY (campaign_id) REFERENCES campaigns(id),
+                INDEX (campaign_id)
             )
         """)
     conn.commit()
@@ -79,12 +91,15 @@ def create_submissions_table():
                 id BIGINT UNSIGNED PRIMARY KEY,
                 campaign_id BIGINT UNSIGNED NOT NULL,
                 user_id BIGINT UNSIGNED NOT NULL,
-                creation_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                completion_time TIMESTAMP DEFAULT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                completed_at TIMESTAMP DEFAULT NULL,
                 is_complete BOOLEAN NOT NULL DEFAULT FALSE,
-                total_points INT NOT NULL,
+                total_points INT NOT NULL DEFAULT 0,
                 FOREIGN KEY (campaign_id) REFERENCES campaigns(id),
-                FOREIGN KEY (user_id) REFERENCES users(id)
+                FOREIGN KEY (user_id) REFERENCES users(id),
+                INDEX (user_id, campaign_id),
+                INDEX (is_complete)
             )
         """)
     conn.commit()
@@ -101,9 +116,14 @@ def create_submission_answers_table():
                 video_path VARCHAR(255) NOT NULL,
                 transcript TEXT NOT NULL,
                 score INT DEFAULT NULL,
-                score_rationale VARCHAR(1000) DEFAULT NULL,
+                score_rationale TEXT DEFAULT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 FOREIGN KEY (submission_id) REFERENCES submissions(id),
-                FOREIGN KEY (question_id) REFERENCES questions(id)
+                FOREIGN KEY (question_id) REFERENCES questions(id),
+                INDEX (submission_id),
+                INDEX (question_id),
+                UNIQUE KEY (submission_id, question_id)
             )
         """)
     conn.commit()

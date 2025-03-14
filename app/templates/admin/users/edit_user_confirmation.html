@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1 class="text-2xl font-bold mb-4">User Password Reset Successfully</h1>
+<div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative" role="alert">
+  <strong class="font-bold">Success!</strong>
+  <span class="block sm:inline">User password reset successfully.</span>
+  <p>The new generated password is: <strong>{{ password }}</strong></p>
+  <p>Please copy and securely send this password to the user.</p>
+  <a href="{{ url_for('admin_users') }}" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700">Back to Users</a>
+</div>
+{% endblock %}

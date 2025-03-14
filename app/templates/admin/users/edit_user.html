@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1 class="text-2xl font-bold mb-4">Edit User</h1>
+<form method="POST" class="space-y-4">
+    <div>
+        <label for="email" class="block text-sm font-medium text-gray-700">Email:</label>
+        <input type="email" id="email" name="email" value="{{ user.email }}" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2">
+    </div>
+    <div>
+        <label for="name" class="block text-sm font-medium text-gray-700">Name:</label>
+        <input type="text" id="name" name="name" value="{{ user.name }}" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2">
+    </div>
+    <div>
+        <label for="is_admin" class="block text-sm font-medium text-gray-700">Admin:</label>
+        <input type="checkbox" id="is_admin" name="is_admin" {% if user.is_admin %}checked{% endif %} class="mt-1">
+    </div>
+    <div>
+        <label for="reset_password" class="block text-sm font-medium text-gray-700">Reset Password:</label>
+        <input type="checkbox" id="reset_password" name="reset_password" class="mt-1">
+    </div>
+    <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700">Update User</button>
+    <a href="{{ url_for('admin_user_details', user_id=user.id) }}" class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-700">Cancel</a>
+</form>
+{% endblock %}
