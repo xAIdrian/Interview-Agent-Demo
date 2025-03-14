@@ -26,7 +26,20 @@
           },
           cellClick: function(e, cell) {
             const campaignId = cell.getRow().getData().id;
-            window.location.href = `/interview/${campaignId}`;
+            fetch(`http://127.0.0.1:5000/interview/${campaignId}`)
+              .then(response => {
+                if (response.ok) {
+                  return response.json();
+                }
+                throw new Error('Network response was not ok.');
+              })
+              .then(data => {
+                // Redirect to the interview room or handle accordingly
+              })
+              .catch(error => {
+                console.error('There was a problem with the fetch operation:', error);
+              });
+              window.location.href = `http://localhost:3000`;
           }
         }
       ]
