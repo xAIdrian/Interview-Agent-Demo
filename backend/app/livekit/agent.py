@@ -15,7 +15,7 @@ from livekit.agents.multimodal import MultimodalAgent
 from livekit.plugins import openai
 from livekit.agents import stt, transcription
 from livekit.plugins.deepgram import STT
-import subprocess
+from prompts import sample_agent_prompt, sample_resume
 
 load_dotenv()
 logger = logging.getLogger("livekit-agent-worker")
@@ -56,14 +56,14 @@ async def entrypoint(ctx: JobContext):
         async for segment in audio_stream:
             stt_stream.push_frame(segment.frame)
 
-    @ctx.room.on("track_subscribed")
-    def on_track_subscribed(
-        track: rtc.Track,
-        publication: rtc.TrackPublication,
-        participant: rtc.RemoteParticipant,
-    ):
-        if track.kind == rtc.TrackKind.KIND_AUDIO:
-            tasks.append(asyncio.create_task(transcribe_track(participant, track)))
+    # @ctx.room.on("track_subscribed")
+    # def on_track_subscribed(
+    #     track: rtc.Track,
+    #     publication: rtc.TrackPublication,
+    #     participant: rtc.RemoteParticipant,
+    # ):
+    #     if track.kind == rtc.TrackKind.KIND_AUDIO:
+    #         tasks.append(asyncio.create_task(transcribe_track(participant, track)))
 
     logger.info(f"connecting to room {ctx.room.name}")
     await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
@@ -77,15 +77,9 @@ async def entrypoint(ctx: JobContext):
 
 def run_multimodal_agent(ctx: JobContext, participant: rtc.RemoteParticipant):
     logger.info("starting multimodal agent")
-    
-    print("🚀 ~ prompting_questions:", prompting_questions)
 
     model = openai.realtime.RealtimeModel(
-        instructions=(
-            "You are a voice assistant created by LiveKit. Your interface with users will be voice. "
-            "You should use short and concise responses, and avoiding usage of unpronouncable punctuation. "
-            "You were created as a demo to showcase the capabilities of LiveKit's agents framework."
-        ),
+        instructions=(sample_agent_prompt),
         modalities=["audio", "text"],
     )
 
@@ -93,8 +87,7 @@ def run_multimodal_agent(ctx: JobContext, participant: rtc.RemoteParticipant):
     # upon session establishment
     chat_ctx = llm.ChatContext()
     chat_ctx.append(
-        text="Context about the user: you are talking to a software engineer who's building voice AI applications."
-        "Greet the user with a friendly greeting and ask how you can help them today.",
+        text=f"Context about the user: {sample_resume}",
         role="assistant",
     )
 
