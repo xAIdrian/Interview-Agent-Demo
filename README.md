@@ -97,3 +97,43 @@ This project is an AI-powered candidate scoring system that allows administrator
 This project is licensed under the MIT License. See the LICENSE file for details.
 
 [Click here to view the project on Notion](https://www.notion.so/adrianmohnacs/Projects-Pok-dex-f99abda38000453a9f584c7139b9222b?p=19f5c918fe368117a57cd938148733b9&pm=c)
+
+
+### Dependencies
+
+Project is dependent on MariaDB you can get this running on a mac with 
+
+make sure you install whisper with 
+```
+pip install git+https://github.com/openai/whisper.git
+```
+
+```
+brew services start mariadb
+```
+
+### Getting it running
+
+**1. Agent Service 2. Flask Service 3. Flask Frontend**
+
+Running our flask server with a work thread kicked off
+```
+python3 app.py
+python3 agent.py dev
+
+# options
+Commands:
+  connect         Connect to a specific room
+  dev             Start the worker in development mode
+  download-files  Download plugin dependency files
+  start           Start the worker in production mode.
+```
+
+Run our Next.js (frontend only) with our command:
+```
+npm run dev
+```
+
+[Learn about LiveKit agents](https://docs.livekit.io/agents-js/)
+
+[Don't forget that we need to get information from the session in progress](https://docs.livekit.io/agents/voice-agent/transcriptions/)
