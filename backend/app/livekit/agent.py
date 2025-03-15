@@ -56,14 +56,14 @@ async def entrypoint(ctx: JobContext):
         async for segment in audio_stream:
             stt_stream.push_frame(segment.frame)
 
-    # @ctx.room.on("track_subscribed")
-    # def on_track_subscribed(
-    #     track: rtc.Track,
-    #     publication: rtc.TrackPublication,
-    #     participant: rtc.RemoteParticipant,
-    # ):
-    #     if track.kind == rtc.TrackKind.KIND_AUDIO:
-    #         tasks.append(asyncio.create_task(transcribe_track(participant, track)))
+    @ctx.room.on("track_subscribed")
+    def on_track_subscribed(
+        track: rtc.Track,
+        publication: rtc.TrackPublication,
+        participant: rtc.RemoteParticipant,
+    ):
+        if track.kind == rtc.TrackKind.KIND_AUDIO:
+            tasks.append(asyncio.create_task(transcribe_track(participant, track)))
 
     logger.info(f"connecting to room {ctx.room.name}")
     await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
