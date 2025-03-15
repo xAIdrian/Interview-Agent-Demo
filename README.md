@@ -112,14 +112,14 @@ pip install git+https://github.com/openai/whisper.git
 brew services start mariadb
 ```
 
-### Getting it running
+### Getting LiveKit Running
 
 **1. Agent Service 2. Flask Service 3. Flask Frontend**
 
 Running our flask server with a work thread kicked off
 ```
 python3 app.py
-python3 agent.py dev
+python3 agent.py dev #<- Runs our Livekit agent on independent thread.
 
 # options
 Commands:
