@@ -20,8 +20,13 @@ import os
 import tempfile
 from create_campaign_from_doc import extract_text_from_file, generate_campaign_context, generate_interview_questions
 from utils.file_handling import SafeTemporaryFile, safe_delete
+from flask_cors import CORS
 
 app = Flask(__name__)
+
+# Initialize CORS to allow all origins
+CORS(app)
+
 app.config.from_object(Config)
 app.register_blueprint(api_bp, url_prefix='/api')
 
@@ -341,8 +346,8 @@ def interview_room(campaign_id):
     
     # Get the real user_id from the session (assuming the user is logged in)
     user_id = session.get('user_id')
-    if not user_id:
-        return redirect(url_for('login'))  # Redirect to login if not logged in
+    # if not user_id:
+    #     return redirect(url_for('login'))  # Redirect to login if not logged in
     
     # Generate or retrieve a LiveKit token for the candidate to join the room
     livekit_token = generate_livekit_token(campaign_id, user_id)
@@ -371,7 +376,7 @@ def interview_room(campaign_id):
     conn.commit()
     conn.close()
     
-    return render_template("interview_room.html", questions=questions, livekit_token=livekit_token, submission_id=submission_id)
+    return jsonify(questions=questions)
 
 # Configure your S3 bucket name (already created)
 S3_BUCKET = "gulpin-interviews"

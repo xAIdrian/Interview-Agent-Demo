@@ -23,8 +23,16 @@ export type ConnectionDetails = {
 // dynamic session and token creation for the voice assistant.
 // creates a unique identity and room name for the voice assistant.
 // returns the connection details to the voice assistant.
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const url = new URL(request.url);
+    const campaignId = url.searchParams.get("campaignId");
+    console.log('🚀 ~ GET ~ campaignId:', campaignId);
+
+    if (!campaignId) {
+      throw new Error("campaignId is required");
+    }
+
     if (LIVEKIT_URL === undefined) {
       throw new Error("LIVEKIT_URL is not defined");
     }
@@ -36,7 +44,7 @@ export async function GET() {
     }
 
     // Generate participant token
-    const participantIdentity = `voice_assistant_user_${Math.floor(Math.random() * 10_000)}`;
+    const participantIdentity = `${campaignId}_${Math.floor(Math.random() * 10_000)}`;
     const roomName = `voice_assistant_room_${Math.floor(Math.random() * 10_000)}`;
     const participantToken = await createParticipantToken(
       { identity: participantIdentity },
