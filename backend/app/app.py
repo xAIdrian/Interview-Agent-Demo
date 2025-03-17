@@ -338,11 +338,12 @@ def generate_livekit_token(campaign_id, candidate_id):
 @app.route("/interview/<int:campaign_id>")
 def interview_room(campaign_id):
     questions = get_campaign_questions(campaign_id)
+    print('🚀 ~ questions:', questions);
     
     # Get the real user_id from the session (assuming the user is logged in)
     user_id = session.get('user_id')
-    if not user_id:
-        return redirect(url_for('login'))  # Redirect to login if not logged in
+    # if not user_id:
+    #     return redirect(url_for('login'))  # Redirect to login if not logged in
     
     # Generate or retrieve a LiveKit token for the candidate to join the room
     livekit_token = generate_livekit_token(campaign_id, user_id)
@@ -371,7 +372,7 @@ def interview_room(campaign_id):
     conn.commit()
     conn.close()
     
-    return render_template("interview_room.html", questions=questions, livekit_token=livekit_token, submission_id=submission_id)
+    return jsonify(questions=questions)
 
 # Configure your S3 bucket name (already created)
 S3_BUCKET = "gulpin-interviews"
