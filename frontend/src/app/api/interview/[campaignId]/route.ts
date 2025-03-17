@@ -10,6 +10,7 @@ export async function GET(req: NextRequest) {
     // Send a GET request to the Flask server
     const response = await axios.get(`http://127.0.0.1:5000/interview/${campaignId}`);
 
+    console.log('🚀 ~ GET ~ response:', response);
     // Return the response data as JSON
     return NextResponse.json(response.data, { status: response.status });
   } catch (error) {
