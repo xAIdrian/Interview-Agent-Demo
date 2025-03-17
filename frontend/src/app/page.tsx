@@ -10,18 +10,21 @@ import {
   AgentState,
   DisconnectButton,
 } from "@livekit/components-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { MediaDeviceFailure } from "livekit-client";
 import type { ConnectionDetails } from "./api/connection-details/route";
 import { NoAgentNotification } from "@/components/NoAgentNotification";
 import { CloseIcon } from "@/components/CloseIcon";
 import { useKrispNoiseFilter } from "@livekit/components-react/krisp";
+import { createLocalVideoTrack, Room, RoomEvent } from "livekit-client";
+
 
 export default function Page() {
   const [connectionDetails, updateConnectionDetails] = useState<
     ConnectionDetails | undefined
   >(undefined);
   const [agentState, setAgentState] = useState<AgentState>("disconnected");
+  const roomRef = useRef<Room | null>(null);
 
   const onConnectButtonClicked = useCallback(async () => {
     // Generate room connection details, including:
