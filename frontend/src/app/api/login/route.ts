@@ -1,17 +1,26 @@
-// pages/api/login.ts
-import { NextApiRequest, NextApiResponse } from 'next';
+// frontend/src/app/api/login/route.ts
+import { NextRequest, NextResponse } from 'next/server';
 import axios from 'axios';
 
-export default async (req: NextApiRequest, res: NextApiResponse) => {
-  if (req.method === 'POST') {
-    try {
-      const response = await axios.post('http://localhost:5000/login', req.body);
-      res.status(response.status).json(response.data);
-    } catch (error) {
-      res.status(500).json({ error: 'Login failed' });
-    }
-  } else {
-    res.setHeader('Allow', ['POST']);
-    res.status(405).end(`Method ${req.method} Not Allowed`);
+export async function POST(req: NextRequest) {
+  try {
+    const { email, password } = await req.json();
+
+    // Create form data
+    const formData = new URLSearchParams();
+    formData.append('email', email);
+    formData.append('password', password);
+
+    // Send form data to the Flask server
+    const response = await axios.post('http://127.0.0.1:5000/login', formData, {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+    });
+
+    return NextResponse.json(response.data, { status: response.status });
+  } catch (error) {
+    console.error('Login error:', error);
+    return NextResponse.json({ error: 'Login failed' }, { status: 500 });
   }
-};
+}
