@@ -10,38 +10,53 @@ import {
   AgentState,
   DisconnectButton,
 } from "@livekit/components-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { MediaDeviceFailure } from "livekit-client";
-import type { ConnectionDetails } from "./api/connection-details/route";
+import type { ConnectionDetails } from "../../app/api/connection-details/route";
 import { NoAgentNotification } from "@/components/NoAgentNotification";
 import { CloseIcon } from "@/components/CloseIcon";
 import { useKrispNoiseFilter } from "@livekit/components-react/krisp";
+import { useRouter } from 'next/router';
 
 export default function Page() {
   const [connectionDetails, updateConnectionDetails] = useState<
     ConnectionDetails | undefined
   >(undefined);
   const [agentState, setAgentState] = useState<AgentState>("disconnected");
+  const [interviewData, setInterviewData] = useState<any>(null);
+  const router = useRouter();
+  const { candidateId } = router.query;
 
   const onConnectButtonClicked = useCallback(async () => {
-    // Generate room connection details, including:
-    //   - A random Room name
-    //   - A random Participant name
-    //   - An Access Token to permit the participant to join the room
-    //   - The URL of the LiveKit server to connect to
-    //
-    // In real-world application, you would likely allow the user to specify their
-    // own participant name, and possibly to choose from existing rooms to join.
+    if (!candidateId) {
+      console.error("Candidate ID is not available");
+      return;
+    }
 
     const url = new URL(
       process.env.NEXT_PUBLIC_CONN_DETAILS_ENDPOINT ??
       "/api/connection-details",
       window.location.origin
     );
-    const response = await fetch(url.toString());
-    const connectionDetailsData = await response.json();
-    updateConnectionDetails(connectionDetailsData);
-  }, []);
+    // Append the campaignId as a query parameter
+     url.searchParams.append("campaignId", candidateId.toString());
+
+     const response = await fetch(url.toString());
+     const connectionDetailsData = await response.json();
+     updateConnectionDetails(connectionDetailsData);
+   }, [candidateId]);
+
+  // useEffect(() => {
+  //   if (candidateId) {
+  //     fetch(`/api/interview/${candidateId}`)
+  //       .then((response) => response.json())
+  //       .then((data) => {
+  //         setInterviewData(data)
+  //         console.log(data)
+  //       })
+  //       .catch((error) => console.error('Error fetching interview data:', error));
+  //   }
+  // }, [candidateId]);
 
   return (
     <main
@@ -96,10 +111,6 @@ function ControlBar(props: {
   onConnectButtonClicked: () => void;
   agentState: AgentState;
 }) {
-  /**
-   * Use Krisp background noise reduction when available.
-   * Note: This is only available on Scale plan, see {@link https://livekit.io/pricing | LiveKit Pricing} for more details.
-   */
   const krisp = useKrispNoiseFilter();
   useEffect(() => {
     krisp.setNoiseFilterEnabled(true);
