@@ -16,7 +16,6 @@ import type { ConnectionDetails } from "../../app/api/connection-details/route";
 import { NoAgentNotification } from "@/components/NoAgentNotification";
 import { CloseIcon } from "@/components/CloseIcon";
 import { useKrispNoiseFilter } from "@livekit/components-react/krisp";
-import { createLocalVideoTrack, Room, RoomEvent } from "livekit-client";
 import { useRouter } from 'next/router';
 
 export default function Page() {
@@ -25,7 +24,6 @@ export default function Page() {
   >(undefined);
   const [agentState, setAgentState] = useState<AgentState>("disconnected");
   const [interviewData, setInterviewData] = useState<any>(null);
-  const roomRef = useRef<Room | null>(null);
   const router = useRouter();
   const { candidateId } = router.query;
 
@@ -58,10 +56,6 @@ export default function Page() {
       className="h-full grid content-center bg-[var(--lk-bg)]"
     >
       {interviewData && (
-        <div>
-          <h1>Interview for Campaign: {interviewData.title}</h1>
-          {/* Render other interview details */}
-        
         <LiveKitRoom
           token={connectionDetails?.participantToken}
           serverUrl={connectionDetails?.serverUrl}
@@ -82,7 +76,6 @@ export default function Page() {
           <RoomAudioRenderer />
           <NoAgentNotification state={agentState} />
         </LiveKitRoom>
-      </div>
       )}
     </main>
   );
