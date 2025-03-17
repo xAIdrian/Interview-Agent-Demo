@@ -16,6 +16,7 @@ from livekit.plugins import openai
 from livekit.agents import stt, transcription
 from livekit.plugins.deepgram import STT
 from prompts import sample_agent_prompt, sample_resume
+import requests
 
 load_dotenv()
 logger = logging.getLogger("livekit-agent-worker")
@@ -69,7 +70,10 @@ async def entrypoint(ctx: JobContext):
     await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
 
     participant = await ctx.wait_for_participant()
-    print('🚀 ~ participant:', participant);
+    campaign_id_from_participant_identity = participant.identity.split('_')[0]
+    # make request to our flask server to get the questions
+    questions = requests.get(f"http://localhost:5000/api/interview/{campaign_id_from_participant_identity}")
+    print('🚀 ~ questions:', questions);
 
     run_multimodal_agent(ctx, participant)
 
