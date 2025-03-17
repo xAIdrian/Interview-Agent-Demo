@@ -14,3 +14,5 @@ livekit-plugins-deepgram
 livekit-plugins-openai
 python-docx
 PyPDF2
+requests
+flask-cors

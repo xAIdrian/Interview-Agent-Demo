@@ -20,8 +20,13 @@ import os
 import tempfile
 from create_campaign_from_doc import extract_text_from_file, generate_campaign_context, generate_interview_questions
 from utils.file_handling import SafeTemporaryFile, safe_delete
+from flask_cors import CORS
 
 app = Flask(__name__)
+
+# Initialize CORS to allow all origins
+CORS(app)
+
 app.config.from_object(Config)
 app.register_blueprint(api_bp, url_prefix='/api')
 
