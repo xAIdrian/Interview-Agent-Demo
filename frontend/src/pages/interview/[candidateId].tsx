@@ -28,55 +28,61 @@ export default function Page() {
   const { candidateId } = router.query;
 
   const onConnectButtonClicked = useCallback(async () => {
+    if (!candidateId) {
+      console.error("Candidate ID is not available");
+      return;
+    }
+
     const url = new URL(
       process.env.NEXT_PUBLIC_CONN_DETAILS_ENDPOINT ??
       "/api/connection-details",
       window.location.origin
     );
-    const response = await fetch(url.toString());
-    const connectionDetailsData = await response.json();
-    updateConnectionDetails(connectionDetailsData);
-  }, []);
+    // Append the campaignId as a query parameter
+     url.searchParams.append("campaignId", candidateId.toString());
 
-  useEffect(() => {
-    if (candidateId) {
-      fetch(`/api/interview/${candidateId}`)
-        .then((response) => response.json())
-        .then((data) => {
-          setInterviewData(data)
-          console.log(data)
-        })
-        .catch((error) => console.error('Error fetching interview data:', error));
-    }
-  }, [candidateId]);
+     const response = await fetch(url.toString());
+     const connectionDetailsData = await response.json();
+     updateConnectionDetails(connectionDetailsData);
+   }, [candidateId]);
+
+  // useEffect(() => {
+  //   if (candidateId) {
+  //     fetch(`/api/interview/${candidateId}`)
+  //       .then((response) => response.json())
+  //       .then((data) => {
+  //         setInterviewData(data)
+  //         console.log(data)
+  //       })
+  //       .catch((error) => console.error('Error fetching interview data:', error));
+  //   }
+  // }, [candidateId]);
 
   return (
     <main
       data-lk-theme="default"
       className="h-full grid content-center bg-[var(--lk-bg)]"
     >
-      {interviewData && (
-        <LiveKitRoom
-          token={connectionDetails?.participantToken}
-          serverUrl={connectionDetails?.serverUrl}
-          connect={connectionDetails !== undefined}
-          audio={true}
-          video={false}
-          onMediaDeviceFailure={onDeviceFailure}
-          onDisconnected={() => {
-            updateConnectionDetails(undefined);
-          }}
-          className="grid grid-rows-[2fr_1fr] items-center"
-        >
-          <SimpleVoiceAssistant onStateChange={setAgentState} />
-          <ControlBar
-            onConnectButtonClicked={onConnectButtonClicked}
-            agentState={agentState}
-          />
-          <RoomAudioRenderer />
-          <NoAgentNotification state={agentState} />
-        </LiveKitRoom>
-      )}
+      <LiveKitRoom
+        token={connectionDetails?.participantToken}
+        serverUrl={connectionDetails?.serverUrl}
+        connect={connectionDetails !== undefined}
+        audio={true}
+        video={false}
+        onMediaDeviceFailure={onDeviceFailure}
+        onDisconnected={() => {
+          updateConnectionDetails(undefined);
+        }}
+        className="grid grid-rows-[2fr_1fr] items-center"
+      >
+        <SimpleVoiceAssistant onStateChange={setAgentState} />
+        <ControlBar
+          onConnectButtonClicked={onConnectButtonClicked}
+          agentState={agentState}
+        />
+        <RoomAudioRenderer />
+        <NoAgentNotification state={agentState} />
+      </LiveKitRoom>
     </main>
   );
 }

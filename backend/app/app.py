@@ -338,7 +338,6 @@ def generate_livekit_token(campaign_id, candidate_id):
 @app.route("/interview/<int:campaign_id>")
 def interview_room(campaign_id):
     questions = get_campaign_questions(campaign_id)
-    print('🚀 ~ questions:', questions);
     
     # Get the real user_id from the session (assuming the user is logged in)
     user_id = session.get('user_id')
