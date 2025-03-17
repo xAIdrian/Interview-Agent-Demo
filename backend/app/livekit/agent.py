@@ -69,6 +69,7 @@ async def entrypoint(ctx: JobContext):
     await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
 
     participant = await ctx.wait_for_participant()
+    print('🚀 ~ participant:', participant);
 
     run_multimodal_agent(ctx, participant)
 
