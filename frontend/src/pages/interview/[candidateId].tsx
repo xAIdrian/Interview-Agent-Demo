@@ -57,31 +57,32 @@ export default function Page() {
       data-lk-theme="default"
       className="h-full grid content-center bg-[var(--lk-bg)]"
     >
-      <LiveKitRoom
-        token={connectionDetails?.participantToken}
-        serverUrl={connectionDetails?.serverUrl}
-        connect={connectionDetails !== undefined}
-        audio={true}
-        video={false}
-        onMediaDeviceFailure={onDeviceFailure}
-        onDisconnected={() => {
-          updateConnectionDetails(undefined);
-        }}
-        className="grid grid-rows-[2fr_1fr] items-center"
-      >
-        <SimpleVoiceAssistant onStateChange={setAgentState} />
-        <ControlBar
-          onConnectButtonClicked={onConnectButtonClicked}
-          agentState={agentState}
-        />
-        <RoomAudioRenderer />
-        <NoAgentNotification state={agentState} />
-      </LiveKitRoom>
       {interviewData && (
         <div>
           <h1>Interview for Campaign: {interviewData.title}</h1>
           {/* Render other interview details */}
-        </div>
+        
+        <LiveKitRoom
+          token={connectionDetails?.participantToken}
+          serverUrl={connectionDetails?.serverUrl}
+          connect={connectionDetails !== undefined}
+          audio={true}
+          video={false}
+          onMediaDeviceFailure={onDeviceFailure}
+          onDisconnected={() => {
+            updateConnectionDetails(undefined);
+          }}
+          className="grid grid-rows-[2fr_1fr] items-center"
+        >
+          <SimpleVoiceAssistant onStateChange={setAgentState} />
+          <ControlBar
+            onConnectButtonClicked={onConnectButtonClicked}
+            agentState={agentState}
+          />
+          <RoomAudioRenderer />
+          <NoAgentNotification state={agentState} />
+        </LiveKitRoom>
+      </div>
       )}
     </main>
   );
