@@ -1,12 +1,12 @@
-import type { Config } from "tailwindcss";
-
-const config: Config = {
-  content: [
-    "./pages/**/*.{js,ts,jsx,tsx,mdx}",
-    "./components/**/*.{js,ts,jsx,tsx,mdx}",
-    "./app/**/*.{js,ts,jsx,tsx,mdx}",
-  ],
-  theme: {},
-  plugins: [],
-};
-export default config;
+   // tailwind.config.js
+   module.exports = {
+     content: [
+       './src/**/*.{js,ts,jsx,tsx}', // Adjust the path to match your project structure
+       './pages/**/*.{js,ts,jsx,tsx}',
+       './components/**/*.{js,ts,jsx,tsx}',
+     ],
+     theme: {
+       extend: {},
+     },
+     plugins: [],
+   };
