@@ -21,14 +21,22 @@ import tempfile
 from create_campaign_from_doc import extract_text_from_file, generate_campaign_context, generate_interview_questions
 from utils.file_handling import SafeTemporaryFile, safe_delete
 from flask_cors import CORS
+from flask_jwt_extended import JWTManager, create_access_token, create_refresh_token, jwt_required, get_jwt_identity
+from datetime import timedelta
 
 app = Flask(__name__)
 
 # Initialize CORS to allow all origins
-CORS(app)
+CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
 
 app.config.from_object(Config)
 app.register_blueprint(api_bp, url_prefix='/api')
+
+# Setup the Flask-JWT-Extended extension
+app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'dev-secret-key-change-in-production')  # Change in production!
+app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=1)
+app.config['JWT_REFRESH_TOKEN_EXPIRES'] = timedelta(days=30)
+jwt = JWTManager(app)
 
 @app.before_first_request
 def create_tables_on_startup():
@@ -37,70 +45,167 @@ def create_tables_on_startup():
 @app.route("/register", methods=["GET", "POST"])
 def register():
     if request.method == "POST":
-        email = request.form.get("email")
-        name = request.form.get("name") or ""
-        password = request.form.get("password")
+        if request.is_json:
+            data = request.get_json()
+            email = data.get("email")
+            name = data.get("name", "")
+            password = data.get("password")
+        else:
+            email = request.form.get("email")
+            name = request.form.get("name", "")
+            password = request.form.get("password")
+
         hashed_password = generate_password_hash(password, method='pbkdf2:sha256')
 
         conn = get_db_connection()
-        with conn.cursor() as cursor:
-            sql = "INSERT INTO users (id, email, name, password_hash, is_admin) VALUES (UUID_SHORT(), ?, ?, ?, ?)"
-            cursor.execute(sql, (email, name, hashed_password, False))
-        conn.commit()
-        conn.close()
-
-        flash("Registration successful! Please log in.", "success")
-        return redirect(url_for("login"))
+        try:
+            with conn.cursor() as cursor:
+                sql = "INSERT INTO users (id, email, name, password_hash, is_admin) VALUES (UUID_SHORT(), ?, ?, ?, ?)"
+                cursor.execute(sql, (email, name, hashed_password, False))
+            conn.commit()
+            
+            if request.is_json:
+                return jsonify({"success": True, "message": "Registration successful! Please log in."}), 201
+            else:
+                flash("Registration successful! Please log in.", "success")
+                return redirect(url_for("login"))
+        except mariadb.Error as e:
+            conn.rollback()
+            if request.is_json:
+                return jsonify({"success": False, "message": f"Error: {str(e)}"}), 400
+            else:
+                flash(f"Error: {str(e)}", "danger")
+                return render_template("register.html")
+        finally:
+            conn.close()
 
     return render_template("register.html")
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        email = request.form["email"]
-        password = request.form["password"]
+        # Handle both JSON and form data requests
+        if request.is_json:
+            data = request.get_json()
+            email = data.get("email")
+            password = data.get("password")
+        else:
+            email = request.form.get("email")
+            password = request.form.get("password")
         
         conn = get_db_connection()
         with conn.cursor(dictionary=True) as cursor:
-            sql = "SELECT id, email, password_hash, is_admin FROM users WHERE email = ?"
+            sql = "SELECT id, email, name, password_hash, is_admin FROM users WHERE email = ?"
             cursor.execute(sql, (email,))
             user = cursor.fetchone()
         
         conn.close()
         
         if user and check_password_hash(user["password_hash"], password):
-            session["user_id"] = user["id"]
-            session["email"] = user["email"]
-            session["is_admin"] = user["is_admin"]
-            flash("Login successful!", "success")
-            return redirect(url_for("index"))
+            # Create JWT tokens
+            user_identity = {
+                "id": str(user["id"]),
+                "email": user["email"],
+                "is_admin": user["is_admin"]
+            }
+            
+            access_token = create_access_token(identity=user_identity)
+            refresh_token = create_refresh_token(identity=user_identity)
+            
+            # For JSON requests (API)
+            if request.is_json:
+                user_data = {
+                    "id": str(user["id"]),
+                    "email": user["email"],
+                    "name": user["name"],
+                    "is_admin": user["is_admin"]
+                }
+                return jsonify({
+                    "success": True,
+                    "message": "Login successful!",
+                    "access_token": access_token,
+                    "refresh_token": refresh_token,
+                    "user": user_data
+                }), 200
+            
+            # For form submissions (Web UI)
+            else:
+                session["user_id"] = user["id"]
+                session["email"] = user["email"]
+                session["is_admin"] = user["is_admin"]
+                session["jwt_token"] = access_token  # Store JWT in session for web UI
+                flash("Login successful!", "success")
+                return redirect(url_for("index"))
         else:
-            flash("Invalid email or password", "danger")
+            # Authentication failed
+            if request.is_json:
+                return jsonify({
+                    "success": False, 
+                    "message": "Invalid email or password"
+                }), 401
+            else:
+                flash("Invalid email or password", "danger")
+                return render_template("login.html")
     
     return render_template("login.html")
 
-@app.route("/logout")
+@app.route("/logout", methods=["GET", "POST"])
 def logout():
-    session.pop("user_id", None)
-    session.pop("is_admin", None)
+    # Clear session data
+    session.clear()
+    
+    # For API requests
+    if request.is_json:
+        return jsonify({"success": True, "message": "Logged out successfully"}), 200
+    
+    # For web UI
     flash("You have been logged out.", "success")
     return redirect(url_for("login"))
 
-# Decorator to require login
+@app.route("/api/refresh", methods=["POST"])
+@jwt_required(refresh=True)
+def refresh():
+    """Refresh access token using refresh token"""
+    current_user = get_jwt_identity()
+    new_access_token = create_access_token(identity=current_user)
+    return jsonify({"access_token": new_access_token}), 200
+
+# Updated decorator to check JWT token for API requests
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if "user_id" not in session:
+        # For API requests, check JWT header
+        if request.is_json or request.headers.get('Authorization'):
+            @jwt_required()
+            def verify_jwt(*args, **kwargs):
+                return f(*args, **kwargs)
+            return verify_jwt(*args, **kwargs)
+        
+        # For web UI, check session
+        elif "user_id" not in session:
             return redirect(url_for("login"))
+        
         return f(*args, **kwargs)
     return decorated_function
 
-# Decorator to require admin
+# Updated decorator to check admin status
 def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if not session.get("is_admin"):
+        # For API requests, check JWT claims
+        if request.is_json or request.headers.get('Authorization'):
+            @jwt_required()
+            def verify_admin(*args, **kwargs):
+                current_user = get_jwt_identity()
+                if not current_user.get("is_admin"):
+                    return jsonify({"error": "Admin privileges required"}), 403
+                return f(*args, **kwargs)
+            return verify_admin(*args, **kwargs)
+        
+        # For web UI, check session
+        elif not session.get("is_admin"):
             return redirect(url_for("index"))
+        
         return f(*args, **kwargs)
     return decorated_function
 

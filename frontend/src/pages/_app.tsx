@@ -1,8 +1,8 @@
-   // pages/_app.tsx
-   import '../../styles/globals.css'; // Adjust the path if necessary
+import '../styles/globals.css';
+import type { AppProps } from 'next/app';
 
-   function MyApp({ Component, pageProps }: { Component: React.ComponentType; pageProps: any }) {
-     return <Component {...pageProps} />;
-   }
+function MyApp({ Component, pageProps }: AppProps) {
+  return <Component {...pageProps} />;
+}
 
-   export default MyApp;
+export default MyApp;
