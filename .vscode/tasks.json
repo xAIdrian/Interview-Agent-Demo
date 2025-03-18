@@ -1,0 +1,21 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Git: Add, Commit & Push",
+      "type": "shell",
+      "command": "git add --all && git commit -m \"Automated commit\" && git push origin",
+      "problemMatcher": [],
+      "group": "build",
+      "options": {
+        "shell": {
+          "executable": "cmd.exe",
+          "args": ["/c"]
+        }
+      },
+      "presentation": {
+        "reveal": "always"
+      }
+    }
+  ]
+}

@@ -16,3 +16,4 @@ python-docx
 PyPDF2
 requests
 flask-cors
+flask-jwt-extended>=4.4.4
