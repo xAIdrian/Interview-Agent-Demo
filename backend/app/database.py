@@ -52,6 +52,7 @@ def create_campaigns_table():
                 max_points INT NOT NULL,
                 is_public BOOLEAN NOT NULL DEFAULT FALSE,
                 campaign_context TEXT,
+                job_description TEXT,
                 created_by BIGINT UNSIGNED,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

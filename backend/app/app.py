@@ -10,7 +10,7 @@ import random
 import string
 import tempfile
 import uuid
-import whisper
+#import whisper
 import mariadb
 from fpdf import FPDF
 
