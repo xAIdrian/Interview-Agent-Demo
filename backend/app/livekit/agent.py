@@ -60,7 +60,7 @@ async def entrypoint(ctx: JobContext):
         tasks.append(stt_task)
         async for segment in audio_stream:
             stt_stream.push_frame(segment.frame)
-
+        
     @ctx.room.on("track_subscribed")
     def on_track_subscribed(
         track: rtc.Track,
