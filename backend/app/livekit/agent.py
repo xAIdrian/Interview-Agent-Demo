@@ -15,7 +15,7 @@ from livekit.agents.multimodal import MultimodalAgent
 from livekit.plugins import openai
 from livekit.agents import stt, transcription
 from livekit.plugins.deepgram import STT
-from prompts import sample_agent_prompt, sample_resume
+from prompts import agent_prompt_template, sample_resume, sample_job_description
 import requests
 
 load_dotenv()
@@ -24,6 +24,10 @@ logger.setLevel(logging.INFO)
 
 prompting_questions = []
 global_ctx = None
+
+AUTH_HEADER = "Bearer dVCjV5QO8t"
+CAMPAIGNS_API_URL = "http://localhost:5000/api/campaigns/{campaign_id}"
+QUESTIONS_API_URL = "http://localhost:5000/api/questions?campaign_id={campaign_id}"
 
 async def _forward_transcription(
     stt_stream: stt.SpeechStream,
@@ -71,20 +75,28 @@ async def entrypoint(ctx: JobContext):
 
     participant = await ctx.wait_for_participant()
     campaign_id_from_participant_identity = participant.identity.split('_')[0]
-    # make request to our flask server to get the questions
-    questions = requests.get(f"http://localhost:5000/api/interview/{campaign_id_from_participant_identity}")
-    print('🚀 ~ questions:', questions);
 
-    run_multimodal_agent(ctx, participant)
+    # make request to our flask server to get the questions
+    questions = requests.get(
+        QUESTIONS_API_URL.format(campaign_id=campaign_id_from_participant_identity),
+        headers={"Authorization": AUTH_HEADER}
+    ).json()
+    print('🚀 ~ questions:', questions);
+    question_titles = [question['title'] for question in questions]
+
+    run_multimodal_agent(ctx, participant, question_titles)
 
     logger.info("agent started")
 
 
-def run_multimodal_agent(ctx: JobContext, participant: rtc.RemoteParticipant):
+def run_multimodal_agent(ctx: JobContext, participant: rtc.RemoteParticipant, questions):
     logger.info("starting multimodal agent")
 
     model = openai.realtime.RealtimeModel(
-        instructions=(sample_agent_prompt),
+        instructions=(agent_prompt_template.format(
+            questions="\n".join(questions),
+            job_description=sample_job_description
+        )),
         modalities=["audio", "text"],
     )
 
