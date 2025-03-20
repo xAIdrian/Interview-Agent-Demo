@@ -218,6 +218,34 @@ def create_user():
     conn.close()
     return jsonify({"message": "User created successfully"}), 201
 
+@api_bp.route('/users/create', methods=['POST'])
+@admin_required
+def create_new_user():
+    data = request.json
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # Generate a temporary password or use a default one
+    temporary_password = "changeme123"
+    password_hash = temporary_password  # In production, use proper hashing
+    
+    try:
+        cursor.execute("""
+            INSERT INTO users (id, email, name, password_hash, is_admin)
+            VALUES (UUID_SHORT(), %s, %s, %s, %s)
+        """, (data['email'], data['name'], password_hash, data['is_admin']))
+        conn.commit()
+        
+        return jsonify({
+            "message": "User created successfully",
+            "temporaryPassword": temporary_password
+        }), 201
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": f"Failed to create user: {str(e)}"}), 500
+    finally:
+        conn.close()
+
 @api_bp.route('/campaigns', methods=['POST'])
 @admin_required
 def create_campaign():

@@ -28,21 +28,8 @@ export default function Page() {
   >(undefined);
   const [agentState, setAgentState] = useState<AgentState>("disconnected");
   const [interviewData, setInterviewData] = useState<any>(null);
-  const [conversation, setConversation] = useState<{speaker: string, text: string}[]>([]);
   const router = useRouter();
   const { campaignId } = router.query;
-
-  // Function to add a message to the conversation
-  const addToConversation = useCallback((speaker: string, text: string) => {
-    setConversation(prev => [...prev, { speaker, text }]);
-  }, []);
-
-  // Log conversation when disconnected
-  const handleDisconnect = useCallback(() => {
-    console.log("Interview conversation:");
-    console.table(conversation);
-    updateConnectionDetails(undefined);
-  }, [conversation]);
 
   const onConnectButtonClicked = useCallback(async () => {
     if (!campaignId) {
@@ -91,23 +78,20 @@ export default function Page() {
             audio={true}
             video={true}
             onMediaDeviceFailure={onDeviceFailure}
-            onDisconnected={handleDisconnect}
+            onDisconnected={() => {
+              updateConnectionDetails(undefined);
+            }}
             className="grid grid-rows-[1fr_auto]"
           >
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Left side - Audio Visualization */}
               <div className="h-[300px] flex items-center justify-center">
-                <SimpleVoiceAssistant 
-                  onStateChange={setAgentState} 
-                  onSpeechUpdate={(text) => addToConversation("AI", text)}
-                />
+                <SimpleVoiceAssistant onStateChange={setAgentState} />
               </div>
               
               {/* Right side - Candidate's Webcam */}
               <div className="h-[300px] flex items-center justify-center bg-gray-100 rounded-lg">
-                <CandidateVideo 
-                  onSpeechUpdate={(text) => addToConversation("Candidate", text)}
-                />
+                <CandidateVideo />
               </div>
             </div>
             
@@ -141,7 +125,7 @@ function RemoteAudioTracks() {
   );
 }
 
-function CandidateVideo({ onSpeechUpdate }: { onSpeechUpdate?: (text: string) => void }) {
+function CandidateVideo() {
   const { localParticipant } = useLocalParticipant();
   const [videoEl, setVideoEl] = useState<HTMLVideoElement | null>(null);
   const [hasTrack, setHasTrack] = useState(false);
@@ -191,21 +175,11 @@ function CandidateVideo({ onSpeechUpdate }: { onSpeechUpdate?: (text: string) =>
 
 function SimpleVoiceAssistant(props: {
   onStateChange: (state: AgentState) => void;
-  onSpeechUpdate?: (text: string) => void;
 }) {
-  const { state, audioTrack, transcript } = useVoiceAssistant();
-  
+  const { state, audioTrack } = useVoiceAssistant();
   useEffect(() => {
     props.onStateChange(state);
   }, [props, state]);
-  
-  // When the agent responds, capture the text
-  useEffect(() => {
-    if (transcript && props.onSpeechUpdate) {
-      props.onSpeechUpdate(transcript);
-    }
-  }, [transcript, props]);
-  
   return (
     <div className="h-[300px] w-full mx-auto flex items-center justify-center">
       <div className="w-full h-[200px] min-h-[100px] flex items-center justify-center">
