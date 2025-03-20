@@ -58,15 +58,23 @@ async def entrypoint(ctx: JobContext):
         async for segment in audio_stream:
             stt_stream.push_frame(segment.frame)
 
-    @ctx.room.on("participant_attributes_changed")
-    def on_participant_attributes_changed(
-        changed_attrs: dict[str, str], p: rtc.Participant
+    @ctx.room.on("data_received")
+    def on_data_received(
+        data: bytes, participant: rtc.RemoteParticipant, kind: rtc.DataKind, topic: str
     ):
-        if p == participant:
-            interview_questions = p.attributes.get("interviewQuestions")
-            print(
-                f"🚀🚀🚀 participant {p.identity} changed interview questions to {interview_questions}"
-            )
+        """
+        This callback is triggered whenever this agent receives a data message.
+        data: the raw bytes payload
+        participant: the remote participant who sent it
+        kind: reliable/unreliable (DataKind)
+        topic: optional string that categorizes the data
+        """
+        message = data.decode("utf-8", errors="ignore")
+        print("🚀 ~ message:", message)
+        logger.info(
+            f"Agent received data from {participant.identity} "
+            f"[topic={topic}, kind={kind}]: {message}"
+        )
 
     @ctx.room.on("track_subscribed")
     def on_track_subscribed(
@@ -81,13 +89,6 @@ async def entrypoint(ctx: JobContext):
     await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
 
     participant = await ctx.wait_for_participant()
-    campaign_id_from_participant_identity = participant.identity.split("_")[0]
-    # make request to our flask server to get the questions
-    questions = requests.get(
-        f"http://localhost:5000/api/interview/{campaign_id_from_participant_identity}"
-    )
-    print("🚀 ~ questions:", questions)
-
     run_multimodal_agent(ctx, participant)
 
     logger.info("agent started")

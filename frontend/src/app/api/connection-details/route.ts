@@ -27,7 +27,6 @@ export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
     const campaignId = url.searchParams.get("campaignId");
-    console.log('🚀 ~ GET ~ campaignId:', campaignId);
 
     if (!campaignId) {
       throw new Error("campaignId is required");
