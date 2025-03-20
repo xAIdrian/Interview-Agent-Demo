@@ -25,11 +25,12 @@ export default function Page() {
   >(undefined);
   const [agentState, setAgentState] = useState<AgentState>("disconnected");
   const [interviewData, setInterviewData] = useState<any>(null);
+  
   const router = useRouter();
-  const { candidateId } = router.query;
+  const campaignId = router.asPath.split('/').pop();
 
   const onConnectButtonClicked = useCallback(async () => {
-    if (!candidateId) {
+    if (!campaignId) {
       console.error("Candidate ID is not available");
       return;
     }
@@ -39,34 +40,32 @@ export default function Page() {
       "/api/connection-details",
       window.location.origin
     );
+
     // Append the campaignId as a query parameter
-     url.searchParams.append("campaignId", candidateId.toString());
+    url.searchParams.append("campaignId", campaignId.toString());
 
-     const response = await fetch(url.toString());
-     const connectionDetailsData = await response.json();
-     updateConnectionDetails(connectionDetailsData);
+    const response = await fetch(url.toString());
+    const connectionDetailsData = await response.json();
+    updateConnectionDetails(connectionDetailsData);
 
-     const room = new Room();
-     await room.connect(connectionDetailsData.serverUrl, connectionDetailsData.participantToken);
+    const room = new Room();
+    await room.connect(connectionDetailsData.serverUrl, connectionDetailsData.participantToken);
 
-     const info = await room.localParticipant.setAttributes({
-        "interviewQuestions": JSON.stringify(interviewData),
-      });
-      console.log('🚀 ~ onConnectButtonClicked ~ info:', info);
+    const info = await room.localParticipant.sendText(JSON.stringify(interviewData));
 
-   }, [candidateId]);
+   }, [campaignId]);
 
   useEffect(() => {
-    if (candidateId) {
-      fetch(`/api/interview/${candidateId}`)
+    if (campaignId) {
+      fetch(`/api/interview/${campaignId}`)
         .then((response) => response.json())
         .then((data) => {
-          setInterviewData(data)
-          console.log(data)
+          setInterviewData(data);
+          console.log("🚀 ~ useEffect ~ interview response:", data);
         })
         .catch((error) => console.error('Error fetching interview data:', error));
     }
-  }, [candidateId]);
+  }, [campaignId]);
 
   return (
     <main

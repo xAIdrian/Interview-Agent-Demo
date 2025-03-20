@@ -4,10 +4,9 @@ import axios from 'axios';
 
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);
-  const campaignId = url.pathname.split('/').pop(); // Extract campaignId from the URL
+  const campaignId = url.pathname.split('/').pop(); 
 
   try {
-    // Send a GET request to the Flask server
     const response = await axios.get(`http://127.0.0.1:5000/interview/${campaignId}`);
 
     console.log('🚀 ~ GET ~ response:', response);
