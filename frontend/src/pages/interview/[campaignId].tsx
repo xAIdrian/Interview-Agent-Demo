@@ -51,21 +51,20 @@ export default function Page() {
     const room = new Room();
     await room.connect(connectionDetailsData.serverUrl, connectionDetailsData.participantToken);
 
-    const info = await room.localParticipant.sendText(JSON.stringify(interviewData));
-
-   }, [campaignId]);
-
-  useEffect(() => {
     if (campaignId) {
       fetch(`/api/interview/${campaignId}`)
         .then((response) => response.json())
-        .then((data) => {
-          setInterviewData(data);
-          console.log("🚀 ~ useEffect ~ interview response:", data);
+        .then(async (data) => {
+          const info = await room.localParticipant.sendText(JSON.stringify(data), {
+            topic: 'interview-questions',
+          });
+          console.log('🚀 ~ info ~ info:', info);
         })
         .catch((error) => console.error('Error fetching interview data:', error));
     }
-  }, [campaignId]);
+
+
+   }, [campaignId]);
 
   return (
     <main
