@@ -16,7 +16,12 @@ from livekit.plugins import openai
 from livekit.agents import stt, transcription
 from livekit.plugins.deepgram import STT
 from prompts import sample_agent_prompt, sample_resume
-import requests
+import asyncio
+import json
+
+# Store active tasks to prevent garbage collection
+_active_tasks = set()
+
 
 load_dotenv()
 logger = logging.getLogger("livekit-agent-worker")
@@ -43,7 +48,7 @@ async def _forward_transcription(
 async def entrypoint(ctx: JobContext):
     stt = STT()
     tasks = []
-    global_ctx = ctx
+    _accumulated_questions = []
 
     async def transcribe_track(participant: rtc.RemoteParticipant, track: rtc.Track):
         audio_stream = stt.AudioStream(track)
@@ -58,25 +63,6 @@ async def entrypoint(ctx: JobContext):
         async for segment in audio_stream:
             stt_stream.push_frame(segment.frame)
 
-    @ctx.room.on("data_received")
-    def on_data_received(
-        data: bytes, participant: rtc.RemoteParticipant, kind: rtc.DataKind, topic: str
-    ):
-        """
-        This callback is triggered whenever this agent receives a data message.
-        data: the raw bytes payload
-        participant: the remote participant who sent it
-        kind: reliable/unreliable (DataKind)
-        topic: optional string that categorizes the data
-        """
-        message = data.decode("utf-8", errors="ignore")
-        print("🚀 ~ message:", message)
-        logger.info(
-            f"Agent received data from {participant.identity} "
-            f"[topic={topic}, kind={kind}]: {message}"
-        )
-
-    @ctx.room.on("track_subscribed")
     def on_track_subscribed(
         track: rtc.Track,
         publication: rtc.TrackPublication,
@@ -85,7 +71,46 @@ async def entrypoint(ctx: JobContext):
         if track.kind == rtc.TrackKind.KIND_AUDIO:
             tasks.append(asyncio.create_task(transcribe_track(participant, track)))
 
-    logger.info(f"connecting to room {ctx.room.name}")
+    async def async_handle_text_stream(reader, participant_identity):
+        info = reader.info
+
+        print(
+            f"🚀 ~ async_handle_text_stream ~ info:",
+            f"Text stream received from {participant_identity}\n" f"  {info.topic}",
+        )
+
+        async for chunk in reader:
+            print(f"🚀 ~ async_handle_text_stream ~ chunk:", chunk)
+            try:
+                # Try to parse each chunk as JSON
+                if chunk:
+                    parsed_chunk = json.loads(chunk)
+                    print(f"Successfully parsed JSON chunk: {parsed_chunk}")
+
+                    # If this chunk contains interview questions, process them
+                    if "questions" in parsed_chunk and isinstance(
+                        parsed_chunk["questions"], list
+                    ):
+                        _accumulated_questions.extend(parsed_chunk["questions"])
+                        print(
+                            f"Added {len(parsed_chunk['questions'])} questions to accumulated list"
+                        )
+
+            except json.JSONDecodeError as e:
+                print(f"Error parsing chunk as JSON: {e}")
+                # Continue processing other chunks even if one fails
+
+    def handle_text_stream(reader, participant_identity):
+        task = asyncio.create_task(
+            async_handle_text_stream(reader, participant_identity)
+        )
+        _active_tasks.add(task)
+        task.add_done_callback(lambda t: _active_tasks.remove(t))
+
+    ctx.room.register_text_stream_handler("interview-questions", handle_text_stream)
+    ctx.room.on("track_subscribed", on_track_subscribed)
+
+    logger.info(f"🚀 connecting to room {ctx.room.name}")
     await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
 
     participant = await ctx.wait_for_participant()
