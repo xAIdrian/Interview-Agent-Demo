@@ -17,6 +17,7 @@ import { NoAgentNotification } from "@/components/NoAgentNotification";
 import { CloseIcon } from "@/components/CloseIcon";
 import { useKrispNoiseFilter } from "@livekit/components-react/krisp";
 import { useRouter } from 'next/router';
+import { Room } from 'livekit-client';
 
 export default function Page() {
   const [connectionDetails, updateConnectionDetails] = useState<
@@ -44,19 +45,28 @@ export default function Page() {
      const response = await fetch(url.toString());
      const connectionDetailsData = await response.json();
      updateConnectionDetails(connectionDetailsData);
+
+     const room = new Room();
+     await room.connect(connectionDetailsData.serverUrl, connectionDetailsData.participantToken);
+
+     const info = await room.localParticipant.setAttributes({
+        "interviewQuestions": JSON.stringify(interviewData),
+      });
+      console.log('🚀 ~ onConnectButtonClicked ~ info:', info);
+
    }, [candidateId]);
 
-  // useEffect(() => {
-  //   if (candidateId) {
-  //     fetch(`/api/interview/${candidateId}`)
-  //       .then((response) => response.json())
-  //       .then((data) => {
-  //         setInterviewData(data)
-  //         console.log(data)
-  //       })
-  //       .catch((error) => console.error('Error fetching interview data:', error));
-  //   }
-  // }, [candidateId]);
+  useEffect(() => {
+    if (candidateId) {
+      fetch(`/api/interview/${candidateId}`)
+        .then((response) => response.json())
+        .then((data) => {
+          setInterviewData(data)
+          console.log(data)
+        })
+        .catch((error) => console.error('Error fetching interview data:', error));
+    }
+  }, [candidateId]);
 
   return (
     <main

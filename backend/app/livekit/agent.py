@@ -25,6 +25,7 @@ logger.setLevel(logging.INFO)
 prompting_questions = []
 global_ctx = None
 
+
 async def _forward_transcription(
     stt_stream: stt.SpeechStream,
     stt_forwarder: transcription.STTSegmentsForwarder,
@@ -57,6 +58,16 @@ async def entrypoint(ctx: JobContext):
         async for segment in audio_stream:
             stt_stream.push_frame(segment.frame)
 
+    @ctx.room.on("participant_attributes_changed")
+    def on_participant_attributes_changed(
+        changed_attrs: dict[str, str], p: rtc.Participant
+    ):
+        if p == participant:
+            interview_questions = p.attributes.get("interviewQuestions")
+            print(
+                f"🚀🚀🚀 participant {p.identity} changed interview questions to {interview_questions}"
+            )
+
     @ctx.room.on("track_subscribed")
     def on_track_subscribed(
         track: rtc.Track,
@@ -70,10 +81,12 @@ async def entrypoint(ctx: JobContext):
     await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
 
     participant = await ctx.wait_for_participant()
-    campaign_id_from_participant_identity = participant.identity.split('_')[0]
+    campaign_id_from_participant_identity = participant.identity.split("_")[0]
     # make request to our flask server to get the questions
-    questions = requests.get(f"http://localhost:5000/api/interview/{campaign_id_from_participant_identity}")
-    print('🚀 ~ questions:', questions);
+    questions = requests.get(
+        f"http://localhost:5000/api/interview/{campaign_id_from_participant_identity}"
+    )
+    print("🚀 ~ questions:", questions)
 
     run_multimodal_agent(ctx, participant)
 
@@ -104,6 +117,7 @@ def run_multimodal_agent(ctx: JobContext, participant: rtc.RemoteParticipant):
 
     # to enable the agent to speak first
     agent.generate_reply()
+
 
 if __name__ == "__main__":
     cli.run_app(
