@@ -5,6 +5,10 @@ import boto3
 import uuid
 from config import Config
 from scoring_agent import optimize_with_ai
+import tempfile
+import os
+from werkzeug.utils import secure_filename
+from document_processor import generate_campaign_context, generate_interview_questions, extract_text_from_document, generate_campaign_description
 
 # Create a Blueprint for the API routes
 api_bp = Blueprint('api', __name__)
@@ -74,6 +78,7 @@ def get_user(id):
     else:
         return jsonify({"error": "User not found"}), 404
 
+# Update GET /campaigns to include job_description
 @api_bp.route('/campaigns', methods=['GET'])
 @admin_required
 def get_campaigns():
@@ -91,9 +96,11 @@ def get_campaigns():
         "max_user_submissions": campaign[2],
         "max_points": campaign[3],
         "is_public": campaign[4],
-        "campaign_context": campaign[5]
+        "campaign_context": campaign[5],
+        "job_description": campaign[6]
     } for campaign in campaigns])
 
+# Update GET /campaigns/<id> to include job_description
 @api_bp.route('/campaigns/<int:id>', methods=['GET'])
 def get_campaign(id):
     conn = get_db_connection()
@@ -111,7 +118,8 @@ def get_campaign(id):
             "max_user_submissions": campaign[2],
             "max_points": campaign[3],
             "is_public": campaign[4],
-            "campaign_context": campaign[5]
+            "campaign_context": campaign[5],
+            "job_description": campaign[6]
         })
     else:
         return jsonify({"error": "Campaign not found or not accessible"}), 404
@@ -246,6 +254,7 @@ def create_new_user():
     finally:
         conn.close()
 
+# Update POST /campaigns to include job_description
 @api_bp.route('/campaigns', methods=['POST'])
 @admin_required
 def create_campaign():
@@ -257,9 +266,10 @@ def create_campaign():
     campaign_id = uuid.uuid4().int >> 64
     
     cursor.execute("""
-        INSERT INTO campaigns (id, title, max_user_submissions, max_points, is_public, campaign_context)
-        VALUES (%s, %s, %s, %s, %s, %s)
-    """, (campaign_id, data['title'], data['max_user_submissions'], total_max_points, data['is_public'], data['campaign_context']))
+        INSERT INTO campaigns (id, title, max_user_submissions, max_points, is_public, campaign_context, job_description)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
+    """, (campaign_id, data['title'], data['max_user_submissions'], total_max_points, data['is_public'], 
+          data['campaign_context'], data['job_description']))
 
     for question in data['questions']:
         cursor.execute("""
@@ -311,6 +321,66 @@ def create_submission_answer():
     conn.close()
     return jsonify({"message": "Submission answer created successfully"}), 201
 
+@api_bp.route('/campaigns/create-from-doc', methods=['POST'])
+@admin_required
+def create_campaign_from_doc():
+    """
+    Extract campaign information from an uploaded document
+    """
+    if 'document' not in request.files:
+        return jsonify({"error": "No document file provided"}), 400
+        
+    file = request.files['document']
+    
+    if file.filename == '':
+        return jsonify({"error": "No selected file"}), 400
+        
+    # Check if the file type is allowed
+    allowed_extensions = {'pdf', 'doc', 'docx', 'txt'}
+    if not ('.' in file.filename and file.filename.rsplit('.', 1)[1].lower() in allowed_extensions):
+        return jsonify({"error": "File type not allowed"}), 400
+    
+    # Get template type from request data
+    template_type = request.form.get('template_type', 'standard')
+    
+    try:
+        # Save the file temporarily
+        filename = secure_filename(file.filename)
+        with tempfile.TemporaryDirectory() as temp_dir:
+            file_path = os.path.join(temp_dir, filename)
+            file.save(file_path)
+            
+            # Process the document to extract campaign information
+
+            upload_text = extract_text_from_document(file_path)
+            context = generate_campaign_context(upload_text) 
+            description = generate_campaign_description(upload_text)
+            questions = generate_interview_questions(upload_text, context)
+            
+            return jsonify({ "context": context, "description": description, "questions": questions })
+            
+    except Exception as e:
+        print(f"Error processing document: {e}")
+        return jsonify({"error": f"Failed to process document: {str(e)}"}), 500
+
+# Add route for getting document campaign templates
+@api_bp.route('/campaigns/doc-templates', methods=['GET'])
+@admin_required
+def get_doc_templates():
+    """
+    Get available templates for document-based campaign creation
+    """
+    templates = get_campaign_templates()
+    return jsonify(templates)
+
+# Add route for getting default questions
+@api_bp.route('/campaigns/default-questions', methods=['GET'])
+@admin_required
+def get_default_questions():
+    """
+    Get default questions when document processing fails
+    """
+    return jsonify(DEFAULT_QUESTIONS)
 
 def update_table(table, id, data):
     conn = get_db_connection()
@@ -337,6 +407,7 @@ def update_campaign(id):
     update_table("campaigns", id, data)
     return jsonify({"message": "Campaign updated successfully"}), 200
 
+# Update PUT /campaigns/<id>/update to include job_description
 @api_bp.route('/campaigns/<int:id>/update', methods=['POST'])
 @admin_required
 def update_campaign_with_questions(id):
@@ -350,9 +421,10 @@ def update_campaign_with_questions(id):
     # Update campaign properties
     cursor.execute("""
         UPDATE campaigns
-        SET title = %s, max_user_submissions = %s, is_public = %s, campaign_context = %s
+        SET title = %s, max_user_submissions = %s, is_public = %s, campaign_context = %s, job_description = %s
         WHERE id = %s
-    """, (data['title'], data['max_user_submissions'], data['is_public'], data['campaign_context'], id))
+    """, (data['title'], data['max_user_submissions'], data['is_public'], data['campaign_context'], 
+          data['job_description'], id))
     
     # Get existing questions for this campaign
     cursor.execute("SELECT id FROM questions WHERE campaign_id = %s", (id,))

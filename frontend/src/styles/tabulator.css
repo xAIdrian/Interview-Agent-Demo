@@ -1,0 +1,76 @@
+
+/* Fix Tabulator header styling */
+.tabulator-header {
+  background-color: #f3f4f6 !important;
+  border-bottom: 1px solid #e5e7eb !important;
+}
+
+.tabulator-col {
+  background-color: #f3f4f6 !important;
+  border-right: 1px solid #e5e7eb !important;
+  padding: 8px !important;
+  transition: none !important; /* Prevent width animation */
+}
+
+.tabulator-col-content {
+  padding: 4px !important;
+}
+
+/* Fix Tabulator cell styling */
+.tabulator-cell {
+  padding: 10px 8px !important;
+  border-right: 1px solid #e5e7eb !important;
+}
+
+/* Fix pagination styling */
+.tabulator-footer {
+  background-color: #f9fafb !important;
+  border-top: 1px solid #e5e7eb !important;
+  padding: 6px !important;
+}
+
+.tabulator-paginator {
+  color: #4b5563 !important;
+}
+
+.tabulator-page {
+  border: 1px solid #d1d5db !important;
+  border-radius: 0.25rem !important;
+  padding: 4px 10px !important;
+  margin: 0 2px !important;
+  background: white !important;
+}
+
+.tabulator-page.active {
+  background-color: #2563eb !important;
+  color: white !important;
+}
+
+/* Make sure the table container takes appropriate space */
+.tabulator-container {
+  width: 100%;
+  margin-bottom: 20px;
+}
+
+.tabulator {
+  width: 100% !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 0.375rem !important;
+  overflow: hidden !important;
+  min-height: 200px !important; /* Set minimum height */
+}
+
+/* Fix any height spacing issues */
+.tabulator-tableholder {
+  overflow-y: hidden !important;
+}
+
+/* When table is empty, keep reasonable height */
+.tabulator-placeholder {
+  min-height: 200px !important;
+}
+
+/* Add this to ensure rows touch the bottom */
+.tabulator-tableHolder {
+  overflow-y: hidden !important;
+}
