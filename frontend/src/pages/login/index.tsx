@@ -30,6 +30,7 @@ const LoginPage = () => {
         
         // Store the JWT tokens
         localStorage.setItem('accessToken', userData.access_token);
+        localStorage.setItem('userId', userData.id);
         localStorage.setItem('refreshToken', userData.refresh_token);
         
         // Store user data in localStorage for client-side access
