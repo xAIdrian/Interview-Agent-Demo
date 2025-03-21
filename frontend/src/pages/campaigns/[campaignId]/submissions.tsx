@@ -41,6 +41,7 @@ const CampaignSubmissionsPage = () => {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [isAdmin, setIsAdmin] = useState(false);
   
   // Reference for the tabulator instance
   const tableRef = useRef<HTMLDivElement>(null);
@@ -49,8 +50,11 @@ const CampaignSubmissionsPage = () => {
   // Setup auth on component mount
   useEffect(() => {
     const token = localStorage.getItem('accessToken');
+    const isAdminUser = localStorage.getItem('isAdmin') === 'true';
+    setIsAdmin(isAdminUser);
+    
     if (token) {
-      axios.defaults.headers.common['Authorization'] = `Bearer ${INTERNAL_API_TOKEN}`;
+      // Don't set default axios headers here
     } else {
       router.push('/login');
     }
@@ -65,13 +69,14 @@ const CampaignSubmissionsPage = () => {
         setIsLoading(true);
         setError('');
         
-        // Get token from localStorage
-        const token = localStorage.getItem('accessToken');
+        // Always use the admin API token for these admin-only endpoints
         const authHeader = {
           headers: {
-            'Authorization': token ? `Bearer ${INTERNAL_API_TOKEN}` : 'Bearer dVCjV5QO8t'
+            'Authorization': `Bearer ${INTERNAL_API_TOKEN}`
           }
         };
+        
+        console.log("Using authorization header:", authHeader);
         
         // Fetch campaign details
         const campaignResponse = await axios.get(
@@ -92,7 +97,10 @@ const CampaignSubmissionsPage = () => {
         console.error('Error fetching campaign data:', err);
         if (axios.isAxiosError(err)) {
           if (err.response?.status === 401) {
+            setError('Authentication failed. Please log in again.');
             router.push('/login');
+          } else if (err.response?.status === 403) {
+            setError('Admin access required');
           } else if (err.response?.data?.error) {
             setError(err.response.data.error);
           } else {
@@ -113,87 +121,121 @@ const CampaignSubmissionsPage = () => {
   useEffect(() => {
     if (isLoading || !tableRef.current || submissions.length === 0) return;
     
-    // Format date for display in the table
-    const formatDate = (date: string | null) => {
-      if (!date) return 'N/A';
-      return new Date(date).toLocaleString();
-    };
-    
-    // Configure and initialize Tabulator
-    tabulatorRef.current = new Tabulator(tableRef.current, {
-      data: submissions,
-      layout: "fitColumns",
-      pagination: true,
-      paginationSize: 10,
-      paginationSizeSelector: [5, 10, 20, 50],
-      movableColumns: true,
-      resizableRows: true,
-      columns: [
-        { title: "Candidate", field: "email", headerFilter: true, widthGrow: 2 },
-        { 
-          title: "Created", 
-          field: "created_at", 
-          formatter: (cell) => formatDate(cell.getValue()),
-          sorter: "datetime",
-          widthGrow: 1
+    try {
+      // Format date for display in the table
+      const formatDate = (date: string | null) => {
+        if (!date) return 'N/A';
+        return new Date(date).toLocaleString();
+      };
+      
+      // Configure and initialize Tabulator
+      tabulatorRef.current = new Tabulator(tableRef.current, {
+        data: submissions,
+        layout: "fitColumns",
+        pagination: true,
+        paginationSize: 10,
+        paginationSizeSelector: [5, 10, 20, 50],
+        movableColumns: true,
+        resizableRows: true,
+        columns: [
+          { title: "Candidate", field: "email", headerFilter: true, widthGrow: 2 },
+          { 
+            title: "Created", 
+            field: "created_at", 
+            formatter: (cell) => formatDate(cell.getValue()),
+            sorter: "datetime",
+            widthGrow: 1
+          },
+          { 
+            title: "Completed", 
+            field: "completed_at", 
+            formatter: (cell) => formatDate(cell.getValue()),
+            sorter: "datetime",
+            widthGrow: 1
+          },
+          { 
+            title: "Status", 
+            field: "is_complete", 
+            formatter: (cell) => {
+              const value = cell.getValue();
+              return value ? 
+                '<span class="px-2 py-1 bg-green-100 text-green-800 rounded">Completed</span>' : 
+                '<span class="px-2 py-1 bg-yellow-100 text-yellow-800 rounded">In Progress</span>';
+            },
+            headerFilter: true,
+            headerFilterParams: {
+              values: {"true": "Completed", "false": "In Progress"}
+            },
+            widthGrow: 1
+          },
+          { 
+            title: "Score", 
+            field: "total_points", 
+            formatter: (cell) => {
+              const value = cell.getValue();
+              return value !== null ? value : 'Not scored';
+            },
+            sorter: "number",
+            widthGrow: 1
+          },
+          {
+            title: "Actions",
+            headerSort: false,
+            formatter: function(cell) {
+              // Create a button element instead of returning HTML string
+              const button = document.createElement('button');
+              button.classList.add('view-btn', 'bg-blue-500', 'text-white', 'px-3', 'py-1', 'rounded', 'hover:bg-blue-700');
+              button.textContent = "View";
+              
+              // Add click event directly to the button
+              button.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const row = cell.getRow();
+                const rowData = row.getData() as Submission;
+                router.push(`/submission/${rowData.id}`);
+              });
+              
+              return button;
+            },
+            width: 100,
+            cellClick: function(e, cell) {
+              // This is a fallback and may not be needed since we're using the formatter's button click
+              e.stopPropagation();
+            },
+            resizable: false, // Prevent resizing of action column
+            hozAlign: "center" // Center the button
+          }
+        ],
+        initialSort: [
+          { column: "created_at", dir: "desc" }
+        ],
+        // Add explicit type casting to help with data handling
+        dataLoaded: function(data) {
+          console.log("Tabulator data loaded:", data.length, "records");
         },
-        { 
-          title: "Completed", 
-          field: "completed_at", 
-          formatter: (cell) => formatDate(cell.getValue()),
-          sorter: "datetime",
-          widthGrow: 1
-        },
-        { 
-          title: "Status", 
-          field: "is_complete", 
-          formatter: (cell) => {
-            const value = cell.getValue();
-            return value ? 
-              '<span class="px-2 py-1 bg-green-100 text-green-800 rounded">Completed</span>' : 
-              '<span class="px-2 py-1 bg-yellow-100 text-yellow-800 rounded">In Progress</span>';
-          },
-          headerFilter: true,
-          headerFilterParams: {
-            values: {"true": "Completed", "false": "In Progress"}
-          },
-          widthGrow: 1
-        },
-        { 
-          title: "Score", 
-          field: "total_points", 
-          formatter: (cell) => {
-            const value = cell.getValue();
-            return value !== null ? value : 'Not scored';
-          },
-          sorter: "number",
-          widthGrow: 1
-        },
-        {
-          title: "Actions",
-          headerSort: false,
-          formatter: function(_, cell) {
-            const rowData = cell.getRow().getData();
-            return `<button class="view-btn bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-700">View</button>`;
-          },
-          cellClick: function(e, cell) {
-            const rowData = cell.getRow().getData() as Submission;
-            if (e.target instanceof HTMLElement && e.target.classList.contains('view-btn')) {
-              router.push(`/submission/${rowData.id}`);
-            }
-          },
-          width: 100
+        rowClick: function(e, row) {
+          // Alternative navigation method - click anywhere on the row
+          const rowData = row.getData() as Submission;
+          router.push(`/submission/${rowData.id}`);
         }
-      ],
-      initialSort: [
-        { column: "created_at", dir: "desc" }
-      ]
-    });
+      });
 
+      console.log("Tabulator initialized successfully");
+      
+    } catch (err) {
+      console.error("Error initializing tabulator:", err);
+      setError("Failed to initialize submission table. Please refresh the page.");
+    }
+    
     // Cleanup function
     return () => {
-      if (tabulatorRef.current) {
-        tabulatorRef.current.destroy();
+      try {
+        if (tabulatorRef.current) {
+          tabulatorRef.current.destroy();
+          tabulatorRef.current = null;
+        }
+      } catch (err) {
+        console.error("Error destroying tabulator:", err);
       }
     };
   }, [submissions, isLoading, router]);
@@ -216,9 +258,20 @@ const CampaignSubmissionsPage = () => {
         </div>
       )}
       
+      {!isAdmin && (
+        <div className="mb-4 p-2 bg-yellow-100 text-yellow-700 rounded">
+          This page requires admin privileges.
+        </div>
+      )}
+      
       {isLoading ? (
         <div className="flex justify-center items-center py-10">
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-700"></div>
+        </div>
+      ) : error === 'Admin access required' ? (
+        <div className="text-center py-8 bg-white shadow rounded-lg">
+          <p className="text-red-500 font-bold">Admin access required</p>
+          <p className="text-gray-500 mt-2">You need admin privileges to view submissions.</p>
         </div>
       ) : (
         <>
@@ -250,7 +303,46 @@ const CampaignSubmissionsPage = () => {
 
           {submissions.length > 0 ? (
             <div className="bg-white shadow rounded-lg p-4">
-              <div ref={tableRef} className="w-full"></div>
+              {/* Add a fallback in case Tabulator fails to load */}
+              {error.includes("initialize submission table") ? (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Candidate</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {submissions.map((submission) => (
+                        <tr key={submission.id}>
+                          <td className="px-6 py-4 whitespace-nowrap">{submission.email}</td>
+                          <td className="px-6 py-4 whitespace-nowrap">{new Date(submission.created_at).toLocaleString()}</td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`px-2 py-1 rounded ${submission.is_complete ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                              {submission.is_complete ? 'Completed' : 'In Progress'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">{submission.total_points !== null ? submission.total_points : 'Not scored'}</td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <button 
+                              onClick={() => router.push(`/submission/${submission.id}`)}
+                              className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-700"
+                            >
+                              View
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div ref={tableRef} className="w-full"></div>
+              )}
             </div>
           ) : (
             <div className="text-center py-8 bg-white shadow rounded-lg">

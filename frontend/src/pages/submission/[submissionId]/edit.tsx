@@ -83,56 +83,64 @@ const EditSubmissionPage = () => {
         const token = localStorage.getItem('accessToken');
         const authHeader = {
           headers: {
-            'Authorization': token ? `Bearer ${token}` : 'Bearer dVCjV5QO8t'
+            'Authorization': `Bearer ${INTERNAL_API_TOKEN}`
           }
         };
         
-        // Fetch submission details
-        const submissionResponse = await axios.get(`${API_BASE_URL}/api/submissions?id=${submissionId}`, authHeader);
+        // Use the new direct endpoint to fetch a submission by ID
+        const submissionResponse = await axios.get(
+          `${API_BASE_URL}/api/submissions/${submissionId}`, 
+          authHeader
+        );
         
-        if (submissionResponse.data && submissionResponse.data.length > 0) {
-          const submissionData = submissionResponse.data[0];
+        if (submissionResponse.data) {
+          const submissionData = submissionResponse.data;
           setSubmission(submissionData);
           setCampaignId(submissionData.campaign_id);
           
-          // Fetch submission answers
-          const answersResponse = await axios.get(
-            `${API_BASE_URL}/api/submission_answers?submission_id=${submissionId}`, 
-            authHeader
-          );
-          
-          // Fetch questions for the campaign
-          const questionsResponse = await axios.get(
-            `${API_BASE_URL}/api/questions?campaign_id=${submissionData.campaign_id}`, 
-            authHeader
-          );
-          
-          setQuestions(questionsResponse.data);
-          
-          // Merge question titles with submission answers
-          const answersWithQuestionTitles = answersResponse.data.map((answer: SubmissionAnswer) => {
-            const matchingQuestion = questionsResponse.data.find(
-              (q: Question) => q.id === answer.question_id
+          try {
+            // Fetch submission answers using the fixed endpoint with unambiguous column reference
+            const answersResponse = await axios.get(
+              `${API_BASE_URL}/api/submission_answers?submission_id=${submissionId}`, 
+              authHeader
             );
-            return {
-              ...answer,
-              question_title: matchingQuestion ? matchingQuestion.title : 'Unknown Question'
-            };
-          });
-          
-          setSubmissionAnswers(answersWithQuestionTitles);
-          
-          // Initialize form data from submission answers
-          const initialFormData: AnswerFormData = {};
-          answersWithQuestionTitles.forEach((answer: SubmissionAnswer) => {
-            initialFormData[answer.id] = {
-              transcript: answer.transcript || '',
-              score: answer.score !== null ? String(answer.score) : '',
-              score_rationale: answer.score_rationale || ''
-            };
-          });
-          
-          setFormData(initialFormData);
+            
+            // Fetch questions for the campaign
+            const questionsResponse = await axios.get(
+              `${API_BASE_URL}/api/questions?campaign_id=${submissionData.campaign_id}`, 
+              authHeader
+            );
+            
+            setQuestions(questionsResponse.data);
+            
+            // Merge question titles with submission answers
+            const answersWithQuestionTitles = answersResponse.data.map((answer: SubmissionAnswer) => {
+              const matchingQuestion = questionsResponse.data.find(
+                (q: Question) => q.id === answer.question_id
+              );
+              return {
+                ...answer,
+                question_title: matchingQuestion ? matchingQuestion.title : 'Unknown Question'
+              };
+            });
+            
+            setSubmissionAnswers(answersWithQuestionTitles);
+            
+            // Initialize form data from submission answers
+            const initialFormData: AnswerFormData = {};
+            answersWithQuestionTitles.forEach((answer: SubmissionAnswer) => {
+              initialFormData[answer.id] = {
+                transcript: answer.transcript || '',
+                score: answer.score !== null ? String(answer.score) : '',
+                score_rationale: answer.score_rationale || ''
+              };
+            });
+            
+            setFormData(initialFormData);
+          } catch (innerErr) {
+            console.error('Error fetching answers or questions:', innerErr);
+            setError('Failed to load submission answers or questions.');
+          }
         } else {
           setError('Submission not found');
         }
@@ -141,6 +149,8 @@ const EditSubmissionPage = () => {
         if (axios.isAxiosError(err)) {
           if (err.response?.status === 401) {
             router.push('/login');
+          } else if (err.response?.status === 404) {
+            setError('Submission not found');
           } else if (err.response?.data?.error) {
             setError(err.response.data.error);
           } else {
