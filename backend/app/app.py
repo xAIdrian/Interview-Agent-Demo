@@ -23,6 +23,7 @@ from utils.file_handling import SafeTemporaryFile, safe_delete
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager, create_access_token, create_refresh_token, jwt_required, get_jwt_identity
 from datetime import timedelta
+import secrets
 
 app = Flask(__name__)
 
@@ -37,6 +38,17 @@ app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'dev-secret-key-
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=1)
 app.config['JWT_REFRESH_TOKEN_EXPIRES'] = timedelta(days=30)
 jwt = JWTManager(app)
+
+# Configure the app for proper session handling
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', secrets.token_hex(16))
+app.config['SESSION_TYPE'] = 'filesystem'
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=1)
+app.config['SESSION_COOKIE_SECURE'] = False  # Set to True in production with HTTPS
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # Use 'Strict' in production
+
+# Set up CORS to allow credentials
+CORS(app, supports_credentials=True, origins=["http://localhost:3000", "http://127.0.0.1:3000"])
 
 @app.before_first_request
 def create_tables_on_startup():
@@ -993,6 +1005,18 @@ def admin_create_campaign_from_doc():
     
     return render_template("admin/campaigns/create_campaign_from_doc.html")
 
+# Add a route to test sessions
+@app.route('/api/test-session', methods=['GET', 'POST'])
+def test_session():
+    if request.method == 'POST':
+        session['test_value'] = 'This is a test value'
+        return jsonify({"message": "Session value set", "session": dict(session)})
+    else:
+        return jsonify({
+            "has_session": bool(session),
+            "session_contents": dict(session),
+            "test_value": session.get('test_value', 'Not set')
+        })
 
 if __name__ == "__main__":
     app.run()
