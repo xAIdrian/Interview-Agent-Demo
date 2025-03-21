@@ -781,6 +781,8 @@ def update_current_user_profile():
     """
     # Get user identity from JWT
     current_user = get_jwt_identity()
+
+    print(f"JWT identity content: {current_user}")
     user_id = current_user.get("id")
     
     data = request.json

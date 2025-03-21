@@ -2,9 +2,9 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import axios from 'axios';
 import Link from 'next/link';
-import { PageTemplate } from '../../components/PageTemplate';
-import { PrimaryButton } from '../../components/Button';
-import { INTERNAL_API_TOKEN } from '../../utils/internalApiToken';
+import { PageTemplate } from '../../../components/PageTemplate';
+import { PrimaryButton } from '../../../components/Button';
+import { INTERNAL_API_TOKEN } from '../../../utils/internalApiToken';
 
 interface Question {
   id: string;
