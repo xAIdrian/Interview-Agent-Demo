@@ -8,7 +8,9 @@ from scoring_agent import optimize_with_ai
 import tempfile
 import os
 from werkzeug.utils import secure_filename
+from werkzeug.security import check_password_hash, generate_password_hash  # Add generate_password_hash
 from document_processor import generate_campaign_context, generate_interview_questions, extract_text_from_document, generate_campaign_description
+from flask_jwt_extended import create_access_token, create_refresh_token, jwt_required, get_jwt_identity
 
 # Create a Blueprint for the API routes
 api_bp = Blueprint('api', __name__)
@@ -38,6 +40,26 @@ def build_filter_query(args):
     if filter_query:
         filter_query = "WHERE " + filter_query
     return filter_query, filter_values
+
+# Helper function to verify JWT token
+def jwt_token_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or not auth_header.startswith('Bearer '):
+            return jsonify({"error": "Valid token is required"}), 401
+        
+        # Extract the token
+        token = auth_header.split('Bearer ')[1]
+        
+        # This will be handled by flask_jwt_extended
+        @jwt_required()
+        def verify_jwt_token(*args, **kwargs):
+            # If we get here, the token is valid
+            return f(*args, **kwargs)
+            
+        return verify_jwt_token(*args, **kwargs)
+    return decorated_function
 
 # GET routes
 @api_bp.route('/users', methods=['GET'])
@@ -660,3 +682,191 @@ def optimize_prompt_api():
     except Exception as e:
         print(f"Error optimizing prompt: {e}")
         return jsonify({"error": str(e)}), 500
+
+@api_bp.route('/profile', methods=['GET'])
+@jwt_required()
+def get_current_user_profile():
+    """
+    Get the profile information for the currently logged-in user using JWT
+    """
+    # Get user identity from JWT
+    current_user = get_jwt_identity()
+    user_id = current_user.get("id")
+    
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT * FROM users WHERE id = %s", (user_id,))
+    user = cursor.fetchone()
+    conn.close()
+    
+    if user:
+        return jsonify({
+            "id": str(user["id"]),
+            "email": user["email"],
+            "name": user["name"],
+            "is_admin": user["is_admin"]
+        })
+    else:
+        return jsonify({"error": "User not found"}), 404
+
+# Add a session debug endpoint
+@api_bp.route('/debug/session', methods=['GET'])
+def debug_session():
+    """
+    Debug endpoint to check the current session
+    """
+    return jsonify({
+        "session": dict(session),
+        "has_session": bool(session),
+        "keys": list(session.keys()) if session else []
+    })
+
+# Add a route to handle the proper login (if not already present)
+@api_bp.route('/login', methods=['POST'])
+def login():
+    """
+    Handle user login and establish JWT-based authentication
+    """
+    data = request.json
+    email = data.get('email')
+    password = data.get('password')
+    
+    print(f"Login attempt: {email}")
+    
+    if not email or not password:
+        return jsonify({"error": "Email and password are required"}), 400
+    
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)  # Use dictionary cursor for named columns
+    cursor.execute("SELECT * FROM users WHERE email = %s", (email,))
+    user = cursor.fetchone()
+    conn.close()
+    
+    if not user:
+        print(f"User not found: {email}")
+        return jsonify({"error": "Invalid credentials"}), 401
+    
+    # Use check_password_hash for secure password verification
+    if not check_password_hash(user["password_hash"], password):
+        print(f"Invalid password for: {email}")
+        return jsonify({"error": "Invalid credentials"}), 401
+    
+    # Create JWT tokens for the user
+    user_identity = {
+        "id": str(user["id"]),
+        "email": user["email"],
+        "is_admin": user["is_admin"]
+    }
+    
+    access_token = create_access_token(identity=user_identity)
+    refresh_token = create_refresh_token(identity=user_identity)
+    
+    print(f"Login successful for: {email}")
+    
+    # Return user data and tokens
+    return jsonify({
+        "id": str(user["id"]),
+        "email": user["email"],
+        "name": user["name"],
+        "is_admin": bool(user["is_admin"]),
+        "access_token": access_token,
+        "refresh_token": refresh_token
+    })
+
+@api_bp.route('/profile', methods=['PUT'])
+@jwt_required()
+def update_current_user_profile():
+    """
+    Update the profile information for the currently logged-in user
+    """
+    # Get user identity from JWT
+    current_user = get_jwt_identity()
+    user_id = current_user.get("id")
+    
+    data = request.json
+    
+    # Filter which fields can be updated
+    updateable_fields = {
+        "name": data.get("name"),
+        "email": data.get("email")
+    }
+    
+    # Remove None values
+    filtered_data = {k: v for k, v in updateable_fields.items() if v is not None}
+    
+    if not filtered_data:
+        return jsonify({"error": "No valid fields to update"}), 400
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # Build the update query
+    set_clause = ", ".join([f"{key} = %s" for key in filtered_data.keys()])
+    values = list(filtered_data.values()) + [user_id]
+    
+    cursor.execute(f"UPDATE users SET {set_clause} WHERE id = %s", values)
+    conn.commit()
+    conn.close()
+    
+    return jsonify({"message": "Profile updated successfully"}), 200
+
+@api_bp.route('/change-password', methods=['POST'])
+@jwt_required()
+def change_current_user_password():
+    """
+    Change the password for the currently logged-in user
+    """
+    # Get user identity from JWT
+    current_user = get_jwt_identity()
+    user_id = current_user.get("id")
+    
+    data = request.json
+    
+    current_password = data.get('current_password')
+    new_password = data.get('new_password')
+    
+    if not current_password or not new_password:
+        return jsonify({"error": "Current password and new password are required"}), 400
+    
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)  # Use dictionary cursor for consistent access
+    
+    # Verify current password
+    cursor.execute("SELECT password_hash FROM users WHERE id = %s", (user_id,))
+    result = cursor.fetchone()
+    
+    if not result:
+        conn.close()
+        return jsonify({"error": "User not found"}), 404
+    
+    stored_password_hash = result["password_hash"]
+    
+    # Use proper password verification
+    if not check_password_hash(stored_password_hash, current_password):
+        conn.close()
+        return jsonify({"error": "Current password is incorrect"}), 401
+    
+    # Generate hash for new password
+    new_password_hash = generate_password_hash(new_password, method='pbkdf2:sha256')
+    
+    # Update the password with the new hash
+    cursor.execute("UPDATE users SET password_hash = %s WHERE id = %s", (new_password_hash, user_id))
+    conn.commit()
+    conn.close()
+    
+    return jsonify({"message": "Password changed successfully"}), 200
+
+@api_bp.route('/logout', methods=['POST'])
+def logout():
+    """
+    Log out the current user by clearing their session
+    """
+    # Add debug logging
+    print(f"Logging out user with session: {session}")
+    
+    # Clear the session
+    session.clear()
+    
+    print(f"Session after logout: {session}")
+    
+    return jsonify({"message": "Logged out successfully"}), 200
