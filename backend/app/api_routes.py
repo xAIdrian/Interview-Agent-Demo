@@ -203,11 +203,37 @@ def get_submission_answers():
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    filter_query, filter_values = build_filter_query(request.args)
-    cursor.execute(f"SELECT * FROM submission_answers {filter_query}", filter_values)
+    # Replace the previous code to avoid ambiguous column references
+    if request.args.get('submission_id'):
+        # Case when specifically querying by submission_id
+        submission_id = request.args.get('submission_id')
+        query = """
+            SELECT sa.id, sa.submission_id, sa.question_id, sa.video_path, 
+                   sa.transcript, sa.score, sa.score_rationale
+            FROM submission_answers sa
+            WHERE sa.submission_id = %s
+        """
+        cursor.execute(query, (submission_id,))
+    else:
+        # Handle other filters using build_filter_query
+        filter_query, filter_values = build_filter_query(request.args)
+        
+        # Make sure the table alias is used for all columns in the filter
+        if filter_query:
+            # Replace 'WHERE ' with 'WHERE sa.' and add 'sa.' before each 'AND'
+            filter_query = filter_query.replace('WHERE ', 'WHERE sa.').replace(' AND ', ' AND sa.')
+        
+        query = f"""
+            SELECT sa.id, sa.submission_id, sa.question_id, sa.video_path, 
+                   sa.transcript, sa.score, sa.score_rationale
+            FROM submission_answers sa
+            {filter_query}
+        """
+        cursor.execute(query, filter_values)
     
     submission_answers = cursor.fetchall()
     conn.close()
+    
     return jsonify([{
         "id": str(answer[0]),
         "submission_id": str(answer[1]),
@@ -232,6 +258,43 @@ def get_public_campaigns():
         "max_points": campaign[3],
         "is_public": campaign[4]
     } for campaign in campaigns])
+
+@api_bp.route('/submissions/<int:id>', methods=['GET'])
+@admin_required
+def get_submission_by_id(id):
+    """
+    Get a specific submission by ID with joined data from users and campaigns tables
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute("""
+        SELECT submissions.id, submissions.campaign_id, submissions.user_id, submissions.created_at, 
+               submissions.completed_at, submissions.is_complete, submissions.total_points, 
+               users.email, campaigns.title AS campaign_name
+        FROM submissions
+        JOIN users ON submissions.user_id = users.id
+        JOIN campaigns ON submissions.campaign_id = campaigns.id
+        WHERE submissions.id = %s
+    """, (id,))
+    
+    submission = cursor.fetchone()
+    conn.close()
+    
+    if not submission:
+        return jsonify({"error": "Submission not found"}), 404
+        
+    return jsonify({
+        "id": str(submission[0]),
+        "campaign_id": str(submission[1]),
+        "user_id": str(submission[2]),
+        "created_at": submission[3],
+        "completed_at": submission[4],
+        "is_complete": submission[5],
+        "total_points": submission[6],
+        "email": submission[7],
+        "campaign_name": submission[8]
+    })
 
 # POST routes
 @api_bp.route('/users', methods=['POST'])
