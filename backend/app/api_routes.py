@@ -749,28 +749,45 @@ def optimize_prompt_api():
 @api_bp.route('/profile', methods=['GET'])
 @jwt_required()
 def get_current_user_profile():
-    """
-    Get the profile information for the currently logged-in user using JWT
-    """
-    # Get user identity from JWT
-    current_user = get_jwt_identity()
-    user_id = current_user.get("id")
-    
-    conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT * FROM users WHERE id = %s", (user_id,))
-    user = cursor.fetchone()
-    conn.close()
-    
-    if user:
-        return jsonify({
-            "id": str(user["id"]),
-            "email": user["email"],
-            "name": user["name"],
-            "is_admin": user["is_admin"]
-        })
-    else:
-        return jsonify({"error": "User not found"}), 404
+    try:
+        """
+        Get the profile information for the currently logged-in user using JWT
+        If user_id is provided and the requester is an admin, return that user's profile
+        Otherwise return the current user's profile
+        """
+        # Get user identity from JWT
+        current_user = get_jwt_identity()
+        current_user_id = current_user.get("id")
+        is_admin = current_user.get("is_admin", False)
+        
+        # Get requested user_id from query parameters
+        requested_user_id = request.args.get("user_id")
+        
+        # Determine which user's profile to fetch
+        target_user_id = requested_user_id if requested_user_id and is_admin else current_user_id
+        
+        # If a user is requesting someone else's profile and isn't an admin, reject
+        if requested_user_id and requested_user_id != current_user_id and not is_admin:
+            return jsonify({"error": "You are not authorized to view this profile"}), 403
+        
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT * FROM users WHERE id = %s", (target_user_id,))
+        user = cursor.fetchone()
+        conn.close()
+        
+        if user:
+            return jsonify({
+                "id": str(user["id"]),
+                "email": user["email"],
+                "name": user["name"],
+                "is_admin": user["is_admin"]
+            })
+        else:
+            return jsonify({"error": "User not found"}), 404
+    except Exception as e:
+        print(e)
+        return jsonify({"error": str(e)}), 500
 
 # Add a session debug endpoint
 @api_bp.route('/debug/session', methods=['GET'])
@@ -840,15 +857,24 @@ def login():
 @jwt_required()
 def update_current_user_profile():
     """
-    Update the profile information for the currently logged-in user
+    Update the profile information for a user
+    If user_id is provided and the requester is an admin, update that user's profile
+    Otherwise update the current user's profile
     """
     # Get user identity from JWT
     current_user = get_jwt_identity()
-
-    print(f"JWT identity content: {current_user}")
-    user_id = current_user.get("id")
+    current_user_id = current_user.get("id")
+    is_admin = current_user.get("is_admin", False)
     
+    # Get data from request
     data = request.json
+    
+    # Determine which user's profile to update
+    target_user_id = data.get("user_id") if is_admin and data.get("user_id") else current_user_id
+    
+    # If a user is trying to update someone else's profile and isn't an admin, reject
+    if data.get("user_id") and data.get("user_id") != current_user_id and not is_admin:
+        return jsonify({"error": "You are not authorized to update this profile"}), 403
     
     # Filter which fields can be updated
     updateable_fields = {
@@ -856,70 +882,125 @@ def update_current_user_profile():
         "email": data.get("email")
     }
     
+    # If admin is updating, they can also update admin status
+    if is_admin and "is_admin" in data and data.get("user_id"):
+        updateable_fields["is_admin"] = data.get("is_admin")
+    
     # Remove None values
     filtered_data = {k: v for k, v in updateable_fields.items() if v is not None}
     
     if not filtered_data:
         return jsonify({"error": "No valid fields to update"}), 400
     
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    # Build the update query
-    set_clause = ", ".join([f"{key} = %s" for key in filtered_data.keys()])
-    values = list(filtered_data.values()) + [user_id]
-    
-    cursor.execute(f"UPDATE users SET {set_clause} WHERE id = %s", values)
-    conn.commit()
-    conn.close()
-    
-    return jsonify({"message": "Profile updated successfully"}), 200
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Build the update query
+        set_clause = ", ".join([f"{key} = %s" for key in filtered_data.keys()])
+        values = list(filtered_data.values()) + [target_user_id]
+        
+        cursor.execute(f"UPDATE users SET {set_clause} WHERE id = %s", values)
+        
+        if cursor.rowcount == 0:
+            conn.rollback()
+            conn.close()
+            return jsonify({"error": "User not found"}), 404
+            
+        conn.commit()
+        
+        # Fetch the updated user data
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT * FROM users WHERE id = %s", (target_user_id,))
+        updated_user = cursor.fetchone()
+        conn.close()
+        
+        return jsonify({
+            "message": "Profile updated successfully",
+            "user": {
+                "id": str(updated_user["id"]),
+                "email": updated_user["email"],
+                "name": updated_user["name"],
+                "is_admin": updated_user["is_admin"]
+            }
+        }), 200
+        
+    except Exception as e:
+        print(f"Error updating profile: {e}")
+        return jsonify({"error": str(e)}), 500
 
 @api_bp.route('/change-password', methods=['POST'])
 @jwt_required()
 def change_current_user_password():
     """
-    Change the password for the currently logged-in user
+    Change the password for a user
+    If user_id is provided and the requester is an admin, change that user's password
+    Otherwise change the current user's password
     """
     # Get user identity from JWT
     current_user = get_jwt_identity()
-    user_id = current_user.get("id")
+    current_user_id = current_user.get("id")
+    is_admin = current_user.get("is_admin", False)
     
     data = request.json
+    
+    # Determine which user's password to change
+    target_user_id = data.get("user_id") if is_admin and data.get("user_id") else current_user_id
+    
+    # If a user is trying to change someone else's password and isn't an admin, reject
+    if data.get("user_id") and data.get("user_id") != current_user_id and not is_admin:
+        return jsonify({"error": "You are not authorized to change this user's password"}), 403
     
     current_password = data.get('current_password')
     new_password = data.get('new_password')
     
-    if not current_password or not new_password:
-        return jsonify({"error": "Current password and new password are required"}), 400
+    # Admin reset doesn't require current password
+    if not is_admin or not data.get("user_id"):
+        if not current_password:
+            return jsonify({"error": "Current password is required"}), 400
     
-    conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)  # Use dictionary cursor for consistent access
+    if not new_password:
+        return jsonify({"error": "New password is required"}), 400
     
-    # Verify current password
-    cursor.execute("SELECT password_hash FROM users WHERE id = %s", (user_id,))
-    result = cursor.fetchone()
-    
-    if not result:
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        
+        # Verify current password (except for admin reset)
+        if not is_admin or not data.get("user_id"):
+            cursor.execute("SELECT password_hash FROM users WHERE id = %s", (current_user_id,))
+            result = cursor.fetchone()
+            
+            if not result:
+                conn.close()
+                return jsonify({"error": "User not found"}), 404
+            
+            stored_password_hash = result["password_hash"]
+            
+            # Use proper password verification
+            if not check_password_hash(stored_password_hash, current_password):
+                conn.close()
+                return jsonify({"error": "Current password is incorrect"}), 401
+        
+        # Generate hash for new password
+        new_password_hash = generate_password_hash(new_password, method='pbkdf2:sha256')
+        
+        # Update the password with the new hash
+        cursor.execute("UPDATE users SET password_hash = %s WHERE id = %s", (new_password_hash, target_user_id))
+        
+        if cursor.rowcount == 0:
+            conn.rollback()
+            conn.close()
+            return jsonify({"error": "User not found"}), 404
+            
+        conn.commit()
         conn.close()
-        return jsonify({"error": "User not found"}), 404
-    
-    stored_password_hash = result["password_hash"]
-    
-    # Use proper password verification
-    if not check_password_hash(stored_password_hash, current_password):
-        conn.close()
-        return jsonify({"error": "Current password is incorrect"}), 401
-    
-    # Generate hash for new password
-    new_password_hash = generate_password_hash(new_password, method='pbkdf2:sha256')
-    
-    # Update the password with the new hash
-    cursor.execute("UPDATE users SET password_hash = %s WHERE id = %s", (new_password_hash, user_id))
-    conn.commit()
-    conn.close()
-    
-    return jsonify({"message": "Password changed successfully"}), 200
+        
+        return jsonify({"message": "Password changed successfully"}), 200
+        
+    except Exception as e:
+        print(f"Error changing password: {e}")
+        return jsonify({"error": str(e)}), 500
 
 @api_bp.route('/logout', methods=['POST'])
 def logout():

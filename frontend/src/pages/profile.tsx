@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useRouter } from 'next/router';
 import { PageTemplate } from '../components/PageTemplate';
+import { INTERNAL_API_TOKEN } from '../utils/internalApiToken';
 
 // Define API base URL for consistent usage
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
@@ -15,10 +16,14 @@ interface User {
 
 const ProfilePage = () => {
   const router = useRouter();
+  const { userId } = router.query; // Get userId from URL query parameter
+  
   const [user, setUser] = useState<User | null>(null);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
+    is_admin: false,
     current_password: '',
     new_password: '',
     confirm_password: ''
@@ -27,79 +32,98 @@ const ProfilePage = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [viewingOwnProfile, setViewingOwnProfile] = useState(true);
 
   // Add auth token setup on component mount
   useEffect(() => {
-    // Setup axios default authorization header from localStorage
+    // Check if user is logged in
     const token = localStorage.getItem('accessToken');
-    if (token) {
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    } else {
+    if (!token) {
       router.push('/login');
+      return;
     }
-  }, [router]);
+    
+    // Get current user's ID from localStorage
+    const currentUserId = localStorage.getItem('userId');
+    if (!currentUserId) {
+      router.push('/login');
+      return;
+    }
+    
+    // Load current user data first
+    loadUserData(currentUserId, true);
+    
+    // Then load the requested user's data if viewing someone else's profile
+    if (userId && userId !== currentUserId) {
+      loadUserData(userId as string, false);
+      setViewingOwnProfile(false);
+    }
+  }, [router, userId]);
 
-  // Fetch the user profile using JWT token
-  useEffect(() => {
-    const fetchUserProfile = async () => {
-      try {
-        setIsLoading(true);
-        setError('');
-        
-        // Get token from localStorage
-        const token = localStorage.getItem('accessToken');
-        if (!token) {
-          router.push('/login');
-          return;
+  // Function to load user data from the API
+  const loadUserData = async (id: string, isCurrentUser: boolean) => {
+    try {
+      setIsLoading(true);
+      setError('');
+      
+      // Use the internal API token for admin-level access
+      const response = await axios.get(`${API_BASE_URL}/api/users/${id}`, {
+        headers: {
+          'Authorization': `Bearer ${INTERNAL_API_TOKEN}`
         }
+      });
+      
+      const userData = response.data;
+      
+      if (isCurrentUser) {
+        setCurrentUser(userData);
         
-        // Send request with authorization header to the correct endpoint
-        const response = await axios.get(`${API_BASE_URL}/api/profile`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-        
-        const userData = response.data;
+        // If we're not viewing someone else's profile, set this as the main user
+        if (!userId || userId === id) {
+          setUser(userData);
+          setFormData({
+            ...formData,
+            name: userData.name || '',
+            email: userData.email || '',
+            is_admin: userData.is_admin || false
+          });
+          setViewingOwnProfile(true);
+        }
+      } else {
         setUser(userData);
-        setFormData(prevData => ({
-          ...prevData,
+        setFormData({
+          ...formData,
           name: userData.name || '',
-          email: userData.email || ''
-        }));
-      } catch (err) {
-        console.error('Error fetching profile:', err);
-        
-        // Handle different error types
-        if (axios.isAxiosError(err)) {
-          // Handle specific error status codes
-          if (err.response?.status === 401) {
-            setError('Your session has expired. Please login again.');
-            router.push('/login');
-          } else if (err.response?.status === 422) {
-            setError('Invalid request format. Please try logging in again.');
-            router.push('/login');
-          } else if (err.response?.data?.error) {
-            setError(`Failed to load profile: ${err.response.data.error}`);
-          } else {
-            setError('Failed to load profile. Please try again later.');
-          }
-        } else {
-          setError('An unexpected error occurred. Please try again.');
-        }
-      } finally {
-        setIsLoading(false);
+          email: userData.email || '',
+          is_admin: userData.is_admin || false
+        });
       }
-    };
-
-    fetchUserProfile();
-  }, [router]);
+    } catch (err) {
+      console.error(`Error loading ${isCurrentUser ? 'current' : 'requested'} user data:`, err);
+      
+      if (axios.isAxiosError(err)) {
+        if (err.response?.status === 401 || err.response?.status === 403) {
+          router.push('/login');
+        } else if (err.response?.status === 404) {
+          setError('User not found');
+        } else if (err.response?.data?.error) {
+          setError(err.response.data.error);
+        } else {
+          setError(`Failed to load ${isCurrentUser ? 'your' : 'user'} profile`);
+        }
+      } else {
+        setError('An unexpected error occurred');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
+    const { name, value, type, checked } = e.target;
     setFormData({
       ...formData,
-      [name]: value
+      [name]: type === 'checkbox' ? checked : value
     });
   };
 
@@ -113,8 +137,8 @@ const ProfilePage = () => {
       return false;
     }
     
-    // If changing password, current password is required
-    if (formData.new_password && !formData.current_password) {
+    // If changing password, current password is required (only for own profile)
+    if (viewingOwnProfile && formData.new_password && !formData.current_password) {
       setError('Current password is required to set a new password');
       return false;
     }
@@ -125,7 +149,7 @@ const ProfilePage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!validateForm()) {
+    if (!validateForm() || !user) {
       return;
     }
     
@@ -134,36 +158,50 @@ const ProfilePage = () => {
       setError('');
       setSuccess('');
       
-      // Get token from localStorage
-      const token = localStorage.getItem('accessToken');
-      if (!token) {
-        router.push('/login');
-        return;
-      }
-      
+      // Use internal API token for admin-level access
       const authHeader = {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${INTERNAL_API_TOKEN}`
         }
       };
       
-      // If changing password, include the password fields
-      if (formData.new_password && formData.current_password) {
-        await axios.post(`${API_BASE_URL}/api/change-password`, {
-          current_password: formData.current_password,
-          new_password: formData.new_password
-        }, authHeader);
-      }
-      
       // Update user profile information
-      const updateData = {
+      const updateData: Record<string, any> = {
         name: formData.name,
         email: formData.email
       };
       
-      await axios.put(`${API_BASE_URL}/api/profile`, updateData, authHeader);
+      // If admin is updating another user, they can update admin status
+      if (currentUser?.is_admin && !viewingOwnProfile) {
+        updateData.is_admin = formData.is_admin;
+      }
+      
+      // Update user profile
+      await axios.put(`${API_BASE_URL}/api/users/${user.id}`, updateData, authHeader);
+      
+      // If changing password
+      if (formData.new_password) {
+        const passwordData: Record<string, string> = {
+          new_password: formData.new_password
+        };
+        
+        // Add current password only if user is changing their own password
+        if (viewingOwnProfile) {
+          passwordData.current_password = formData.current_password;
+        }
+        
+        // Add user_id if admin is changing someone else's password
+        if (!viewingOwnProfile) {
+          passwordData.user_id = user.id;
+        }
+        
+        await axios.post(`${API_BASE_URL}/api/change-password`, passwordData, authHeader);
+      }
       
       setSuccess('Profile updated successfully!');
+      
+      // Refresh user data
+      loadUserData(user.id, viewingOwnProfile);
       
       // Clear password fields
       setFormData({
