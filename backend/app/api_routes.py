@@ -1016,3 +1016,110 @@ def logout():
     print(f"Session after logout: {session}")
     
     return jsonify({"message": "Logged out successfully"}), 200
+
+# Add a route for user registration
+@api_bp.route('/register', methods=['POST'])
+def register():
+    """
+    Handle user registration
+    """
+    data = request.json
+    email = data.get('email')
+    name = data.get('name')
+    password = data.get('password')
+    
+    if not email or not name or not password:
+        return jsonify({"error": "Email, name, and password are required"}), 400
+    
+    # Check if user already exists
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT * FROM users WHERE email = %s", (email,))
+    existing_user = cursor.fetchone()
+    
+    if existing_user:
+        conn.close()
+        return jsonify({"error": "A user with this email address already exists"}), 409
+    
+    try:
+        # Generate password hash
+        password_hash = generate_password_hash(password, method='pbkdf2:sha256')
+        
+        # Insert new user, default to non-admin
+        cursor.execute("""
+            INSERT INTO users (id, email, name, password_hash, is_admin)
+            VALUES (UUID_SHORT(), %s, %s, %s, %s)
+        """, (email, name, password_hash, False))
+        conn.commit()
+        
+        # Get the new user's ID
+        cursor.execute("SELECT id FROM users WHERE email = %s", (email,))
+        user_id = cursor.fetchone()["id"]
+        
+        # Create JWT tokens for the new user
+        user_identity = {
+            "id": str(user_id),
+            "email": email,
+            "is_admin": False
+        }
+        
+        access_token = create_access_token(identity=user_identity)
+        refresh_token = create_refresh_token(identity=user_identity)
+        
+        conn.close()
+        
+        return jsonify({
+            "message": "User registered successfully",
+            "id": str(user_id),
+            "name": name,
+            "email": email,
+            "is_admin": False,
+            "access_token": access_token,
+            "refresh_token": refresh_token
+        }), 201
+        
+    except Exception as e:
+        conn.rollback()
+        conn.close()
+        print(f"Error registering user: {e}")
+        return jsonify({"error": f"Failed to register user: {str(e)}"}), 500
+
+@api_bp.route('/auth/me', methods=['GET'])
+@jwt_required()
+def get_current_auth_user():
+    """
+    Get current authenticated user for navbar and access control
+    """
+    try:
+        # Get user identity from JWT
+        current_user = get_jwt_identity()
+        
+        if not current_user or not current_user.get("id"):
+            return jsonify({"error": "Invalid token or missing user identity"}), 401
+            
+        user_id = current_user.get("id")
+        
+        # Get user data from database to ensure it's current
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT id, email, name, is_admin FROM users WHERE id = %s", (user_id,))
+        user = cursor.fetchone()
+        conn.close()
+        
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+            
+        return jsonify({
+            "id": str(user["id"]),
+            "email": user["email"],
+            "name": user["name"],
+            "is_admin": bool(user["is_admin"]),
+            "isAuthenticated": True
+        })
+        
+    except Exception as e:
+        print(f"Error in auth/me endpoint: {e}")
+        return jsonify({
+            "error": str(e),
+            "isAuthenticated": False
+        }), 500
