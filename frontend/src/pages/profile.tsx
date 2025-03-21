@@ -3,6 +3,9 @@ import axios from 'axios';
 import { useRouter } from 'next/router';
 import { PageTemplate } from '../components/PageTemplate';
 
+// Define API base URL for consistent usage
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+
 interface User {
   id: string;
   email: string;
@@ -41,26 +44,48 @@ const ProfilePage = () => {
     const fetchUserProfile = async () => {
       try {
         setIsLoading(true);
-        // Send request with authorization header 
-        const response = await axios.get('/api/profile', {
+        setError('');
+        
+        // Get token from localStorage
+        const token = localStorage.getItem('accessToken');
+        if (!token) {
+          router.push('/login');
+          return;
+        }
+        
+        // Send request with authorization header to the correct endpoint
+        const response = await axios.get(`${API_BASE_URL}/api/profile`, {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+            'Authorization': `Bearer ${token}`
           }
         });
+        
         const userData = response.data;
         setUser(userData);
         setFormData(prevData => ({
           ...prevData,
-          name: userData.name,
-          email: userData.email
+          name: userData.name || '',
+          email: userData.email || ''
         }));
       } catch (err) {
         console.error('Error fetching profile:', err);
-        setError('Failed to load profile information. Please try again.');
         
-        // If unauthorized, redirect to login
-        if (axios.isAxiosError(err) && err.response?.status === 401) {
-          router.push('/login');
+        // Handle different error types
+        if (axios.isAxiosError(err)) {
+          // Handle specific error status codes
+          if (err.response?.status === 401) {
+            setError('Your session has expired. Please login again.');
+            router.push('/login');
+          } else if (err.response?.status === 422) {
+            setError('Invalid request format. Please try logging in again.');
+            router.push('/login');
+          } else if (err.response?.data?.error) {
+            setError(`Failed to load profile: ${err.response.data.error}`);
+          } else {
+            setError('Failed to load profile. Please try again later.');
+          }
+        } else {
+          setError('An unexpected error occurred. Please try again.');
         }
       } finally {
         setIsLoading(false);
@@ -109,27 +134,34 @@ const ProfilePage = () => {
       setError('');
       setSuccess('');
       
-      const updateData = {
-        name: formData.name,
-        email: formData.email
-      };
+      // Get token from localStorage
+      const token = localStorage.getItem('accessToken');
+      if (!token) {
+        router.push('/login');
+        return;
+      }
       
       const authHeader = {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+          'Authorization': `Bearer ${token}`
         }
       };
       
       // If changing password, include the password fields
       if (formData.new_password && formData.current_password) {
-        await axios.post('/api/change-password', {
+        await axios.post(`${API_BASE_URL}/api/change-password`, {
           current_password: formData.current_password,
           new_password: formData.new_password
         }, authHeader);
       }
       
-      // Update user profile information with JWT auth
-      await axios.put('/api/profile', updateData, authHeader);
+      // Update user profile information
+      const updateData = {
+        name: formData.name,
+        email: formData.email
+      };
+      
+      await axios.put(`${API_BASE_URL}/api/profile`, updateData, authHeader);
       
       setSuccess('Profile updated successfully!');
       
@@ -143,16 +175,25 @@ const ProfilePage = () => {
       
     } catch (err) {
       console.error('Error updating profile:', err);
-      if (axios.isAxiosError(err) && err.response?.data?.error) {
-        setError(err.response.data.error);
+      
+      if (axios.isAxiosError(err)) {
+        if (err.response?.status === 401) {
+          setError('Your session has expired. Please login again.');
+          router.push('/login');
+        } else if (err.response?.data?.error) {
+          setError(err.response.data.error);
+        } else {
+          setError('Failed to update profile. Please try again.');
+        }
       } else {
-        setError('Failed to update profile. Please try again.');
+        setError('An unexpected error occurred. Please try again.');
       }
     } finally {
       setIsSaving(false);
     }
   };
 
+  // Rest of the component remains the same
   return (
     <PageTemplate title="Edit Profile" maxWidth="md">
       <div className="w-full bg-white shadow-md rounded-lg p-6">
