@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useRouter } from 'next/router';
-import { PrimaryButton } from '../../components/Button';
-import { PageTemplate } from '../../components/PageTemplate';
-import { INTERNAL_API_TOKEN } from '../../utils/internalApiToken';
+import { PrimaryButton } from '../../../components/Button';
+import { PageTemplate } from '../../../components/PageTemplate';
+import { INTERNAL_API_TOKEN } from '../../../utils/internalApiToken';
 
 // This is the user creation page component
 const CreateUserPage = () => {
