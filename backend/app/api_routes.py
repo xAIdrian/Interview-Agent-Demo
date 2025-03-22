@@ -1123,3 +1123,11 @@ def get_current_auth_user():
             "error": str(e),
             "isAuthenticated": False
         }), 500
+
+# Add a health check endpoint
+@api_bp.route('/health', methods=['GET', 'HEAD'])
+def health_check():
+    """
+    Simple health check endpoint to verify the API is running
+    """
+    return jsonify({"status": "ok", "message": "API is operational"}), 200

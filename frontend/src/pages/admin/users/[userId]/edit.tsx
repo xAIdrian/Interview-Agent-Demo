@@ -1,10 +1,10 @@
-
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import axios from 'axios';
 import Link from 'next/link';
-import { PageTemplate } from '../../../../components/PageTemplate';
-import { INTERNAL_API_TOKEN } from '../../../../utils/internalApiToken';
+import React from 'react';
+import { AdminLayout } from '../../../../components/Layout/AdminLayout';
+import { AuthLogger } from '../../../../utils/logging';
 
 interface User {
   id: string;
@@ -21,6 +21,7 @@ const EditUserPage = () => {
   const [formData, setFormData] = useState({
     email: '',
     name: '',
+    password: '',
     is_admin: false,
     reset_password: false
   });
@@ -30,32 +31,39 @@ const EditUserPage = () => {
   const [success, setSuccess] = useState('');
 
   useEffect(() => {
-    if (!userId) return;
-
     const fetchUser = async () => {
+      if (!userId) return;
+      
       try {
         setIsLoading(true);
-        const response = await axios.get(`http://127.0.0.1:5000/api/users/${userId}`, {
-          headers: {
-            'Authorization': `Bearer ${INTERNAL_API_TOKEN}`
-          }
-        });
+        const response = await axios.get(`/api/users/${userId}`);
         const userData = response.data;
         setUser(userData);
+        
+        // Initialize form with existing user data
         setFormData({
-          email: userData.email,
-          name: userData.name,
-          is_admin: userData.is_admin,
+          email: userData.email || '',
+          name: userData.name || '',
+          password: '', // Don't populate password field for security
+          is_admin: userData.is_admin || false,
           reset_password: false
         });
+        
+        AuthLogger.info(`Loaded user #${userId} for editing`);
       } catch (err) {
         console.error('Error fetching user:', err);
-        setError('Failed to load user details. Please try again.');
+        setError('Failed to load user details');
+        
+        if (axios.isAxiosError(err)) {
+          AuthLogger.error('Error fetching user for edit:', err.response?.status, err.response?.data);
+        } else {
+          AuthLogger.error('Unexpected error fetching user for edit:', err);
+        }
       } finally {
         setIsLoading(false);
       }
     };
-
+    
     fetchUser();
   }, [userId]);
 
@@ -81,39 +89,39 @@ const EditUserPage = () => {
         is_admin: formData.is_admin
       };
       
-      await axios.put(`http://127.0.0.1:5000/api/users/${userId}`, updatedData, {
-        headers: {
-          'Authorization': `Bearer ${INTERNAL_API_TOKEN}`
-        }
-      });
+      await axios.put(`/api/users/${userId}`, updatedData);
       
       // If reset_password is true, make additional API call
       if (formData.reset_password) {
         // This would depend on your API structure - here's a placeholder
-        await axios.post(`http://127.0.0.1:5000/api/users/${userId}/reset-password`, {}, {
-          headers: {
-            'Authorization': `Bearer ${INTERNAL_API_TOKEN}`
-          }
-        });
+        await axios.post(`/api/users/${userId}/reset-password`, {});
+        AuthLogger.info(`Password reset requested for user #${userId}`);
       }
       
       setSuccess('User updated successfully!');
+      AuthLogger.info(`Updated user #${userId}`);
       
       // Navigate back to user detail page after a short delay
       setTimeout(() => {
-        router.push(`/users/${userId}`);
+        router.push(`/admin/users/${userId}`);
       }, 1500);
       
     } catch (err) {
       console.error('Error updating user:', err);
       setError('Failed to update user. Please try again.');
+      
+      if (axios.isAxiosError(err)) {
+        AuthLogger.error('Error updating user:', err.response?.status, err.response?.data);
+      } else {
+        AuthLogger.error('Unexpected error updating user:', err);
+      }
     } finally {
       setIsSaving(false);
     }
   };
 
   return (
-    <PageTemplate title="Edit User" maxWidth="md">
+    <AdminLayout title="Edit User">
       <div className="w-full bg-white shadow-md rounded-lg p-6">
         <h1 className="text-2xl font-bold mb-6">Edit User</h1>
         
@@ -200,4 +208,13 @@ const EditUserPage = () => {
                 disabled={isSaving}
               >
                 {isSaving ? 'Updating...' : 'Update User'}
-             
+              </button>
+            </div>
+          </form>
+        ) : null}
+      </div>
+    </AdminLayout>
+  );
+};
+
+export default EditUserPage;

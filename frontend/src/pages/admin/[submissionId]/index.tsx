@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import axios from 'axios';
-import { PageTemplate } from '../../../components/PageTemplate';
+import { AdminLayout } from '../../../components/Layout/AdminLayout';
 import Link from 'next/link';
-import { INTERNAL_API_TOKEN } from '../../../utils/internalApiToken';
+import { AuthLogger } from '../../../utils/logging';
 
 // Define API base URL for consistent usage
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
@@ -72,18 +72,8 @@ const SubmissionPage = () => {
         setIsLoading(true);
         setError('');
         
-        // Use the admin token for API access
-        const authHeader = {
-          headers: {
-            'Authorization': `Bearer ${INTERNAL_API_TOKEN}`
-          }
-        };
-        
         // Use the new direct endpoint to fetch a submission by ID
-        const submissionResponse = await axios.get(
-          `${API_BASE_URL}/api/submissions/${submissionId}`, 
-          authHeader
-        );
+        const submissionResponse = await axios.get(`/api/submissions/${submissionId}`);
         
         // Check if we got a valid submission
         if (submissionResponse.data) {
@@ -94,16 +84,10 @@ const SubmissionPage = () => {
           try {
             // Fetch submission answers using the correct API endpoint format
             // Use the explicit submission_id parameter to avoid ambiguity
-            const answersResponse = await axios.get(
-              `${API_BASE_URL}/api/submission_answers?submission_id=${submissionId}`, 
-              authHeader
-            );
+            const answersResponse = await axios.get(`/api/submission_answers?submission_id=${submissionId}`);
             
             // Fetch questions for the campaign to get question titles
-            const questionsResponse = await axios.get(
-              `${API_BASE_URL}/api/questions?campaign_id=${submissionData.campaign_id}`, 
-              authHeader
-            );
+            const questionsResponse = await axios.get(`/api/questions?campaign_id=${submissionData.campaign_id}`);
             
             setQuestions(questionsResponse.data);
             
@@ -162,7 +146,7 @@ const SubmissionPage = () => {
   };
 
   return (
-    <PageTemplate title="Submission Details" maxWidth="lg">
+    <AdminLayout title={`Submission ${submission?.id || ''}`}>
       <div className="flex justify-between mb-4 items-center">
         <h1 className="text-2xl font-bold">Submission Details</h1>
         {submission && isAdmin && (
@@ -345,7 +329,7 @@ const SubmissionPage = () => {
           Back to Dashboard
         </button>
       </div>
-    </PageTemplate>
+    </AdminLayout>
   );
 };
 
