@@ -50,6 +50,14 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # Use 'Strict' in production
 # Set up CORS to allow credentials
 CORS(app, supports_credentials=True, origins=["http://localhost:3000", "http://127.0.0.1:3000"])
 
+# Add a root-level health endpoint
+@app.route('/health', methods=['GET', 'HEAD'])
+def health_check():
+    """
+    Simple health check endpoint to verify the API is running
+    """
+    return jsonify({"status": "ok", "message": "API is operational"}), 200
+
 @app.before_first_request
 def create_tables_on_startup():
     create_tables()

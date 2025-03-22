@@ -1,16 +1,18 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import Link from 'next/link';
-import { PageTemplate } from '../../../components/PageTemplate';
-import { INTERNAL_API_TOKEN } from '../../../utils/internalApiToken';
+import { AdminLayout } from '../../../components/Layout/AdminLayout';
+import { AuthLogger } from '../../../utils/logging';
 // Import Tabulator styles
 import 'react-tabulator/lib/styles.css';
 import 'react-tabulator/lib/css/tabulator.min.css';
 // Import custom tabulator styles
-import '../../styles/tabulator.css';
+import '../../../styles/tabulator.css';
 
 // Need to conditionally import for SSR compatibility
 import dynamic from 'next/dynamic';
+import { ColumnDefinition } from 'react-tabulator';
+
 const ReactTabulator = dynamic(() => import('react-tabulator').then(mod => mod.ReactTabulator), {
   ssr: false,
 });
@@ -19,6 +21,7 @@ const ReactTabulator = dynamic(() => import('react-tabulator').then(mod => mod.R
 interface User {
   id: number;
   email: string;
+  name?: string;
   is_admin: boolean;
 }
 
@@ -39,15 +42,18 @@ const UsersPage = () => {
     const fetchUsers = async () => {
       try {
         setIsLoading(true);
-        const response = await axios.get('http://127.0.0.1:5000/api/users', {
-          headers: {
-            'Authorization': `Bearer ${INTERNAL_API_TOKEN}`
-          }
-        });
+        const response = await axios.get('/api/users');
         setUsers(response.data);
+        AuthLogger.info(`Loaded ${response.data.length} users successfully`);
       } catch (err) {
         console.error('Error fetching users:', err);
         setError('Failed to load users. Please try again.');
+        
+        if (axios.isAxiosError(err)) {
+          AuthLogger.error('Error fetching users:', err.response?.status, err.response?.data);
+        } else {
+          AuthLogger.error('Unexpected error fetching users:', err);
+        }
       } finally {
         setIsLoading(false);
       }
@@ -56,26 +62,41 @@ const UsersPage = () => {
     fetchUsers();
   }, [isClient]);
 
-  const columns = [
+  const columns: ColumnDefinition[] = [
     { title: "ID", field: "id", widthGrow: 1 },
     { title: "Email", field: "email", widthGrow: 3 },
+    { title: "Name", field: "name", widthGrow: 2 },
     { 
-      title: "Type", 
+      title: "Role", 
       field: "is_admin", 
-      widthGrow: 2, 
+      widthGrow: 1.5, 
       formatter: (cell: any) => cell.getValue() ? "Admin" : "Candidate" 
     },
     { 
       title: "Actions", 
       field: "id", 
-      hozAlign: "center",
-      widthGrow: 1,
+      hozAlign: "center" as const,
+      widthGrow: 1.5,
       formatter: function(cell: any) {
-        return `<a href="/users/${cell.getValue()}" class="text-blue-500 hover:text-blue-700">View</a>`;
+        const id = cell.getValue();
+        return `
+          <div class="flex space-x-2 justify-center">
+            <a href="/admin/users/${id}" class="text-blue-500 hover:text-blue-700">View</a>
+            <a href="/admin/users/${id}/edit" class="text-indigo-500 hover:text-indigo-700">Edit</a>
+          </div>
+        `;
       },
       cellClick: function(e: any, cell: any) {
+        // Get the element that was clicked on
+        const element = e.target;
+        if (element.tagName === 'A') {
+          // Let the browser handle the link click
+          return;
+        }
+        
+        // If not clicked directly on a link, navigate to the view page
         const id = cell.getValue();
-        window.location.href = `/users/${id}`;
+        window.location.href = `/admin/users/${id}`;
       }
     }
   ];
@@ -87,10 +108,8 @@ const UsersPage = () => {
     paginationSize: 10,
     paginationSizeSelector: [5, 10, 20, 50],
     movableColumns: true,
-    resizableRows: true,
     height: "auto",
-    renderVerticalBuffer: 0,
-    layoutColumnsOnNewData: true,
+    renderVerticalBuffer: 10,
   };
 
   if (!isClient) {
@@ -98,12 +117,20 @@ const UsersPage = () => {
   }
 
   return (
-    <PageTemplate title="User Manager" maxWidth="lg">
-      <div className="w-full bg-white shadow-md rounded-lg p-6">
-        <h1 className="text-2xl font-bold mb-6">User Manager</h1>
+    <AdminLayout title="User Management">
+      <div className="bg-white shadow-md rounded-lg p-6">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-bold">User Management</h1>
+          <Link 
+            href="/admin/users/create" 
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md font-medium"
+          >
+            Add New User
+          </Link>
+        </div>
 
         {error && (
-          <div className="mb-4 p-2 bg-red-100 text-red-700 rounded">
+          <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md">
             {error}
           </div>
         )}
@@ -119,7 +146,7 @@ const UsersPage = () => {
                 No users found. Create a new user to get started.
               </div>
             ) : (
-              <div className="overflow-x-auto tabulator-container">
+              <div className="overflow-x-auto">
                 <ReactTabulator
                   data={users}
                   columns={columns}
@@ -130,15 +157,8 @@ const UsersPage = () => {
             )}
           </>
         )}
-
-        <div className="mt-6">
-          <Link href="/users/create" 
-            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700">
-            Create a New User
-          </Link>
-        </div>
       </div>
-    </PageTemplate>
+    </AdminLayout>
   );
 };
 

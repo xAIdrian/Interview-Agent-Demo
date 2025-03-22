@@ -2,15 +2,17 @@ import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import Link from 'next/link';
 import { PageTemplate } from '../../components/PageTemplate';
-import { INTERNAL_API_TOKEN } from '../../utils/internalApiToken';
 // Import Tabulator styles
 import 'react-tabulator/lib/styles.css';
 import 'react-tabulator/lib/css/tabulator.min.css';
 // Import custom tabulator styles
 import '../../styles/tabulator.css';
+import { AuthLogger } from '../../utils/logging';
 
 // Need to conditionally import for SSR compatibility
 import dynamic from 'next/dynamic';
+import { ColumnDefinition } from 'react-tabulator';
+
 const ReactTabulator = dynamic(() => import('react-tabulator').then(mod => mod.ReactTabulator), {
   ssr: false,
 });
@@ -42,15 +44,18 @@ const CampaignsPage = () => {
     const fetchCampaigns = async () => {
       try {
         setIsLoading(true);
-        const response = await axios.get('http://127.0.0.1:5000/api/campaigns', {
-          headers: {
-            'Authorization': `Bearer ${INTERNAL_API_TOKEN}`
-          }
-        });
+        const response = await axios.get('/api/campaigns');
         setCampaigns(response.data);
+        AuthLogger.info(`Loaded ${response.data.length} campaigns successfully`);
       } catch (err) {
         console.error('Error fetching campaigns:', err);
         setError('Failed to load campaigns. Please try again.');
+        
+        if (axios.isAxiosError(err)) {
+          AuthLogger.error('Error fetching campaigns:', err.response?.status, err.response?.data);
+        } else {
+          AuthLogger.error('Unexpected error fetching campaigns:', err);
+        }
       } finally {
         setIsLoading(false);
       }
@@ -59,7 +64,7 @@ const CampaignsPage = () => {
     fetchCampaigns();
   }, [isClient]);
 
-  const columns = [
+  const columns: ColumnDefinition[] = [
     { title: "Title", field: "title", widthGrow: 3 },
     // Add job description column with shortened display
     { 
@@ -71,19 +76,19 @@ const CampaignsPage = () => {
         return text.length > 100 ? text.substring(0, 100) + '...' : text;
       }
     },
-    { title: "Max User Submissions", field: "max_user_submissions", hozAlign: "center", widthGrow: 2 },
-    { title: "Max Points", field: "max_points", hozAlign: "center", widthGrow: 1 },
+    { title: "Max User Submissions", field: "max_user_submissions", hozAlign: "center" as "center", widthGrow: 2 },
+    { title: "Max Points", field: "max_points", hozAlign: "center" as "center", widthGrow: 1 },
     { 
       title: "Is Public", 
       field: "is_public", 
-      hozAlign: "center", 
+      hozAlign: "center" as "center", 
       widthGrow: 1,
       formatter: (cell: any) => cell.getValue() ? "Yes" : "No" 
     },
     { 
       title: "Actions", 
       field: "id", 
-      hozAlign: "center",
+      hozAlign: "center" as "center",
       widthGrow: 1,
       formatter: function(cell: any) {
         return `<a href="/campaigns/${cell.getValue()}" class="text-blue-500 hover:text-blue-700">View</a>`;

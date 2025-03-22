@@ -1,10 +1,9 @@
-
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import axios from 'axios';
 import Link from 'next/link';
-import { PageTemplate } from '../../../components/PageTemplate';
-import { INTERNAL_API_TOKEN } from '../../../utils/internalApiToken';
+import { AdminLayout } from '../../../components/Layout/AdminLayout';
+import { AuthLogger } from '../../../utils/logging';
 
 interface User {
   id: string;
@@ -22,25 +21,28 @@ const UserDetailPage = () => {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (!userId) return;
-
     const fetchUser = async () => {
+      if (!userId) return;
+      
       try {
         setIsLoading(true);
-        const response = await axios.get(`http://127.0.0.1:5000/api/users/${userId}`, {
-          headers: {
-            'Authorization': `Bearer ${INTERNAL_API_TOKEN}`
-          }
-        });
+        const response = await axios.get(`/api/users/${userId}`);
         setUser(response.data);
+        AuthLogger.info(`Loaded user #${userId} successfully`);
       } catch (err) {
         console.error('Error fetching user:', err);
-        setError('Failed to load user details. Please try again.');
+        setError('Failed to load user details');
+        
+        if (axios.isAxiosError(err)) {
+          AuthLogger.error('Error fetching user:', err.response?.status, err.response?.data);
+        } else {
+          AuthLogger.error('Unexpected error fetching user:', err);
+        }
       } finally {
         setIsLoading(false);
       }
     };
-
+    
     fetchUser();
   }, [userId]);
 
@@ -48,20 +50,23 @@ const UserDetailPage = () => {
     if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) return;
     
     try {
-      await axios.delete(`http://127.0.0.1:5000/api/users/${userId}`, {
-        headers: {
-          'Authorization': `Bearer ${INTERNAL_API_TOKEN}`
-        }
-      });
-      router.push('/users');
+      await axios.delete(`/api/users/${userId}`);
+      AuthLogger.info(`User ${userId} deleted successfully`);
+      router.push('/admin/users');
     } catch (err) {
       console.error('Error deleting user:', err);
-      setError('Failed to delete user. Please try again.');
+      setError('Failed to delete user.');
+      
+      if (axios.isAxiosError(err)) {
+        AuthLogger.error('Error deleting user:', err.response?.status, err.response?.data);
+      } else {
+        AuthLogger.error('Unexpected error deleting user:', err);
+      }
     }
   };
 
   return (
-    <PageTemplate title={user?.name || 'User Details'} maxWidth="md">
+    <AdminLayout title={user?.name || 'User Details'}>
       <div className="w-full bg-white shadow-md rounded-lg p-6">
         <h1 className="text-2xl font-bold mb-6">User Details</h1>
         
@@ -76,59 +81,42 @@ const UserDetailPage = () => {
             <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-700"></div>
           </div>
         ) : user ? (
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <h3 className="text-sm font-medium text-gray-500">ID</h3>
-                <p className="mt-1 text-sm text-gray-900">{user.id}</p>
-              </div>
-              
-              <div>
-                <h3 className="text-sm font-medium text-gray-500">Email</h3>
-                <p className="mt-1 text-sm text-gray-900">{user.email}</p>
-              </div>
-              
-              <div>
-                <h3 className="text-sm font-medium text-gray-500">Name</h3>
-                <p className="mt-1 text-sm text-gray-900">{user.name}</p>
-              </div>
-              
-              <div>
-                <h3 className="text-sm font-medium text-gray-500">User Type</h3>
-                <p className="mt-1 text-sm text-gray-900">{user.is_admin ? 'Admin' : 'Candidate'}</p>
-              </div>
+          <div>
+            <div className="mb-4">
+              <p className="text-sm text-gray-500">User ID</p>
+              <p className="text-lg">{user.id}</p>
             </div>
-            
-            <div className="flex space-x-4 pt-4 border-t mt-6">
-              <Link 
-                href={`/users/${userId}/edit`}
-                className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700"
-              >
+            <div className="mb-4">
+              <p className="text-sm text-gray-500">Email</p>
+              <p className="text-lg">{user.email}</p>
+            </div>
+            <div className="mb-4">
+              <p className="text-sm text-gray-500">Name</p>
+              <p className="text-lg">{user.name}</p>
+            </div>
+            <div className="mb-4">
+              <p className="text-sm text-gray-500">Role</p>
+              <p className="text-lg">{user.is_admin ? 'Administrator' : 'User'}</p>
+            </div>
+            <div className="flex mt-6 space-x-3">
+              <Link href={`/admin/users/${user.id}/edit`} className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700">
                 Edit User
               </Link>
-              
-              <button 
+              <button
                 onClick={handleDeleteUser}
                 className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-700"
               >
                 Delete User
               </button>
-              
-              <Link 
-                href="/users"
-                className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-700"
-              >
-                Back to Users
-              </Link>
             </div>
           </div>
         ) : (
           <div className="text-center py-8 text-gray-500">
-            User not found
+            User not found.
           </div>
         )}
       </div>
-    </PageTemplate>
+    </AdminLayout>
   );
 };
 
