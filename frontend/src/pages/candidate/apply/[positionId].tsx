@@ -27,19 +27,6 @@ const ApplicationPage = () => {
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Check authentication on component mount
-  useEffect(() => {
-    const token = localStorage.getItem('accessToken');
-    const storedUserId = localStorage.getItem('userId');
-    
-    if (token && storedUserId) {
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      setUserId(storedUserId);
-    } else {
-      router.push('/login');
-    }
-  }, [router]);
-
   // Fetch position details
   useEffect(() => {
     const fetchPositionDetails = async () => {
