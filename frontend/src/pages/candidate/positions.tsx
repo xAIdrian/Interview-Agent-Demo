@@ -24,21 +24,13 @@ const PositionsPage = () => {
   const [error, setError] = useState('');
   const [userName, setUserName] = useState('');
 
-  // Check authentication and setup on component mount
+  // Get username if available
   useEffect(() => {
-    const token = localStorage.getItem('accessToken');
     const name = localStorage.getItem('userName');
-    
     if (name) {
       setUserName(name);
     }
-    
-    if (token) {
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    } else {
-      router.push('/login?redirect=/candidate/positions');
-    }
-  }, [router]);
+  }, []);
 
   // Fetch available public positions (campaigns)
   useEffect(() => {
