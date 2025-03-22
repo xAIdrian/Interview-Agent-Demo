@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import Link from 'next/link';
-import { PageTemplate } from '../../components/PageTemplate';
-import { INTERNAL_API_TOKEN } from '../../utils/internalApiToken';
+import { PageTemplate } from '../../../components/PageTemplate';
+import { INTERNAL_API_TOKEN } from '../../../utils/internalApiToken';
 // Import Tabulator styles
 import 'react-tabulator/lib/styles.css';
 import 'react-tabulator/lib/css/tabulator.min.css';

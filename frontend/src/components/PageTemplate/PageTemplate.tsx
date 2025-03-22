@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
+import { useAuth } from '../../app/components/AuthProvider';
+import { AuthLogger } from '../../utils/logging';
 
 interface PageTemplateProps {
   children: React.ReactNode;
@@ -16,33 +18,8 @@ export const PageTemplate: React.FC<PageTemplateProps> = ({
   maxWidth = 'lg',
 }) => {
   const router = useRouter();
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [userName, setUserName] = useState('');
+  const { user, isAuthenticated, isAdmin, handleLogout } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  
-  // Check authentication status on mount
-  useEffect(() => {
-    const token = localStorage.getItem('accessToken');
-    const userIsAdmin = localStorage.getItem('isAdmin') === 'true';
-    const name = localStorage.getItem('userName');
-    
-    setIsLoggedIn(!!token);
-    setIsAdmin(userIsAdmin);
-    if (name) setUserName(name);
-  }, []);
-  
-  // Function to handle logout
-  const handleLogout = () => {
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('userId');
-    localStorage.removeItem('userName');
-    localStorage.removeItem('isAdmin');
-    setIsLoggedIn(false);
-    setIsAdmin(false);
-    setUserName('');
-    router.push('/login');
-  };
   
   // Function to generate breadcrumbs from path
   const generateBreadcrumbs = () => {
@@ -65,6 +42,12 @@ export const PageTemplate: React.FC<PageTemplateProps> = ({
   // Hide breadcrumbs on home, login, and register pages
   const showBreadcrumbs = !['/', '/login', '/register'].includes(router.pathname);
 
+  const onLogout = async () => {
+    AuthLogger.info('User logging out from PageTemplate');
+    await handleLogout();
+    router.push('/login');
+  };
+
   return (
     <div className="min-h-screen bg-gray-100">
       {/* Navigation Bar */}
@@ -80,22 +63,22 @@ export const PageTemplate: React.FC<PageTemplateProps> = ({
               
               {/* Desktop Navigation Links */}
               <div className="hidden md:ml-6 md:flex md:space-x-8">
-                {isLoggedIn && !isAdmin && (
+                {isAuthenticated && !isAdmin && (
                   <Link href="/candidate/positions" className="inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700">
                     Positions
                   </Link>
                 )}
                 
-                {isLoggedIn && isAdmin && (
+                {isAuthenticated && isAdmin && (
                   <>
                     <Link href="/admin/dashboard" className="inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700">
                       Dashboard
                     </Link>
+                    <Link href="/admin/users" className="inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700">
+                      Users
+                    </Link>
                     <Link href="/campaigns" className="inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700">
                       Campaigns
-                    </Link>
-                    <Link href="/users" className="inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700">
-                      Users
                     </Link>
                   </>
                 )}
@@ -104,14 +87,14 @@ export const PageTemplate: React.FC<PageTemplateProps> = ({
             
             {/* Desktop Right Navigation Items */}
             <div className="hidden md:flex md:items-center md:space-x-3">
-              {isLoggedIn ? (
+              {isAuthenticated ? (
                 <div className="relative ml-3">
                   <div className="flex items-center space-x-3">
                     <Link href="/profile" className="text-sm font-medium text-gray-700 hover:text-gray-800">
-                      {userName || 'Profile'}
+                      {user?.name || 'Profile'}
                     </Link>
                     <button
-                      onClick={handleLogout}
+                      onClick={onLogout}
                       className="inline-flex items-center justify-center rounded-md border border-transparent bg-gray-100 px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-200 focus:outline-none"
                     >
                       Log out
@@ -189,22 +172,22 @@ export const PageTemplate: React.FC<PageTemplateProps> = ({
           id="mobile-menu"
         >
           <div className="pt-2 pb-3 space-y-1">
-            {isLoggedIn && !isAdmin && (
+            {isAuthenticated && !isAdmin && (
               <Link href="/candidate/positions" className="block pl-3 pr-4 py-2 border-l-4 border-transparent text-base font-medium text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800">
                 Positions
               </Link>
             )}
             
-            {isLoggedIn && isAdmin && (
+            {isAuthenticated && isAdmin && (
               <>
                 <Link href="/admin/dashboard" className="block pl-3 pr-4 py-2 border-l-4 border-transparent text-base font-medium text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800">
                   Dashboard
                 </Link>
+                <Link href="/admin/users" className="block pl-3 pr-4 py-2 border-l-4 border-transparent text-base font-medium text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800">
+                  Users
+                </Link>
                 <Link href="/campaigns" className="block pl-3 pr-4 py-2 border-l-4 border-transparent text-base font-medium text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800">
                   Campaigns
-                </Link>
-                <Link href="/users" className="block pl-3 pr-4 py-2 border-l-4 border-transparent text-base font-medium text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800">
-                  Users
                 </Link>
               </>
             )}
@@ -212,16 +195,16 @@ export const PageTemplate: React.FC<PageTemplateProps> = ({
           
           {/* Mobile Authentication Buttons */}
           <div className="pt-4 pb-3 border-t border-gray-200">
-            {isLoggedIn ? (
+            {isAuthenticated ? (
               <div className="mt-3 space-y-1">
                 <div className="px-4 py-2 text-sm text-gray-500">
-                  Signed in as <span className="font-medium text-gray-800">{userName}</span>
+                  Signed in as <span className="font-medium text-gray-800">{user?.name}</span>
                 </div>
                 <Link href="/profile" className="block px-4 py-2 text-base font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-800">
                   Your Profile
                 </Link>
                 <button
-                  onClick={handleLogout}
+                  onClick={onLogout}
                   className="block w-full text-left px-4 py-2 text-base font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-800"
                 >
                   Log out
@@ -249,13 +232,16 @@ export const PageTemplate: React.FC<PageTemplateProps> = ({
               {breadcrumbs.map((breadcrumb, index) => (
                 <li key={breadcrumb.href} className="flex items-center">
                   {index > 0 && (
-                    <span className="mx-2 text-gray-400">/</span>
+                    <span className="mx-1 text-gray-400">/</span>
                   )}
-                  <Link href={breadcrumb.href} className={`text-sm font-medium ${
-                    index === breadcrumbs.length - 1
-                      ? 'text-blue-600'
-                      : 'text-gray-500 hover:text-gray-700'
-                  }`}>
+                  <Link
+                    href={breadcrumb.href}
+                    className={`text-sm font-medium ${
+                      index === breadcrumbs.length - 1
+                        ? 'text-gray-700 hover:text-gray-900'
+                        : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
                     {breadcrumb.label}
                   </Link>
                 </li>
@@ -265,14 +251,18 @@ export const PageTemplate: React.FC<PageTemplateProps> = ({
         </div>
       )}
 
-      {/* Main Content */}
-      <main className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6`}>
-        {title && <h1 className="text-3xl font-bold mb-6">{title}</h1>}
-        <div className={`${centered ? 'flex justify-center items-center' : ''}`}>
-          <div className={`${maxWidth !== 'full' ? `max-w-${maxWidth}` : 'w-full'} ${centered ? 'w-full' : ''}`}>
-            {children}
+      {/* Page title */}
+      {title && (
+        <header className="bg-white shadow">
+          <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+            <h1 className="text-3xl font-bold text-gray-900">{title}</h1>
           </div>
-        </div>
+        </header>
+      )}
+
+      {/* Page content */}
+      <main className={`max-w-${maxWidth} mx-auto py-6 px-4 sm:px-6 lg:px-8 ${centered ? 'flex items-center justify-center' : ''}`}>
+        {children}
       </main>
     </div>
   );

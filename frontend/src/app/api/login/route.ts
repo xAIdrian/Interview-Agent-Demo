@@ -1,4 +1,8 @@
 // frontend/src/app/api/login/route.ts
+// NOTE: This route is no longer being used directly. The authentication is now handled by AuthProvider.tsx
+// which makes requests directly to the backend API.
+
+/*
 import { NextRequest, NextResponse } from 'next/server';
 import axios from 'axios';
 
@@ -61,4 +65,15 @@ export async function POST(req: NextRequest) {
       status: error.response?.status || 500
     });
   }
+}
+*/
+
+// Added a placeholder handler to avoid 404 for any lingering requests
+import { NextRequest, NextResponse } from 'next/server';
+
+export async function POST(req: NextRequest) {
+  return NextResponse.json({
+    success: false,
+    message: "This endpoint is deprecated. Authentication is now handled directly by the frontend."
+  }, { status: 308 });
 }
