@@ -10,45 +10,48 @@ prompting_questions = [
 
 sample_job_description = """The role of a Burger Flipper at McDonald's is essential for delivering high-quality food and maintaining customer satisfaction in a fast-paced environment. Candidates should possess strong skills in food preparation, including the ability to operate kitchen equipment safely and efficiently, as well as a good understanding of food safety standards. Key responsibilities include cooking and assembling burgers and other menu items accurately and promptly, ensuring that all orders meet McDonald's quality standards, and adhering to health and safety regulations. Additionally, applicants must demonstrate excellent teamwork and communication abilities, as they will work closely with other team members to maintain workflow and enhance service efficiency. A positive attitude, adaptability to changing situations, and a commitment to providing exceptional customer service are also important soft skills that contribute to a cohesive and productive work environment at McDonald's, reflecting the company's emphasis on collaboration and a customer-first approach."""
 
-#sample_job_description = """
-#Job Title: Virtual Assistant
+# sample_job_description = """
+# Job Title: Virtual Assistant
 #
-#Job Summary:
-#We are seeking a highly organized and proactive Virtual Assistant to support our team with various administrative tasks. The ideal candidate will have excellent communication skills, a strong attention to detail, and the ability to manage multiple tasks efficiently in a remote work environment.
+# Job Summary:
+# We are seeking a highly organized and proactive Virtual Assistant to support our team with various administrative tasks. The ideal candidate will have excellent communication skills, a strong attention to detail, and the ability to manage multiple tasks efficiently in a remote work environment.
 #
-#Key Responsibilities:
-#- Manage and respond to emails and other communications in a timely manner.
-#- Schedule and coordinate meetings, appointments, and travel arrangements.
-#- Maintain organized digital files and records.
-#- Assist with data entry and database management.
-#- Conduct research and compile reports as needed.
-#- Provide customer support and handle inquiries via phone, email, or chat.
-#- Support project management by tracking deadlines and deliverables.
-#- Perform other administrative tasks as assigned.
+# Key Responsibilities:
+# - Manage and respond to emails and other communications in a timely manner.
+# - Schedule and coordinate meetings, appointments, and travel arrangements.
+# - Maintain organized digital files and records.
+# - Assist with data entry and database management.
+# - Conduct research and compile reports as needed.
+# - Provide customer support and handle inquiries via phone, email, or chat.
+# - Support project management by tracking deadlines and deliverables.
+# - Perform other administrative tasks as assigned.
 #
-#Qualifications:
-#- Proven experience as a Virtual Assistant or in a similar administrative role.
-#- Proficient in Microsoft Office Suite (Word, Excel, PowerPoint) and Google Workspace.
-#- Familiarity with project management tools (e.g., Trello, Asana) is a plus.
-#- Excellent written and verbal communication skills.
-#- Strong organizational and time management abilities.
-#- Ability to work independently and prioritize tasks effectively.
-#- High level of discretion and confidentiality.
+# Qualifications:
+# - Proven experience as a Virtual Assistant or in a similar administrative role.
+# - Proficient in Microsoft Office Suite (Word, Excel, PowerPoint) and Google Workspace.
+# - Familiarity with project management tools (e.g., Trello, Asana) is a plus.
+# - Excellent written and verbal communication skills.
+# - Strong organizational and time management abilities.
+# - Ability to work independently and prioritize tasks effectively.
+# - High level of discretion and confidentiality.
 #
-#Preferred Skills:
-#- Experience in customer service or support roles.
-#- Basic knowledge of social media management and marketing.
-#- Familiarity with online collaboration tools (e.g., Zoom, Slack).
+# Preferred Skills:
+# - Experience in customer service or support roles.
+# - Basic knowledge of social media management and marketing.
+# - Familiarity with online collaboration tools (e.g., Zoom, Slack).
 #
-#Work Environment:
-#This is a remote position, and the candidate must have a reliable internet connection and a suitable workspace.
+# Work Environment:
+# This is a remote position, and the candidate must have a reliable internet connection and a suitable workspace.
 #
-#Salary:
-#Competitive salary based on experience and qualifications.
+# Salary:
+# Competitive salary based on experience and qualifications.
 #
-#To Apply:
-#Please submit your resume and a cover letter detailing your relevant experience and why you would be a great fit for this role.
-#"""
+# To Apply:
+# Please submit your resume and a cover letter detailing your relevant experience and why you would be a great fit for this role.
+# """
+
+sample_agent_prompt = """ You are responsible for interviewing candidates for a job.  You will ask them questions and evaluate their responses.  You will also provide feedback on their responses.  You will use the following prompt to guide your interview:
+"""
 
 agent_prompt_template = """
 You will serve as a conversational interviewer who demonstrates warmth, integrity, and a genuine desire to provide an excellent candidate experience. 
@@ -170,6 +173,3 @@ Bachelor of Arts in Business Management
 College of Arts, Othertown, USA
 Graduated: May 2005
 """
-
-
-

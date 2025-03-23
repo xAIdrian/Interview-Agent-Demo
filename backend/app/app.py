@@ -1,6 +1,10 @@
 from botocore.exceptions import ClientError
 from config import Config
-from database import get_db_connection, create_tables, migrate_submissions_table_add_resume_columns
+from database import (
+    get_db_connection,
+    create_tables,
+    migrate_submissions_table_add_resume_columns,
+)
 from flask import (
     Flask,
     render_template,
@@ -20,7 +24,8 @@ import random
 import string
 import tempfile
 import uuid
-#import whisper
+
+# import whisper
 import mariadb
 from fpdf import FPDF
 
@@ -35,93 +40,100 @@ from create_campaign_from_doc import (
 )
 from utils.file_handling import SafeTemporaryFile, safe_delete
 from flask_cors import CORS
-from flask_jwt_extended import JWTManager, create_access_token, create_refresh_token, jwt_required, get_jwt_identity
+from flask_jwt_extended import (
+    JWTManager,
+    create_access_token,
+    create_refresh_token,
+    jwt_required,
+    get_jwt_identity,
+)
 from datetime import timedelta
 import secrets
 
 app = Flask(__name__)
 
-# Initialize CORS to allow all origins
-CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
-
 app.config.from_object(Config)
 app.register_blueprint(api_bp, url_prefix="/api")
 
-
 # Setup the Flask-JWT-Extended extension
-app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'dev-secret-key-change-in-production')  # Change in production!
-app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=1)
-app.config['JWT_REFRESH_TOKEN_EXPIRES'] = timedelta(days=30)
+app.config["JWT_SECRET_KEY"] = os.environ.get(
+    "JWT_SECRET_KEY", "dev-secret-key-change-in-production"
+)  # Change in production!
+app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=1)
+app.config["JWT_REFRESH_TOKEN_EXPIRES"] = timedelta(days=30)
 jwt = JWTManager(app)
 
 # Configure the app for proper session handling
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', secrets.token_hex(16))
-app.config['SESSION_TYPE'] = 'filesystem'
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=1)
-app.config['SESSION_COOKIE_SECURE'] = False  # Set to True in production with HTTPS
-app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # Use 'Strict' in production
+app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", secrets.token_hex(16))
+app.config["SESSION_TYPE"] = "filesystem"
+app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=1)
+app.config["SESSION_COOKIE_SECURE"] = False  # Set to True in production with HTTPS
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"  # Use 'Strict' in production
 
 # Set up CORS to allow credentials
-CORS(app, supports_credentials=True, origins=["http://localhost:3000", "http://127.0.0.1:3000"])
+CORS(
+    app,
+    origins=["*"],
+    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+)
+
 
 # Add a root-level health endpoint
-@app.route('/health', methods=['GET', 'HEAD'])
+@app.route("/health", methods=["GET", "HEAD"])
 def health_check():
     """
     Simple health check endpoint to verify the API is running
     """
     return jsonify({"status": "ok", "message": "API is operational"}), 200
 
+
 # Setup the Flask-JWT-Extended extension
-app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'dev-secret-key-change-in-production')  # Change in production!
-app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=1)
-app.config['JWT_REFRESH_TOKEN_EXPIRES'] = timedelta(days=30)
+app.config["JWT_SECRET_KEY"] = os.environ.get(
+    "JWT_SECRET_KEY", "dev-secret-key-change-in-production"
+)  # Change in production!
+app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=1)
+app.config["JWT_REFRESH_TOKEN_EXPIRES"] = timedelta(days=30)
 jwt = JWTManager(app)
 
 # Configure the app for proper session handling
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', secrets.token_hex(16))
-app.config['SESSION_TYPE'] = 'filesystem'
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=1)
-app.config['SESSION_COOKIE_SECURE'] = False  # Set to True in production with HTTPS
-app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # Use 'Strict' in production
+app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", secrets.token_hex(16))
+app.config["SESSION_TYPE"] = "filesystem"
+app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=1)
+app.config["SESSION_COOKIE_SECURE"] = False  # Set to True in production with HTTPS
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"  # Use 'Strict' in production
 
-# Set up CORS to allow credentials
-CORS(app, supports_credentials=True, origins=["http://localhost:3000", "http://127.0.0.1:3000"])
-
-# Add a root-level health endpoint
-@app.route('/health', methods=['GET', 'HEAD'])
-def health_check():
-    """
-    Simple health check endpoint to verify the API is running
-    """
-    return jsonify({"status": "ok", "message": "API is operational"}), 200
 
 @app.before_first_request
 def create_tables_on_startup():
     create_tables()
     migrate_submissions_table_add_resume_columns()
-    
+
     # Execute the migration to update total_points to allow NULL
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
             # Modify the total_points column to allow NULL values
-            cursor.execute("""
+            cursor.execute(
+                """
                 ALTER TABLE submissions
                 MODIFY COLUMN total_points INT DEFAULT NULL
-            """)
+            """
+            )
             print("Successfully modified total_points column to allow NULL values")
-            
+
             # Update existing submissions with total_points=0 to NULL
-            cursor.execute("""
+            cursor.execute(
+                """
                 UPDATE submissions 
                 SET total_points = NULL 
                 WHERE total_points = 0 AND is_complete = FALSE
-            """)
+            """
+            )
             print(f"Updated {cursor.rowcount} submissions with total_points=0 to NULL")
-            
+
         conn.commit()
     except Exception as e:
         print(f"Error during migration: {e}")
@@ -143,7 +155,7 @@ def register():
             name = request.form.get("name", "")
             password = request.form.get("password")
 
-        hashed_password = generate_password_hash(password, method='pbkdf2:sha256')
+        hashed_password = generate_password_hash(password, method="pbkdf2:sha256")
         email = request.form.get("email")
         name = request.form.get("name") or ""
         password = request.form.get("password")
@@ -155,9 +167,17 @@ def register():
                 sql = "INSERT INTO users (id, email, name, password_hash, is_admin) VALUES (UUID_SHORT(), ?, ?, ?, ?)"
                 cursor.execute(sql, (email, name, hashed_password, False))
             conn.commit()
-            
+
             if request.is_json:
-                return jsonify({"success": True, "message": "Registration successful! Please log in."}), 201
+                return (
+                    jsonify(
+                        {
+                            "success": True,
+                            "message": "Registration successful! Please log in.",
+                        }
+                    ),
+                    201,
+                )
             else:
                 flash("Registration successful! Please log in.", "success")
                 return redirect(url_for("login"))
@@ -185,7 +205,7 @@ def login():
         else:
             email = request.form.get("email")
             password = request.form.get("password")
-        
+
         email = request.form["email"]
         password = request.form["password"]
 
@@ -202,28 +222,33 @@ def login():
             user_identity = {
                 "id": str(user["id"]),
                 "email": user["email"],
-                "is_admin": user["is_admin"]
+                "is_admin": user["is_admin"],
             }
-            
+
             access_token = create_access_token(identity=user_identity)
             refresh_token = create_refresh_token(identity=user_identity)
-            
+
             # For JSON requests (API)
             if request.is_json:
                 user_data = {
                     "id": str(user["id"]),
                     "email": user["email"],
                     "name": user["name"],
-                    "is_admin": user["is_admin"]
+                    "is_admin": user["is_admin"],
                 }
-                return jsonify({
-                    "success": True,
-                    "message": "Login successful!",
-                    "access_token": access_token,
-                    "refresh_token": refresh_token,
-                    "user": user_data
-                }), 200
-            
+                return (
+                    jsonify(
+                        {
+                            "success": True,
+                            "message": "Login successful!",
+                            "access_token": access_token,
+                            "refresh_token": refresh_token,
+                            "user": user_data,
+                        }
+                    ),
+                    200,
+                )
+
             # For form submissions (Web UI)
             else:
                 session["user_id"] = user["id"]
@@ -235,14 +260,14 @@ def login():
         else:
             # Authentication failed
             if request.is_json:
-                return jsonify({
-                    "success": False, 
-                    "message": "Invalid email or password"
-                }), 401
+                return (
+                    jsonify({"success": False, "message": "Invalid email or password"}),
+                    401,
+                )
             else:
                 flash("Invalid email or password", "danger")
                 return render_template("login.html")
-    
+
     return render_template("login.html")
 
 
@@ -250,14 +275,15 @@ def login():
 def logout():
     # Clear session data
     session.clear()
-    
+
     # For API requests
     if request.is_json:
         return jsonify({"success": True, "message": "Logged out successfully"}), 200
-    
+
     # For web UI
     flash("You have been logged out.", "success")
     return redirect(url_for("login"))
+
 
 @app.route("/api/refresh", methods=["POST"])
 @jwt_required(refresh=True)
@@ -267,43 +293,49 @@ def refresh():
     new_access_token = create_access_token(identity=current_user)
     return jsonify({"access_token": new_access_token}), 200
 
+
 # Updated decorator to check JWT token for API requests
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         # For API requests, check JWT header
-        if request.is_json or request.headers.get('Authorization'):
+        if request.is_json or request.headers.get("Authorization"):
+
             @jwt_required()
             def verify_jwt(*args, **kwargs):
                 return f(*args, **kwargs)
+
             return verify_jwt(*args, **kwargs)
-        
+
         # For web UI, check session
         elif "user_id" not in session:
             return redirect(url_for("login"))
-        
+
         return f(*args, **kwargs)
 
     return decorated_function
+
 
 # Updated decorator to check admin status
 def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         # For API requests, check JWT claims
-        if request.is_json or request.headers.get('Authorization'):
+        if request.is_json or request.headers.get("Authorization"):
+
             @jwt_required()
             def verify_admin(*args, **kwargs):
                 current_user = get_jwt_identity()
                 if not current_user.get("is_admin"):
                     return jsonify({"error": "Admin privileges required"}), 403
                 return f(*args, **kwargs)
+
             return verify_admin(*args, **kwargs)
-        
+
         # For web UI, check session
         elif not session.get("is_admin"):
             return redirect(url_for("index"))
-        
+
         return f(*args, **kwargs)
 
     return decorated_function
@@ -1209,18 +1241,22 @@ def admin_create_campaign_from_doc():
 
     return render_template("admin/campaigns/create_campaign_from_doc.html")
 
+
 # Add a route to test sessions
-@app.route('/api/test-session', methods=['GET', 'POST'])
+@app.route("/api/test-session", methods=["GET", "POST"])
 def test_session():
-    if request.method == 'POST':
-        session['test_value'] = 'This is a test value'
+    if request.method == "POST":
+        session["test_value"] = "This is a test value"
         return jsonify({"message": "Session value set", "session": dict(session)})
     else:
-        return jsonify({
-            "has_session": bool(session),
-            "session_contents": dict(session),
-            "test_value": session.get('test_value', 'Not set')
-        })
+        return jsonify(
+            {
+                "has_session": bool(session),
+                "session_contents": dict(session),
+                "test_value": session.get("test_value", "Not set"),
+            }
+        )
+
 
 if __name__ == "__main__":
     app.run()
