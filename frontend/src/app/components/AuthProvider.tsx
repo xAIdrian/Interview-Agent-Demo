@@ -42,7 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       try {
         // Get user profile from the server
-        const response = await axios.get('/api/profile');
+        const response = await axios.get(`${axios.defaults.baseURL}/api/profile`);
         
         if (response.data && response.data.id) {
           setUser(response.data);
@@ -51,15 +51,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUser(null);
           AuthLogger.info('No authenticated user');
         }
-      } catch (err) {
-        setUser(null);
-        AuthLogger.info('No authenticated user or session expired');
+      } catch (err: any) {
+        // If error is 401 (Unauthorized), don't treat it as an error
+        if (err.response && err.response.status === 401) {
+          setUser(null);
+          AuthLogger.info('No authenticated user');
+        } else {
+          setUser(null);
+          AuthLogger.info('No authenticated user or session expired');
+        }
       } finally {
         setLoading(false);
       }
     };
     
-    checkAuth();
+    //checkAuth();
   }, []);
 
   // Function to check if API is available
