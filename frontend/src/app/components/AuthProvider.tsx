@@ -141,111 +141,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
         
-        AuthLogger.info('Verifying authentication');
-        AuthLogger.logAuthState();
+        AuthLogger.info('Verifying authentication from stored user data');
         
-        // Make sure we have properly set the cookie for middleware
-        setCookie('access_token', accessToken, 1); // 1 day
-        
-        try {
-          // Get user data with the stored token
-          const response = await axios.get('/auth/me', {
-            headers: {
-              'Authorization': `Bearer ${accessToken}`
-            }
-          });
-          
-          // Log the full response in development mode
-          if (process.env.NODE_ENV === 'development') {
-            AuthLogger.debug('Auth check response:', JSON.stringify(response.data, null, 2));
-          }
-          
-          // Set the user state with response data
-          setUser(response.data);
-          
-          // Store user data in localStorage for persistence
-          localStorage.setItem('user', JSON.stringify(response.data));
-          localStorage.setItem('userId', response.data.id);
-          localStorage.setItem('userName', response.data.name || '');
-          localStorage.setItem('isAdmin', response.data.is_admin ? 'true' : 'false');
-          
-          AuthLogger.info('Authentication verified', response.data);
-        } catch (apiError) {
-          // Handle API errors specifically
-          if (axios.isAxiosError(apiError)) {
-            if (apiError.code === 'ERR_NETWORK') {
-              AuthLogger.warn('Network error during auth check - attempting to use cached user data');
-              
-              // Fallback to locally stored user data if available
-              const cachedUserData = localStorage.getItem('user');
-              if (cachedUserData) {
-                try {
-                  const userData = JSON.parse(cachedUserData);
-                  setUser(userData);
-                  AuthLogger.info('Using cached user data due to network error', userData);
-                  // Don't clear auth data - we want to try again when network is available
-                } catch (parseError) {
-                  AuthLogger.error('Failed to parse cached user data', parseError);
-                  setUser(null);
-                }
-              } else {
-                setUser(null);
-              }
-            } else if (apiError.response?.status === 401 || apiError.response?.status === 422) {
-              AuthLogger.warn(`Invalid token (${apiError.response?.status}), logging out`);
-              await handleLogout(false); // silent logout (don't call API)
-            } else {
-              AuthLogger.error('Authentication check failed with status:', apiError.response?.status);
-              
-              // Show detailed error information in development
-              if (process.env.NODE_ENV === 'development') {
-                AuthLogger.debug('Error details:', {
-                  status: apiError.response?.status,
-                  data: apiError.response?.data,
-                  config: {
-                    url: apiError.config?.url,
-                    headers: apiError.config?.headers
-                  }
-                });
-              }
-              
-              // For non-auth errors, try using cached data
-              const cachedUserData = localStorage.getItem('user');
-              if (cachedUserData) {
-                try {
-                  const userData = JSON.parse(cachedUserData);
-                  setUser(userData);
-                  AuthLogger.info('Using cached user data for non-auth error', userData);
-                } catch (parseError) {
-                  AuthLogger.error('Failed to parse cached user data', parseError);
-                  setUser(null);
-                }
-              } else {
-                setUser(null);
-              }
-            }
-          } else {
-            AuthLogger.error('Authentication check failed with unexpected error:', apiError);
-            setUser(null);
-          }
-        }
-      } catch (err) {
-        AuthLogger.error('General error in authentication check:', err);
-        
-        // Try to use cached user data as fallback
+        // Get user data from localStorage
         const cachedUserData = localStorage.getItem('user');
         if (cachedUserData) {
           try {
             const userData = JSON.parse(cachedUserData);
             setUser(userData);
-            AuthLogger.info('Using cached user data as fallback', userData);
+            AuthLogger.info('Using cached user data', userData);
           } catch (parseError) {
             AuthLogger.error('Failed to parse cached user data', parseError);
             setUser(null);
           }
         } else {
           setUser(null);
+          AuthLogger.info('No cached user data found');
         }
+      } catch (err) {
+        AuthLogger.error('General error in authentication check:', err);
+        setUser(null);
       } finally {
         setLoading(false);
       }
@@ -262,20 +177,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       AuthLogger.info('Attempting login...');
       
-      // Check if backend is reachable before attempting login
+      // Check if the backend is reachable
       let networkWorks = true;
       try {
-        // Simple fetch with timeout to test network connectivity
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 3000);
         
-        await fetch(`${API_BASE_URL}/health`, {
+        const response = await fetch(`${API_BASE_URL}/health`, {
           method: 'HEAD',
-          mode: 'no-cors',
+          cache: 'no-cache',
+          credentials: 'include',
           signal: controller.signal
         });
         
         clearTimeout(timeoutId);
+        
+        // Check if the response indicates the server is healthy
+        if (!response.ok) {
+          networkWorks = false;
+          AuthLogger.warn(`Backend health check failed with status: ${response.status}`);
+          setError('Cannot connect to server. Please check your internet connection and try again.');
+          setLoading(false);
+          return false;
+        }
       } catch (networkError) {
         networkWorks = false;
         AuthLogger.warn('Network connectivity issue detected:', networkError);

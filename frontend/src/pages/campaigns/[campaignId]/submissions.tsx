@@ -4,7 +4,7 @@ import axios from 'axios';
 import { PageTemplate } from '../../../components/PageTemplate';
 import Link from 'next/link';
 import { TabulatorFull as Tabulator } from 'tabulator-tables';
-import { INTERNAL_API_TOKEN } from '../../../utils/internalApiToken';
+import { AuthLogger } from '../../../utils/logging';
 import "tabulator-tables/dist/css/tabulator.min.css";
 import "../../../styles/tabulator.css"; // Import custom tabulator styles
 
@@ -64,49 +64,63 @@ const CampaignSubmissionsPage = () => {
     const fetchCampaignData = async () => {
       if (!campaignId) return;
 
+      // Ensure campaignId is treated as string
+      const campaignIdString = String(campaignId);
+
       try {
         setIsLoading(true);
         setError('');
         
-        // Always use the admin API token for these admin-only endpoints
-        const authHeader = {
-          headers: {
-            'Authorization': `Bearer ${INTERNAL_API_TOKEN}`
-          }
-        };
-        
-        console.log("Using authorization header:", authHeader);
+        AuthLogger.info(`Fetching data for campaign: ${campaignIdString}`);
         
         // Fetch campaign details
         const campaignResponse = await axios.get(
-          `${API_BASE_URL}/api/campaigns/${campaignId}`, 
-          authHeader
+          `${API_BASE_URL}/api/campaigns/${campaignIdString}`
         );
         
         setCampaign(campaignResponse.data);
+        AuthLogger.info('Campaign details loaded successfully');
         
         // Fetch all submissions for this campaign
         const submissionsResponse = await axios.get(
-          `${API_BASE_URL}/api/submissions?campaign_id=${campaignId}`, 
-          authHeader
+          `${API_BASE_URL}/api/submissions?campaign_id=${campaignIdString}`,
+          {
+            headers: {
+              'Authorization': localStorage.getItem('access_token') ? `Bearer ${localStorage.getItem('access_token')}` : ''
+            }
+          }
         );
         
-        setSubmissions(submissionsResponse.data);
+        // Ensure all IDs in the submissions are strings
+        const submissionsWithStringIds = submissionsResponse.data.map((submission: any) => ({
+          ...submission,
+          id: String(submission.id),
+          campaign_id: String(submission.campaign_id),
+          user_id: String(submission.user_id)
+        }));
+        
+        setSubmissions(submissionsWithStringIds);
+        AuthLogger.info(`Loaded ${submissionsWithStringIds.length} submissions for campaign`);
+        
       } catch (err) {
-        console.error('Error fetching campaign data:', err);
+        console.error('Error fetching submissions data:', err);
         if (axios.isAxiosError(err)) {
           if (err.response?.status === 401) {
-            setError('Authentication failed. Please log in again.');
             router.push('/login');
+            AuthLogger.error('Authentication error fetching submissions', err.response?.status, err.response?.data);
           } else if (err.response?.status === 403) {
-            setError('Admin access required');
+            setError('Admin access required to view submissions');
+            AuthLogger.error('Permission error fetching submissions', err.response?.status, err.response?.data);
           } else if (err.response?.data?.error) {
             setError(err.response.data.error);
+            AuthLogger.error('API error fetching submissions', err.response?.status, err.response?.data);
           } else {
-            setError('Failed to load campaign data');
+            setError('Failed to load submissions data');
+            AuthLogger.error('Unknown error fetching submissions', err.response?.status);
           }
         } else {
           setError('An unexpected error occurred');
+          AuthLogger.error('Unexpected error fetching submissions data', err);
         }
       } finally {
         setIsLoading(false);
@@ -172,30 +186,42 @@ const CampaignSubmissionsPage = () => {
           },
           {
             title: "Actions",
-            headerSort: false,
-            formatter: function(cell) {
-              // Create a button element instead of returning HTML string
-              const button = document.createElement('button');
-              button.classList.add('view-btn', 'bg-blue-500', 'text-white', 'px-3', 'py-1', 'rounded', 'hover:bg-blue-700');
-              button.textContent = "View";
+            field: "id",
+            hozAlign: "center",
+            formatter: (cell: any) => {
+              const submissionId = String(cell.getValue());
               
-              // Add click event directly to the button
-              button.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const row = cell.getRow();
-                const rowData = row.getData() as Submission;
-                router.push(`/submission/${rowData.id}`);
-              });
+              // Create a container div for the buttons
+              const container = document.createElement("div");
+              container.className = "flex space-x-2";
               
-              return button;
+              // Create View button
+              const viewButton = document.createElement("a");
+              viewButton.innerHTML = "View";
+              viewButton.className = "px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm";
+              viewButton.href = `/submissions/${submissionId}`;
+              container.appendChild(viewButton);
+              
+              // Create Interview button
+              const interviewButton = document.createElement("a");
+              interviewButton.innerHTML = "Interview";
+              interviewButton.className = "px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600 text-sm";
+              interviewButton.href = `/interview/${submissionId}`;
+              container.appendChild(interviewButton);
+              
+              return container;
             },
-            width: 100,
-            cellClick: function(e, cell) {
-              // This is a fallback and may not be needed since we're using the formatter's button click
-              e.stopPropagation();
-            },
-            resizable: false, // Prevent resizing of action column
-            hozAlign: "center" // Center the button
+            cellClick: function(e: any, cell: any) {
+              const target = e.target as HTMLElement;
+              if (target.tagName.toLowerCase() === 'a') {
+                // Let the native link behavior work
+                return;
+              }
+              
+              // If not clicking on a link, navigate to view submission
+              const submissionId = String(cell.getValue());
+              window.location.href = `/submissions/${submissionId}`;
+            }
           }
         ],
         initialSort: [
@@ -320,12 +346,20 @@ const CampaignSubmissionsPage = () => {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">{submission.total_points !== null ? submission.total_points : 'Not scored'}</td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <button 
-                              onClick={() => router.push(`/submission/${submission.id}`)}
-                              className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-700"
-                            >
-                              View
-                            </button>
+                            <div className="flex justify-center space-x-2">
+                              <a 
+                                href={`/submissions/${submission.id}`}
+                                className="text-blue-500 hover:text-blue-700"
+                              >
+                                View
+                              </a>
+                              <a 
+                                href={`/interview/${submission.id}`}
+                                className="text-green-500 hover:text-green-700"
+                              >
+                                Interview
+                              </a>
+                            </div>
                           </td>
                         </tr>
                       ))}

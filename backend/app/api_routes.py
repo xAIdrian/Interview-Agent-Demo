@@ -1,4 +1,4 @@
-from database import get_db_connection, build_filter_query
+from database import get_db_connection, build_filter_query, ensure_string_id, map_row_to_dict
 from flask import Blueprint, request, jsonify, session, redirect, url_for, render_template
 from functools import wraps
 import boto3
@@ -11,6 +11,9 @@ from werkzeug.utils import secure_filename
 from werkzeug.security import check_password_hash, generate_password_hash  # Add generate_password_hash
 from document_processor import generate_campaign_context, generate_interview_questions, extract_text_from_document, generate_campaign_description
 from flask_jwt_extended import create_access_token, create_refresh_token, jwt_required, get_jwt_identity
+import json
+import re
+import bcrypt
 
 # Create a Blueprint for the API routes
 api_bp = Blueprint('api', __name__)
@@ -72,77 +75,81 @@ def get_users():
     cursor.execute(f"SELECT * FROM users {filter_query}", filter_values)
     
     users = cursor.fetchall()
+    columns = ["id", "email", "name", "password_hash", "is_admin"]
+    
+    # Use the helper function to map rows to dictionaries with string IDs
+    result = [map_row_to_dict(user, columns) for user in users]
+    
     conn.close()
-    return jsonify([{
-        "id": str(user[0]),
-        "email": user[1],
-        "name": user[2],
-        "password_hash": user[3],
-        "is_admin": user[4]
-    } for user in users])
+    return jsonify(result)
 
-@api_bp.route('/users/<int:id>', methods=['GET'])
+@api_bp.route('/users/<string:id>', methods=['GET'])
 @admin_required
 def get_user(id):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM users WHERE id = %s", (id,))
+    
+    # Ensure ID is a string
+    user_id = str(id)
+    
+    cursor.execute("SELECT * FROM users WHERE id = %s", (user_id,))
     user = cursor.fetchone()
     conn.close()
+    
     if user:
-        return jsonify({
-            "id": str(user[0]),
-            "email": user[1],
-            "name": user[2],
-            "password_hash": user[3],
-            "is_admin": user[4]
-        })
+        columns = ["id", "email", "name", "password_hash", "is_admin"]
+        # Use the helper function to create the response with string IDs
+        result = map_row_to_dict(user, columns)
+        return jsonify(result)
     else:
         return jsonify({"error": "User not found"}), 404
 
-# Update GET /campaigns to include job_description
+# Update GET /campaigns to include job_description and use helper function
 @api_bp.route('/campaigns', methods=['GET'])
-@admin_required
 def get_campaigns():
     conn = get_db_connection()
     cursor = conn.cursor()
     
     filter_query, filter_values = build_filter_query(request.args)
+    if not session.get('is_admin'):
+        # Add public filter for non-admin users
+        if filter_query:
+            filter_query += " AND is_public = TRUE"
+        else:
+            filter_query = "WHERE is_public = TRUE"
+            
     cursor.execute(f"SELECT * FROM campaigns {filter_query}", filter_values)
     
     campaigns = cursor.fetchall()
+    columns = ["id", "title", "max_user_submissions", "max_points", "is_public", "campaign_context", "job_description"]
+    
+    # Use the helper function to map rows to dictionaries with string IDs
+    result = [map_row_to_dict(campaign, columns) for campaign in campaigns]
+    
     conn.close()
-    return jsonify([{
-        "id": str(campaign[0]),
-        "title": campaign[1],
-        "max_user_submissions": campaign[2],
-        "max_points": campaign[3],
-        "is_public": campaign[4],
-        "campaign_context": campaign[5],
-        "job_description": campaign[6]
-    } for campaign in campaigns])
+    return jsonify(result)
 
-# Update GET /campaigns/<id> to include job_description
-@api_bp.route('/campaigns/<int:id>', methods=['GET'])
+# Update GET /campaigns/<id> to use the helper function
+@api_bp.route('/campaigns/<string:id>', methods=['GET'])
 def get_campaign(id):
     conn = get_db_connection()
     cursor = conn.cursor()
+    # Ensure ID is a string
+    campaign_id = str(id)
+    
     if session.get('is_admin'):
-        cursor.execute("SELECT * FROM campaigns WHERE id = %s", (id,))
+        cursor.execute("SELECT * FROM campaigns WHERE id = %s", (campaign_id,))
     else:
-        cursor.execute("SELECT * FROM campaigns WHERE id = %s AND is_public = TRUE", (id,))
+        cursor.execute("SELECT * FROM campaigns WHERE id = %s AND is_public = TRUE", (campaign_id,))
+    
     campaign = cursor.fetchone()
     conn.close()
+    
     if campaign:
-        return jsonify({
-            "id": str(campaign[0]),
-            "title": campaign[1],
-            "max_user_submissions": campaign[2],
-            "max_points": campaign[3],
-            "is_public": campaign[4],
-            "campaign_context": campaign[5],
-            "job_description": campaign[6]
-        })
+        columns = ["id", "title", "max_user_submissions", "max_points", "is_public", "campaign_context", "job_description"]
+        # Use the helper function to create the response with string IDs
+        result = map_row_to_dict(campaign, columns)
+        return jsonify(result)
     else:
         return jsonify({"error": "Campaign not found or not accessible"}), 404
 
@@ -156,22 +163,50 @@ def get_questions():
     cursor.execute(f"SELECT * FROM questions {filter_query}", filter_values)
     
     questions = cursor.fetchall()
+    columns = ["id", "campaign_id", "title", "body", "scoring_prompt", "max_points"]
+    
+    # Use the helper function to map rows to dictionaries with string IDs
+    result = [map_row_to_dict(question, columns) for question in questions]
+    
     conn.close()
-    return jsonify([{
-        "id": str(question[0]),
-        "campaign_id": str(question[1]),
-        "title": question[2],
-        "body": question[3],
-        "scoring_prompt": question[4],
-        "max_points": question[5]
-    } for question in questions])
+    return jsonify(result)
 
 @api_bp.route('/submissions', methods=['GET'])
+@jwt_required()
 def get_submissions():
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    filter_query, filter_values = build_filter_query(request.args)
+    # Get user identity from JWT
+    current_user = get_jwt_identity()
+    user_id = str(current_user.get("id"))
+    is_admin = current_user.get("is_admin", False)
+    
+    # Process filter parameters from request
+    filter_data = dict(request.args)
+    
+    # For non-admins, force filter by user_id to ensure they only see their own submissions
+    if not is_admin:
+        # Override any user_id in the filter to prevent access to other users' submissions
+        filter_data['submissions.user_id'] = user_id
+    
+    # Build filter string and values
+    filter_clauses = []
+    filter_values = []
+    
+    for key, value in filter_data.items():
+        # Make sure to prefix with table name for clarity
+        if not key.startswith('submissions.') and not key.startswith('users.') and not key.startswith('campaigns.'):
+            key = f"submissions.{key}"
+        
+        filter_clauses.append(f"{key} = %s")
+        filter_values.append(value)
+    
+    filter_query = " AND ".join(filter_clauses)
+    if filter_query:
+        filter_query = f"WHERE {filter_query}"
+    
+    # Execute the query with proper filtering
     cursor.execute(f"""
         SELECT submissions.id, submissions.campaign_id, submissions.user_id, submissions.created_at, 
                submissions.is_complete, submissions.total_points, 
@@ -183,64 +218,106 @@ def get_submissions():
     """, filter_values)
     
     submissions = cursor.fetchall()
+    columns = ["id", "campaign_id", "user_id", "created_at", "is_complete", "total_points", "email", "campaign_name"]
+    
+    # Use the helper function to map rows to dictionaries with string IDs
+    result = [map_row_to_dict(submission, columns) for submission in submissions]
+    
     conn.close()
-    return jsonify([{
-        "id": str(submission[0]),
-        "campaign_id": str(submission[1]),
-        "user_id": str(submission[2]),
-        "created_at": submission[3],
-        "is_complete": submission[4],
-        "total_points": submission[5],
-        "email": submission[6],
-        "campaign_name": submission[7]
-    } for submission in submissions])
+    return jsonify(result)
 
 @api_bp.route('/submission_answers', methods=['GET'])
-@admin_required
+@jwt_required()
 def get_submission_answers():
+    # Get user identity from JWT
+    current_user = get_jwt_identity()
+    user_id = str(current_user.get("id"))
+    is_admin = current_user.get("is_admin", False)
+    
     conn = get_db_connection()
     cursor = conn.cursor()
     
     # Replace the previous code to avoid ambiguous column references
     if request.args.get('submission_id'):
         # Case when specifically querying by submission_id
-        submission_id = request.args.get('submission_id')
-        query = """
-            SELECT sa.id, sa.submission_id, sa.question_id, sa.video_path, 
-                   sa.transcript, sa.score, sa.score_rationale
-            FROM submission_answers sa
-            WHERE sa.submission_id = %s
-        """
-        cursor.execute(query, (submission_id,))
+        submission_id = str(request.args.get('submission_id'))  # Ensure string ID
+        
+        if is_admin:
+            # Admins can access any submission's answers
+            query = """
+                SELECT sa.id, sa.submission_id, sa.question_id, sa.video_path, 
+                       sa.transcript, sa.score, sa.score_rationale
+                FROM submission_answers sa
+                WHERE sa.submission_id = %s
+            """
+            cursor.execute(query, (submission_id,))
+        else:
+            # Regular users can only access their own submissions' answers
+            query = """
+                SELECT sa.id, sa.submission_id, sa.question_id, sa.video_path, 
+                       sa.transcript, sa.score, sa.score_rationale
+                FROM submission_answers sa
+                JOIN submissions s ON sa.submission_id = s.id
+                WHERE sa.submission_id = %s AND s.user_id = %s
+            """
+            cursor.execute(query, (submission_id, user_id))
     else:
-        # Handle other filters using build_filter_query
-        filter_query, filter_values = build_filter_query(request.args)
-        
-        # Make sure the table alias is used for all columns in the filter
-        if filter_query:
-            # Replace 'WHERE ' with 'WHERE sa.' and add 'sa.' before each 'AND'
-            filter_query = filter_query.replace('WHERE ', 'WHERE sa.').replace(' AND ', ' AND sa.')
-        
-        query = f"""
-            SELECT sa.id, sa.submission_id, sa.question_id, sa.video_path, 
-                   sa.transcript, sa.score, sa.score_rationale
-            FROM submission_answers sa
-            {filter_query}
-        """
-        cursor.execute(query, filter_values)
+        # For general queries without a specific submission_id
+        if is_admin:
+            # Admins get all results with filters
+            filter_query, filter_values = build_filter_query(request.args)
+            
+            # Make sure the table alias is used for all columns in the filter
+            if filter_query:
+                # Replace 'WHERE ' with 'WHERE sa.' and add 'sa.' before each 'AND'
+                filter_query = filter_query.replace('WHERE ', 'WHERE sa.').replace(' AND ', ' AND sa.')
+            
+            query = f"""
+                SELECT sa.id, sa.submission_id, sa.question_id, sa.video_path, 
+                       sa.transcript, sa.score, sa.score_rationale
+                FROM submission_answers sa
+                {filter_query}
+            """
+            cursor.execute(query, filter_values)
+        else:
+            # Regular users only get answers for their own submissions
+            # Start with an empty WHERE clause
+            where_clauses = []
+            params = []
+            
+            # Add user_id restriction
+            where_clauses.append("s.user_id = %s")
+            params.append(user_id)
+            
+            # Add any other filter parameters
+            for key, value in request.args.items():
+                if key != 'user_id':  # Skip user_id as we already added it
+                    if key.startswith('sa.'):
+                        where_clauses.append(f"{key} = %s")
+                    else:
+                        where_clauses.append(f"sa.{key} = %s")
+                    params.append(value)
+            
+            # Combine all WHERE clauses
+            where_clause = " AND ".join(where_clauses)
+            
+            query = f"""
+                SELECT sa.id, sa.submission_id, sa.question_id, sa.video_path, 
+                       sa.transcript, sa.score, sa.score_rationale
+                FROM submission_answers sa
+                JOIN submissions s ON sa.submission_id = s.id
+                WHERE {where_clause}
+            """
+            cursor.execute(query, params)
     
     submission_answers = cursor.fetchall()
-    conn.close()
+    columns = ["id", "submission_id", "question_id", "video_path", "transcript", "score", "score_rationale"]
     
-    return jsonify([{
-        "id": str(answer[0]),
-        "submission_id": str(answer[1]),
-        "question_id": str(answer[2]),
-        "video_path": answer[3],
-        "transcript": answer[4],
-        "score": answer[5],
-        "score_rationale": answer[6]
-    } for answer in submission_answers])
+    # Use the helper function to map rows to dictionaries with string IDs
+    result = [map_row_to_dict(answer, columns) for answer in submission_answers]
+    
+    conn.close()
+    return jsonify(result)
 
 @api_bp.route('/public_campaigns', methods=['GET'])
 def get_public_campaigns():
@@ -248,31 +325,66 @@ def get_public_campaigns():
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM campaigns WHERE is_public = TRUE")
     campaigns = cursor.fetchall()
+    columns = ["id", "title", "max_user_submissions", "max_points", "is_public", "campaign_context", "job_description"]
+    
+    # Use the helper function to map rows to dictionaries with string IDs
+    result = [map_row_to_dict(campaign, columns) for campaign in campaigns]
+    
     conn.close()
-    return jsonify([{
-        "id": str(campaign[0]),
-        "title": campaign[1],
-        "max_user_submissions": campaign[2],
-        "max_points": campaign[3],
-        "is_public": campaign[4]
-    } for campaign in campaigns])
+    return jsonify(result)
 
-@api_bp.route('/submissions/<int:id>', methods=['GET'])
+@api_bp.route('/submissions/<string:id>', methods=['GET'])
+@jwt_required()
 def get_submission_by_id(id):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM submissions WHERE id = %s", (id,))
+    
+    # Get user identity from JWT
+    current_user = get_jwt_identity()
+    user_id = str(current_user.get("id"))
+    is_admin = current_user.get("is_admin", False)
+    
+    # Ensure ID is a string
+    submission_id = str(id)
+    
+    # Build the SQL query - admins can access any submission, regular users only their own
+    if is_admin:
+        query = """
+            SELECT s.*, c.title AS campaign_title, u.email 
+            FROM submissions s
+            JOIN campaigns c ON s.campaign_id = c.id
+            JOIN users u ON s.user_id = u.id
+            WHERE s.id = %s
+        """
+        params = (submission_id,)
+    else:
+        # For regular users, include user_id check to ensure they can only access their own submissions
+        query = """
+            SELECT s.*, c.title AS campaign_title, u.email 
+            FROM submissions s
+            JOIN campaigns c ON s.campaign_id = c.id
+            JOIN users u ON s.user_id = u.id
+            WHERE s.id = %s AND s.user_id = %s
+        """
+        params = (submission_id, user_id)
+    
+    cursor.execute(query, params)
     submission = cursor.fetchone()
     conn.close()
     
-    if not submission:
-        return jsonify({"error": "Submission not found"}), 404
+    if submission:
+        # Define all columns including joined ones
+        columns = [
+            "id", "campaign_id", "user_id", "created_at", "is_complete", 
+            "completed_at", "total_points", "resume_path", "resume_text", 
+            "transcript", "campaign_title", "email"
+        ]
         
-    # Convert to dict with column names
-    column_names = [desc[0] for desc in cursor.description]
-    submission_dict = {column_names[i]: submission[i] for i in range(len(column_names))}
-    
-    return jsonify(submission_dict)
+        # Use the helper function to create the response with string IDs
+        result = map_row_to_dict(submission, columns)
+        return jsonify(result)
+    else:
+        return jsonify({"error": "Submission not found or you don't have permission to access it"}), 404
 
 # Add a public endpoint to get submission by ID for the interview page
 @api_bp.route('/submissions/<string:id>', methods=['GET'])
@@ -302,15 +414,68 @@ def get_submission_for_interview(id):
 @admin_required
 def create_user():
     data = request.json
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("""
-        INSERT INTO users (id, email, name, password_hash, is_admin)
-        VALUES (UUID_SHORT(), %s, %s, %s, %s)
-    """, (data['email'], data['name'], data['password_hash'], data['is_admin']))
-    conn.commit()
-    conn.close()
-    return jsonify({"message": "User created successfully"}), 201
+    
+    # Validate required fields
+    if not data or 'email' not in data or 'name' not in data:
+        return jsonify({"error": "Required fields missing: email, name"}), 400
+    
+    # Validate email format
+    email = data.get('email', '')
+    if not re.match(r"[^@]+@[^@]+\.[^@]+", email):
+        return jsonify({"error": "Invalid email format"}), 400
+    
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Check if user with this email already exists
+        cursor.execute("SELECT id FROM users WHERE email = %s", (email,))
+        if cursor.fetchone():
+            conn.close()
+            return jsonify({"error": "A user with this email already exists"}), 400
+        
+        # Generate a UUID for the user
+        user_id = str(uuid.uuid4())
+        
+        # Generate a default password if not provided
+        password_hash = data.get('password_hash')
+        if not password_hash:
+            # In a real application, you would use a proper password hashing algorithm
+            temporary_password = "changeme123"
+            password_hash = temporary_password
+        
+        # Insert the new user
+        cursor.execute("""
+            INSERT INTO users (id, email, name, password_hash, is_admin)
+            VALUES (%s, %s, %s, %s, %s) RETURNING *
+        """, (
+            user_id,
+            email,
+            data.get('name', ''),
+            password_hash,
+            data.get('is_admin', False)
+        ))
+        
+        # Get the newly created user
+        new_user = cursor.fetchone()
+        conn.commit()
+        
+        # Prepare response with string IDs and exclude sensitive information
+        columns = ["id", "email", "name", "is_admin"]
+        result = map_row_to_dict(new_user, columns)
+        
+        # If we generated a temporary password, include it in the response
+        if data.get('password_hash') is None:
+            result["temporary_password"] = temporary_password
+        
+        conn.close()
+        return jsonify(result), 201
+    
+    except Exception as e:
+        if conn:
+            conn.rollback()
+            conn.close()
+        return jsonify({"error": f"Failed to create user: {str(e)}"}), 500
 
 @api_bp.route('/users/create', methods=['POST'])
 @admin_required
@@ -345,77 +510,188 @@ def create_new_user():
 @admin_required
 def create_campaign():
     data = request.json
-    conn = get_db_connection()
-    cursor = conn.cursor()
     
-    total_max_points = sum(question['max_points'] for question in data['questions'])
-    campaign_id = uuid.uuid4().int >> 64
-    
-    cursor.execute("""
-        INSERT INTO campaigns (id, title, max_user_submissions, max_points, is_public, campaign_context, job_description)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
-    """, (campaign_id, data['title'], data['max_user_submissions'], total_max_points, data['is_public'], 
-          data['campaign_context'], data['job_description']))
-
-    for question in data['questions']:
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Calculate the total max points from all questions
+        total_max_points = sum(question.get('max_points', 0) for question in data.get('questions', []))
+        
+        # Generate a UUID for the campaign
+        campaign_id = str(uuid.uuid4())
+        
+        # Insert the campaign
         cursor.execute("""
-            INSERT INTO questions (id, campaign_id, title, body, scoring_prompt, max_points)
-            VALUES (UUID_SHORT(), %s, %s, %s, %s, %s)
-        """, (campaign_id, question['title'], question['body'], question['scoring_prompt'], question['max_points']))
+            INSERT INTO campaigns (id, title, max_user_submissions, max_points, is_public, campaign_context, job_description)
+            VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING *
+        """, (
+            campaign_id, 
+            data.get('title'), 
+            data.get('max_user_submissions', 1), 
+            total_max_points, 
+            data.get('is_public', False), 
+            data.get('campaign_context', ''), 
+            data.get('job_description', '')
+        ))
+        
+        # Get the newly created campaign
+        new_campaign = cursor.fetchone()
+        
+        # Create questions if provided
+        questions_created = []
+        for question in data.get('questions', []):
+            question_id = str(uuid.uuid4())
+            cursor.execute("""
+                INSERT INTO questions (id, campaign_id, title, body, scoring_prompt, max_points)
+                VALUES (%s, %s, %s, %s, %s, %s) RETURNING *
+            """, (
+                question_id,
+                campaign_id, 
+                question.get('title', ''), 
+                question.get('body', ''), 
+                question.get('scoring_prompt', ''), 
+                question.get('max_points', 0)
+            ))
+            new_question = cursor.fetchone()
+            questions_created.append(map_row_to_dict(
+                new_question, 
+                ["id", "campaign_id", "title", "body", "scoring_prompt", "max_points"]
+            ))
 
-    conn.commit()
-    conn.close()
-    return jsonify({"message": "Campaign and questions created successfully"}), 201
+        conn.commit()
+        
+        # Prepare the response
+        campaign_columns = ["id", "title", "max_user_submissions", "max_points", "is_public", "campaign_context", "job_description"]
+        result = map_row_to_dict(new_campaign, campaign_columns)
+        result["questions"] = questions_created
+        
+        conn.close()
+        return jsonify(result), 201
+        
+    except Exception as e:
+        if conn:
+            conn.rollback()
+            conn.close()
+        return jsonify({"error": f"Failed to create campaign: {str(e)}"}), 500
 
 @api_bp.route('/questions', methods=['POST'])
 @admin_required
 def create_question():
     data = request.json
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("""
-        INSERT INTO questions (id, campaign_id, title, body, scoring_prompt, max_points)
-        VALUES (UUID_SHORT(), %s, %s, %s, %s, %s)
-    """, (data['campaign_id'], data['title'], data['body'], data['scoring_prompt'], data['max_points']))
-    conn.commit()
-    conn.close()
-    return jsonify({"message": "Question created successfully"}), 201
-
-@api_bp.route('/submissions', methods=['POST'])
-def create_submission():
-    data = request.json
-    conn = get_db_connection()
-    cursor = conn.cursor()
+    
+    # Validate required fields
+    if not data or 'campaign_id' not in data or 'title' not in data:
+        return jsonify({"error": "Required fields missing: campaign_id, title"}), 400
+    
+    # Ensure ID is a string
+    campaign_id = str(data.get('campaign_id'))
     
     try:
-        # First check if the user exists
-        cursor.execute("SELECT id FROM users WHERE id = %s", (data['user_id'],))
-        user = cursor.fetchone()
+        conn = get_db_connection()
+        cursor = conn.cursor()
         
-        # If user doesn't exist, create a demo user with that ID
-        if not user:
-            cursor.execute("""
-                INSERT INTO users (id, email, name, password_hash, is_admin)
-                VALUES (%s, %s, %s, %s, 0)
-            """, (data['user_id'], f"demo{data['user_id']}@example.com", f"Demo User {data['user_id']}", "demo_hash"))
+        # Verify that the campaign exists
+        cursor.execute("SELECT id FROM campaigns WHERE id = %s", (campaign_id,))
+        if not cursor.fetchone():
+            conn.close()
+            return jsonify({"error": "Campaign not found"}), 404
         
-        # Now create the submission
+        # Generate a unique ID for the question
+        question_id = str(uuid.uuid4())
+        
+        # Insert the question
         cursor.execute("""
-            INSERT INTO submissions (id, campaign_id, user_id, created_at, is_complete, total_points)
-            VALUES (UUID_SHORT(), %s, %s, CURRENT_TIMESTAMP(), %s, %s)
-        """, (data['campaign_id'], data['user_id'], data['is_complete'], data.get('total_points', None)))
+            INSERT INTO questions (id, campaign_id, title, body, scoring_prompt, max_points)
+            VALUES (%s, %s, %s, %s, %s, %s) RETURNING *
+        """, (
+            question_id,
+            campaign_id,
+            data.get('title', ''),
+            data.get('body', ''),
+            data.get('scoring_prompt', ''),
+            data.get('max_points', 0)
+        ))
         
-        # Get the newly created submission ID
-        cursor.execute("SELECT LAST_INSERT_ID()")
-        submission_id = cursor.fetchone()[0]
-        
+        # Get the newly created question
+        new_question = cursor.fetchone()
         conn.commit()
+        
+        # Prepare response with string IDs
+        columns = ["id", "campaign_id", "title", "body", "scoring_prompt", "max_points"]
+        result = map_row_to_dict(new_question, columns)
+        
         conn.close()
-        return jsonify({"message": "Submission created successfully", "submission_id": submission_id}), 201
+        return jsonify(result), 201
+    
     except Exception as e:
-        print(f"Error creating submission: {e}")
-        conn.rollback()
+        if conn:
+            conn.rollback()
+            conn.close()
+        return jsonify({"error": f"Failed to create question: {str(e)}"}), 500
+
+@api_bp.route('/submissions', methods=['POST'])
+@jwt_required()
+def create_submission():
+    # Validate request data
+    data = request.get_json()
+    if not data or 'campaign_id' not in data:
+        return jsonify({"error": "campaign_id is required"}), 400
+    
+    # Get user identity from JWT
+    current_user = get_jwt_identity()
+    user_id = str(current_user.get("id"))
+    
+    # Ensure campaign_id is a string
+    campaign_id = str(data['campaign_id'])
+    
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Check if campaign exists
+        cursor.execute("SELECT * FROM campaigns WHERE id = %s", (campaign_id,))
+        campaign = cursor.fetchone()
+        if not campaign:
+            conn.close()
+            return jsonify({"error": "Campaign not found"}), 404
+        
+        # Verify campaign is accessible to the user (public or admin)
+        is_admin = current_user.get("is_admin", False)
+        if not is_admin and not campaign[4]:  # campaign[4] is is_public field
+            conn.close()
+            return jsonify({"error": "You do not have access to this campaign"}), 403
+        
+        # Check max submissions per user if set
+        if campaign[2] > 0:  # max_user_submissions
+            cursor.execute(
+                "SELECT COUNT(*) FROM submissions WHERE campaign_id = %s AND user_id = %s", 
+                (campaign_id, user_id)
+            )
+            count = cursor.fetchone()[0]
+            if count >= campaign[2]:
+                conn.close()
+                return jsonify({"error": f"Maximum submissions ({campaign[2]}) reached for this campaign"}), 400
+        
+        # Create submission
+        cursor.execute(
+            "INSERT INTO submissions (campaign_id, user_id) VALUES (%s, %s) RETURNING *", 
+            (campaign_id, user_id)
+        )
+        submission = cursor.fetchone()
+        conn.commit()
+        
+        # Map to dictionary with string IDs
+        columns = ["id", "campaign_id", "user_id", "created_at", "is_complete", 
+                   "completed_at", "total_points", "resume_path", "resume_text"]
+        result = map_row_to_dict(submission, columns)
+        
         conn.close()
+        return jsonify(result), 201
+    except Exception as e:
+        if conn:
+            conn.rollback()
+            conn.close()
         return jsonify({"error": str(e)}), 500
 
 @api_bp.route('/submission_answers', methods=['POST'])
@@ -503,14 +779,79 @@ def update_table(table, id, data):
     conn.close()
 
 # PUT routes
-@api_bp.route('/users/<int:id>', methods=['PUT'])
+@api_bp.route('/users/<string:id>', methods=['PUT'])
 @admin_required
 def update_user(id):
     data = request.json
-    update_table("users", id, data)
-    return jsonify({"message": "User updated successfully"}), 200
+    
+    # Ensure ID is a string
+    user_id = str(id)
+    
+    if not data:
+        return jsonify({"error": "No data provided"}), 400
+    
+    # Extract user data
+    email = data.get('email')
+    name = data.get('name')
+    password = data.get('password')
+    is_admin = data.get('is_admin')
+    
+    # Validate email
+    if email and not re.match(r"[^@]+@[^@]+\.[^@]+", email):
+        return jsonify({"error": "Invalid email format"}), 400
+    
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Start building the update query
+        update_parts = []
+        params = []
+        
+        if email:
+            update_parts.append("email = %s")
+            params.append(email)
+        
+        if name:
+            update_parts.append("name = %s")
+            params.append(name)
+        
+        if password:
+            hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+            update_parts.append("password_hash = %s")
+            params.append(hashed_password.decode('utf-8'))
+        
+        if is_admin is not None:
+            update_parts.append("is_admin = %s")
+            params.append(is_admin)
+        
+        if not update_parts:
+            conn.close()
+            return jsonify({"error": "No fields to update"}), 400
+        
+        # Finalize and execute the update query
+        query = f"UPDATE users SET {', '.join(update_parts)} WHERE id = %s RETURNING *"
+        params.append(user_id)
+        
+        cursor.execute(query, params)
+        updated_user = cursor.fetchone()
+        conn.commit()
+        conn.close()
+        
+        if updated_user:
+            columns = ["id", "email", "name", "password_hash", "is_admin"]
+            # Use the helper function to create the response with string IDs
+            result = map_row_to_dict(updated_user, columns)
+            return jsonify(result)
+        else:
+            return jsonify({"error": "User not found"}), 404
+    
+    except Exception as e:
+        if conn:
+            conn.close()
+        return jsonify({"error": f"Failed to update user: {str(e)}"}), 500
 
-@api_bp.route('/campaigns/<int:id>', methods=['PUT'])
+@api_bp.route('/campaigns/<string:id>', methods=['PUT'])
 @admin_required
 def update_campaign(id):
     data = request.json
@@ -518,7 +859,7 @@ def update_campaign(id):
     return jsonify({"message": "Campaign updated successfully"}), 200
 
 # Update PUT /campaigns/<id>/update to include job_description
-@api_bp.route('/campaigns/<int:id>/update', methods=['POST'])
+@api_bp.route('/campaigns/<string:id>/update', methods=['POST'])
 @admin_required
 def update_campaign_with_questions(id):
     """
@@ -578,21 +919,21 @@ def update_campaign_with_questions(id):
     conn.close()
     return jsonify({"message": "Campaign and questions updated successfully"}), 200
 
-@api_bp.route('/questions/<int:id>', methods=['PUT'])
+@api_bp.route('/questions/<string:id>', methods=['PUT'])
 @admin_required
 def update_question(id):
     data = request.json
     update_table("questions", id, data)
     return jsonify({"message": "Question updated successfully"}), 200
 
-@api_bp.route('/submissions/<int:id>', methods=['PUT'])
+@api_bp.route('/submissions/<string:id>', methods=['PUT'])
 @admin_required
 def update_submission(id):
     data = request.json
     update_table("submissions", id, data)
     return jsonify({"message": "Submission updated successfully"}), 200
 
-@api_bp.route('/submission_answers/<int:id>', methods=['PUT'])
+@api_bp.route('/submission_answers/<string:id>', methods=['PUT'])
 @admin_required
 def update_submission_answer(id):
     data = request.json
@@ -630,7 +971,7 @@ def update_submission_answer(id):
     return jsonify({"message": "Submission answer updated successfully"}), 200
 
 # DELETE routes
-@api_bp.route('/users/<int:id>', methods=['DELETE'])
+@api_bp.route('/users/<string:id>', methods=['DELETE'])
 @admin_required
 def delete_user(id):
     """
@@ -658,7 +999,7 @@ def delete_user(id):
     conn.close()
     return jsonify({"message": "User and all related data deleted successfully"}), 200
 
-@api_bp.route('/campaigns/<int:id>', methods=['DELETE'])
+@api_bp.route('/campaigns/<string:id>', methods=['DELETE'])
 @admin_required
 def delete_campaign(id):
     """
@@ -689,7 +1030,7 @@ def delete_campaign(id):
     conn.close()
     return jsonify({"message": "Campaign and all related data deleted successfully"}), 200
 
-@api_bp.route('/questions/<int:id>', methods=['DELETE'])
+@api_bp.route('/questions/<string:id>', methods=['DELETE'])
 @admin_required
 def delete_question(id):
     """
@@ -722,7 +1063,7 @@ def delete_question(id):
     conn.close()
     return jsonify({"message": "Question deleted successfully and campaign max_points updated"}), 200
 
-@api_bp.route('/submissions/<int:id>', methods=['DELETE'])
+@api_bp.route('/submissions/<string:id>', methods=['DELETE'])
 @admin_required
 def delete_submission(id):
     """
@@ -741,7 +1082,7 @@ def delete_submission(id):
     conn.close()
     return jsonify({"message": "Submission and its answers deleted successfully"}), 200
 
-@api_bp.route('/submission_answers/<int:id>', methods=['DELETE'])
+@api_bp.route('/submission_answers/<string:id>', methods=['DELETE'])
 @admin_required
 def delete_submission_answer(id):
     conn = get_db_connection()
@@ -774,45 +1115,50 @@ def optimize_prompt_api():
 @api_bp.route('/profile', methods=['GET'])
 @jwt_required()
 def get_current_user_profile():
+    # Get the current user's identity from JWT
+    current_user_id = get_jwt_identity()
+    
+    # Ensure ID is a string
+    user_id = str(current_user_id)
+    
     try:
-        """
-        Get the profile information for the currently logged-in user using JWT
-        If user_id is provided and the requester is an admin, return that user's profile
-        Otherwise return the current user's profile
-        """
-        # Get user identity from JWT
-        current_user = get_jwt_identity()
-        current_user_id = current_user.get("id")
-        is_admin = current_user.get("is_admin", False)
-        
-        # Get requested user_id from query parameters
-        requested_user_id = request.args.get("user_id")
-        
-        # Determine which user's profile to fetch
-        target_user_id = requested_user_id if requested_user_id and is_admin else current_user_id
-        
-        # If a user is requesting someone else's profile and isn't an admin, reject
-        if requested_user_id and requested_user_id != current_user_id and not is_admin:
-            return jsonify({"error": "You are not authorized to view this profile"}), 403
-        
         conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT * FROM users WHERE id = %s", (target_user_id,))
-        user = cursor.fetchone()
-        conn.close()
+        cursor = conn.cursor()
         
-        if user:
+        # Get user data (excluding password hash for security)
+        cursor.execute(
+            "SELECT id, email, name, is_admin FROM users WHERE id = %s", 
+            (user_id,)
+        )
+        user = cursor.fetchone()
+        
+        if not user:
+            conn.close()
             return jsonify({
-                "id": str(user["id"]),
-                "email": user["email"],
-                "name": user["name"],
-                "is_admin": user["is_admin"]
-            })
-        else:
-            return jsonify({"error": "User not found"}), 404
+                "error": "User not found. The user may have been deleted."
+            }), 404
+        
+        columns = ["id", "email", "name", "is_admin"]
+        # Use the helper function to create the response with string IDs
+        result = map_row_to_dict(user, columns)
+        
+        # Get user's submissions count
+        cursor.execute(
+            "SELECT COUNT(*) FROM submissions WHERE user_id = %s", 
+            (user_id,)
+        )
+        submission_count = cursor.fetchone()[0]
+        result["submission_count"] = submission_count
+        
+        conn.close()
+        return jsonify(result)
+    
     except Exception as e:
-        print(e)
-        return jsonify({"error": str(e)}), 500
+        if conn:
+            conn.close()
+        return jsonify({
+            "error": f"Failed to get user profile: {str(e)}"
+        }), 500
 
 # Add a session debug endpoint
 @api_bp.route('/debug/session', methods=['GET'])
@@ -1109,46 +1455,6 @@ def register():
         print(f"Error registering user: {e}")
         return jsonify({"error": f"Failed to register user: {str(e)}"}), 500
 
-@api_bp.route('/auth/me', methods=['GET'])
-@jwt_required()
-def get_current_auth_user():
-    """
-    Get current authenticated user for navbar and access control
-    """
-    try:
-        # Get user identity from JWT
-        current_user = get_jwt_identity()
-        
-        if not current_user or not current_user.get("id"):
-            return jsonify({"error": "Invalid token or missing user identity"}), 401
-            
-        user_id = current_user.get("id")
-        
-        # Get user data from database to ensure it's current
-        conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT id, email, name, is_admin FROM users WHERE id = %s", (user_id,))
-        user = cursor.fetchone()
-        conn.close()
-        
-        if not user:
-            return jsonify({"error": "User not found"}), 404
-            
-        return jsonify({
-            "id": str(user["id"]),
-            "email": user["email"],
-            "name": user["name"],
-            "is_admin": bool(user["is_admin"]),
-            "isAuthenticated": True
-        })
-        
-    except Exception as e:
-        print(f"Error in auth/me endpoint: {e}")
-        return jsonify({
-            "error": str(e),
-            "isAuthenticated": False
-        }), 500
-
 # Add a health check endpoint
 @api_bp.route('/health', methods=['GET', 'HEAD'])
 def health_check():
@@ -1178,43 +1484,119 @@ def upload_resume():
     file_extension = os.path.splitext(filename)[1]
     unique_filename = f"{user_id}_{submission_id}_{uuid.uuid4()}{file_extension}"
     
-    # Create a temporary file to process the resume
-    with tempfile.NamedTemporaryFile(delete=False, suffix=file_extension) as temp_file:
-        resume_file.save(temp_file.name)
+    # Create a temporary file
+    temp_file = None
+    try:
+        temp_dir = tempfile.gettempdir()
+        temp_path = os.path.join(temp_dir, unique_filename)
         
-        try:
-            # Upload to S3
-            s3_path = f"resumes/{unique_filename}"
-            s3_client.upload_file(
-                temp_file.name,
-                S3_BUCKET,
-                s3_path,
-                ExtraArgs={'ContentType': resume_file.content_type}
+        # Save the uploaded file to our temporary path
+        resume_file.save(temp_path)
+        
+        # Upload to S3
+        s3_path = f"resumes/{unique_filename}"
+        s3_client.upload_file(
+            temp_path,
+            S3_BUCKET,
+            s3_path,
+            ExtraArgs={'ContentType': resume_file.content_type}
+        )
+        
+        # Extract text from the resume
+        resume_text = extract_text_from_document(temp_path)
+        
+        # Update the submission with the resume path and text
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE submissions 
+            SET resume_path = %s, resume_text = %s 
+            WHERE id = %s
+        """, (s3_path, resume_text, submission_id))
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            "message": "Resume uploaded successfully",
+            "resume_path": s3_path
+        }), 200
+            
+    except Exception as e:
+        # Log the error
+        print(f"Error processing resume: {str(e)}")
+        return jsonify({"error": f"Error processing resume: {str(e)}"}), 500
+    finally:
+        # Clean up the temporary file if it exists
+        if temp_path and os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except Exception as cleanup_error:
+                # Just log cleanup errors, don't fail the request
+                print(f"Warning: Could not remove temporary file: {str(cleanup_error)}")
+
+@api_bp.route('/submissions/<string:id>/complete', methods=['POST'])
+@jwt_required()
+def complete_submission(id):
+    try:
+        # Get user identity from JWT
+        current_user = get_jwt_identity()
+        user_id = str(current_user.get("id"))
+        is_admin = current_user.get("is_admin", False)
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Ensure ID is treated as string
+        submission_id = str(id)
+        
+        # First check if the submission exists and belongs to the current user (unless admin)
+        if is_admin:
+            cursor.execute(
+                "SELECT * FROM submissions WHERE id = %s",
+                (submission_id,)
             )
-            
-            # Extract text from the resume
-            resume_text = extract_text_from_document(temp_file.name)
-            
-            # Update the submission with the resume path and text
-            conn = get_db_connection()
-            cursor = conn.cursor()
-            cursor.execute("""
-                UPDATE submissions 
-                SET resume_path = %s, resume_text = %s 
-                WHERE id = %s
-            """, (s3_path, resume_text, submission_id))
-            conn.commit()
+        else:
+            cursor.execute(
+                "SELECT * FROM submissions WHERE id = %s AND user_id = %s",
+                (submission_id, user_id)
+            )
+        
+        submission = cursor.fetchone()
+        
+        if not submission:
             conn.close()
+            return jsonify({"error": "Submission not found or you don't have permission to modify it"}), 404
+        
+        # Update submission as complete
+        cursor.execute(
+            "UPDATE submissions SET is_complete = TRUE WHERE id = %s RETURNING *",
+            (submission_id,)
+        )
+        updated_submission = cursor.fetchone()
+        
+        # Store transcript if provided
+        transcript_data = request.json.get('transcript', [])
+        if transcript_data:
+            # Convert to string if not already
+            transcript_json = json.dumps(transcript_data)
             
-            # Clean up the temporary file
-            os.unlink(temp_file.name)
-            
-            return jsonify({
-                "message": "Resume uploaded successfully",
-                "resume_path": s3_path
-            }), 200
-            
-        except Exception as e:
-            # Clean up the temporary file in case of error
-            os.unlink(temp_file.name)
-            return jsonify({"error": f"Error processing resume: {str(e)}"}), 500
+            # Save transcript to the database
+            cursor.execute(
+                "UPDATE submissions SET transcript = %s WHERE id = %s",
+                (transcript_json, submission_id)
+            )
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            "message": "Submission completed successfully",
+            "id": str(updated_submission[0]),
+            "is_complete": True
+        }), 200
+        
+    except Exception as e:
+        if conn:
+            conn.rollback()
+            conn.close()
+        return jsonify({"error": str(e)}), 500

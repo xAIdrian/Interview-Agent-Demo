@@ -20,15 +20,23 @@ export function NetworkErrorBoundary({ children }: NetworkErrorBoundaryProps) {
       const timeoutId = setTimeout(() => controller.abort(), 5000);
       
       const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-      await fetch(`${API_BASE_URL}/health`, {
+      const response = await fetch(`${API_BASE_URL}/health`, {
         method: 'HEAD',
-        mode: 'no-cors',
         cache: 'no-cache',
+        credentials: 'include',
         signal: controller.signal
       });
       
       clearTimeout(timeoutId);
-      return true;
+      
+      // Check if the response is OK (status in the range 200-299)
+      if (response.ok) {
+        AuthLogger.info('API health check succeeded');
+        return true;
+      } else {
+        AuthLogger.warn(`API health check failed with status: ${response.status}`);
+        return false;
+      }
     } catch (error) {
       AuthLogger.error('API connection check failed:', error);
       return false;
