@@ -1,6 +1,6 @@
 from botocore.exceptions import ClientError
 from config import Config
-from database import get_db_connection, create_tables
+from database import get_db_connection, create_tables, migrate_submissions_table_add_resume_columns
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, send_file
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -61,6 +61,33 @@ def health_check():
 @app.before_first_request
 def create_tables_on_startup():
     create_tables()
+    migrate_submissions_table_add_resume_columns()
+    
+    # Execute the migration to update total_points to allow NULL
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cursor:
+            # Modify the total_points column to allow NULL values
+            cursor.execute("""
+                ALTER TABLE submissions
+                MODIFY COLUMN total_points INT DEFAULT NULL
+            """)
+            print("Successfully modified total_points column to allow NULL values")
+            
+            # Update existing submissions with total_points=0 to NULL
+            cursor.execute("""
+                UPDATE submissions 
+                SET total_points = NULL 
+                WHERE total_points = 0 AND is_complete = FALSE
+            """)
+            print(f"Updated {cursor.rowcount} submissions with total_points=0 to NULL")
+            
+        conn.commit()
+    except Exception as e:
+        print(f"Error during migration: {e}")
+        conn.rollback()
+    finally:
+        conn.close()
 
 @app.route("/register", methods=["GET", "POST"])
 def register():

@@ -16,7 +16,6 @@ interface Submission {
   campaign_id: string;
   user_id: string;
   created_at: string;
-  completed_at: string | null;
   is_complete: boolean;
   total_points: number | null;
   email: string;
@@ -142,13 +141,6 @@ const CampaignSubmissionsPage = () => {
           { 
             title: "Created", 
             field: "created_at", 
-            formatter: (cell) => formatDate(cell.getValue()),
-            sorter: "datetime",
-            widthGrow: 1
-          },
-          { 
-            title: "Completed", 
-            field: "completed_at", 
             formatter: (cell) => formatDate(cell.getValue()),
             sorter: "datetime",
             widthGrow: 1
