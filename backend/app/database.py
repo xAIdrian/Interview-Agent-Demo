@@ -96,7 +96,9 @@ def create_submissions_table():
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 completed_at TIMESTAMP DEFAULT NULL,
                 is_complete BOOLEAN NOT NULL DEFAULT FALSE,
-                total_points INT NOT NULL DEFAULT 0,
+                total_points INT DEFAULT NULL,
+                resume_path VARCHAR(255) DEFAULT NULL,
+                resume_text LONGTEXT DEFAULT NULL,
                 FOREIGN KEY (campaign_id) REFERENCES campaigns(id),
                 FOREIGN KEY (user_id) REFERENCES users(id),
                 INDEX (user_id, campaign_id),
@@ -136,3 +138,43 @@ def create_tables():
     create_questions_table()
     create_submissions_table()
     create_submission_answers_table()
+
+def migrate_submissions_table_add_resume_columns():
+    """Add resume_path and resume_text columns to the submissions table if they don't exist"""
+    conn = get_db_connection()
+    with conn.cursor() as cursor:
+        # Check if columns exist
+        cursor.execute("""
+            SELECT COUNT(*) 
+            FROM INFORMATION_SCHEMA.COLUMNS 
+            WHERE TABLE_NAME = 'submissions' 
+            AND COLUMN_NAME = 'resume_path'
+        """)
+        resume_path_exists = cursor.fetchone()[0] > 0
+        
+        cursor.execute("""
+            SELECT COUNT(*) 
+            FROM INFORMATION_SCHEMA.COLUMNS 
+            WHERE TABLE_NAME = 'submissions' 
+            AND COLUMN_NAME = 'resume_text'
+        """)
+        resume_text_exists = cursor.fetchone()[0] > 0
+        
+        # Add columns if they don't exist
+        if not resume_path_exists:
+            cursor.execute("""
+                ALTER TABLE submissions
+                ADD COLUMN resume_path VARCHAR(255) DEFAULT NULL
+            """)
+            print("Added resume_path column to submissions table")
+            
+        if not resume_text_exists:
+            cursor.execute("""
+                ALTER TABLE submissions
+                ADD COLUMN resume_text LONGTEXT DEFAULT NULL
+            """)
+            print("Added resume_text column to submissions table")
+    
+    conn.commit()
+    conn.close()
+    print("Migrations completed successfully")

@@ -133,17 +133,19 @@ async def entrypoint(ctx: JobContext):
     participant = await ctx.wait_for_participant()
     logger.info(f"🎉 Participant {participant.identity} joined")
     
-    # Extract campaign ID from participant identity
+    # Extract submission ID from participant identity
     try:
-        campaign_id_from_participant_identity = participant.identity.split('_')[0]
-        logger.info(f"🆔 Extracted campaign ID: {campaign_id_from_participant_identity}")
+        submission_id = participant.identity.split('_')[0]
+        logger.info(f"🆔 Extracted submission ID: {submission_id}")
+        
+        # Fetch submission details (including resume_text)
+        resume_text = await fetch_resume_text(submission_id)
         
         # Fetch questions from API
         try:
-            logger.info(f"📝 Fetching questions for campaign: {campaign_id_from_participant_identity}")
+            logger.info(f"📝 Fetching questions for submission: {submission_id}")
             response = requests.get(
-                QUESTIONS_API_URL.format(campaign_id=campaign_id_from_participant_identity),
-                headers={"Authorization": AUTH_HEADER}
+                QUESTIONS_API_URL.format(campaign_id=submission_id)
             )
             response.raise_for_status()
             questions = response.json()
@@ -157,10 +159,11 @@ async def entrypoint(ctx: JobContext):
         logger.error(f"❌ Error processing participant identity: {e}")
         # Fallback questions
         question_titles = ["Tell me about yourself", "What are your strengths?"]
+        resume_text = sample_resume
 
     # Start the multimodal agent with the questions
     try:
-        agent = run_multimodal_agent(ctx, participant, question_titles)
+        agent = run_multimodal_agent(ctx, participant, question_titles, resume_text)
         logger.info("✅ Agent started successfully")
         
         # Add an initial AI message to the transcript
@@ -171,6 +174,9 @@ async def entrypoint(ctx: JobContext):
         }
         transcript_entries.append(initial_message)
         logger.info(f"🤖 Added initial AI greeting to transcript")
+        
+        # Send initial greeting to the frontend
+        await send_message_to_participants(ctx.room, initial_message)
         
     except Exception as e:
         logger.error(f"❌ Error starting multimodal agent: {e}")
@@ -188,6 +194,23 @@ async def entrypoint(ctx: JobContext):
         save_transcript()
         
     logger.info("✅ Agent entrypoint completed")
+
+
+async def send_message_to_participants(room, message):
+    """Send a message to all participants in the room via data channel"""
+    try:
+        # Convert message to JSON
+        message_json = json.dumps({
+            "type": "transcript",
+            "speaker": message["speaker"],
+            "text": message["text"]
+        })
+        
+        # Send to all participants
+        room.local_participant.publish_data(message_json.encode(), reliable=True)
+        logger.debug(f"✉️ Sent message to participants: {message['text'][:50]}...")
+    except Exception as e:
+        logger.error(f"❌ Error sending message to participants: {e}")
 
 
 def save_transcript():
@@ -222,7 +245,7 @@ def save_transcript():
         logger.info("📝 ===============================================")
 
 
-def run_multimodal_agent(ctx: JobContext, participant: rtc.RemoteParticipant, questions):
+def run_multimodal_agent(ctx: JobContext, participant: rtc.RemoteParticipant, questions, resume_text):
     global transcript_entries
     logger.info(f"🤖 Starting multimodal agent with {len(questions)} questions")
 
@@ -230,7 +253,8 @@ def run_multimodal_agent(ctx: JobContext, participant: rtc.RemoteParticipant, qu
         model = openai.realtime.RealtimeModel(
             instructions=(agent_prompt_template.format(
                 questions="\n".join(questions),
-                job_description=sample_job_description
+                job_description=sample_job_description,
+                resume_text=resume_text
             )),
             modalities=["audio", "text"],
         )
@@ -239,7 +263,7 @@ def run_multimodal_agent(ctx: JobContext, participant: rtc.RemoteParticipant, qu
         # create a chat context with chat history
         chat_ctx = llm.ChatContext()
         chat_ctx.append(
-            text=f"Context about the user: {sample_resume}",
+            text=f"Context about the user: {resume_text}",
             role="assistant",
         )
         logger.debug("✅ Chat context initialized")
@@ -265,6 +289,9 @@ def run_multimodal_agent(ctx: JobContext, participant: rtc.RemoteParticipant, qu
                 }
                 transcript_entries.append(entry)
                 logger.debug(f"Added AI response to transcript. Total entries: {len(transcript_entries)}")
+                
+                # Send the message to participants via data channel
+                asyncio.create_task(send_message_to_participants(ctx.room, entry))
             except Exception as e:
                 logger.error(f"❌ Error in on_message_generated: {e}")
         
@@ -281,6 +308,9 @@ def run_multimodal_agent(ctx: JobContext, participant: rtc.RemoteParticipant, qu
                     }
                     transcript_entries.append(entry)
                     logger.debug(f"Added AI text to transcript via send_text. Total entries: {len(transcript_entries)}")
+                    
+                    # Send the message to participants
+                    asyncio.create_task(send_message_to_participants(ctx.room, entry))
                 except Exception as e:
                     logger.error(f"❌ Error in patched_send_text: {e}")
                 return original_send_text(text, *args, **kwargs)
@@ -320,6 +350,9 @@ def run_multimodal_agent(ctx: JobContext, participant: rtc.RemoteParticipant, qu
                         }
                         transcript_entries.append(entry)
                         logger.debug(f"Added AI response via patched generate. Total entries: {len(transcript_entries)}")
+                        
+                        # Send to frontend
+                        asyncio.create_task(send_message_to_participants(ctx.room, entry))
                 except Exception as e:
                     logger.error(f"❌ Error capturing response in patched_generate: {e}")
                 
@@ -343,6 +376,28 @@ def run_multimodal_agent(ctx: JobContext, participant: rtc.RemoteParticipant, qu
     except Exception as e:
         logger.error(f"❌ Error in run_multimodal_agent: {e}", exc_info=True)
         raise
+
+
+async def fetch_resume_text(submission_id):
+    """Fetch the resume text for a submission"""
+    try:
+        logger.info(f"📄 Fetching resume text for submission: {submission_id}")
+        submission_url = f"http://localhost:5000/api/submissions/{submission_id}"
+        response = requests.get(submission_url)
+        response.raise_for_status()
+        
+        submission_data = response.json()
+        
+        if submission_data.get('resume_text'):
+            logger.info("✅ Found resume text in submission")
+            return submission_data['resume_text']
+        else:
+            logger.warning("⚠️ No resume text found in submission")
+            return sample_resume
+            
+    except Exception as e:
+        logger.error(f"❌ Error fetching resume text: {e}")
+        return sample_resume
 
 
 if __name__ == "__main__":

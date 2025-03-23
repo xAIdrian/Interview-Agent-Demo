@@ -167,7 +167,6 @@ def get_questions():
     } for question in questions])
 
 @api_bp.route('/submissions', methods=['GET'])
-@admin_required
 def get_submissions():
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -175,7 +174,7 @@ def get_submissions():
     filter_query, filter_values = build_filter_query(request.args)
     cursor.execute(f"""
         SELECT submissions.id, submissions.campaign_id, submissions.user_id, submissions.created_at, 
-               submissions.completed_at, submissions.is_complete, submissions.total_points, 
+               submissions.is_complete, submissions.total_points, 
                users.email, campaigns.title AS campaign_name
         FROM submissions
         JOIN users ON submissions.user_id = users.id
@@ -190,11 +189,10 @@ def get_submissions():
         "campaign_id": str(submission[1]),
         "user_id": str(submission[2]),
         "created_at": submission[3],
-        "completed_at": submission[4],
-        "is_complete": submission[5],
-        "total_points": submission[6],
-        "email": submission[7],
-        "campaign_name": submission[8]
+        "is_complete": submission[4],
+        "total_points": submission[5],
+        "email": submission[6],
+        "campaign_name": submission[7]
     } for submission in submissions])
 
 @api_bp.route('/submission_answers', methods=['GET'])
@@ -260,41 +258,44 @@ def get_public_campaigns():
     } for campaign in campaigns])
 
 @api_bp.route('/submissions/<int:id>', methods=['GET'])
-@admin_required
 def get_submission_by_id(id):
-    """
-    Get a specific submission by ID with joined data from users and campaigns tables
-    """
     conn = get_db_connection()
     cursor = conn.cursor()
-    
-    cursor.execute("""
-        SELECT submissions.id, submissions.campaign_id, submissions.user_id, submissions.created_at, 
-               submissions.completed_at, submissions.is_complete, submissions.total_points, 
-               users.email, campaigns.title AS campaign_name
-        FROM submissions
-        JOIN users ON submissions.user_id = users.id
-        JOIN campaigns ON submissions.campaign_id = campaigns.id
-        WHERE submissions.id = %s
-    """, (id,))
-    
+    cursor.execute("SELECT * FROM submissions WHERE id = %s", (id,))
     submission = cursor.fetchone()
     conn.close()
     
     if not submission:
         return jsonify({"error": "Submission not found"}), 404
         
-    return jsonify({
-        "id": str(submission[0]),
-        "campaign_id": str(submission[1]),
-        "user_id": str(submission[2]),
-        "created_at": submission[3],
-        "completed_at": submission[4],
-        "is_complete": submission[5],
-        "total_points": submission[6],
-        "email": submission[7],
-        "campaign_name": submission[8]
-    })
+    # Convert to dict with column names
+    column_names = [desc[0] for desc in cursor.description]
+    submission_dict = {column_names[i]: submission[i] for i in range(len(column_names))}
+    
+    return jsonify(submission_dict)
+
+# Add a public endpoint to get submission by ID for the interview page
+@api_bp.route('/submissions/<string:id>', methods=['GET'])
+def get_submission_for_interview(id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT id, campaign_id, user_id, created_at, updated_at, 
+               is_complete, total_points, resume_path, resume_text
+        FROM submissions 
+        WHERE id = %s
+    """, (id,))
+    submission = cursor.fetchone()
+    conn.close()
+    
+    if not submission:
+        return jsonify({"error": "Submission not found"}), 404
+        
+    # Convert to dict with column names
+    column_names = [desc[0] for desc in cursor.description]
+    submission_dict = {column_names[i]: submission[i] for i in range(len(column_names))}
+    
+    return jsonify(submission_dict)
 
 # POST routes
 @api_bp.route('/users', methods=['POST'])
@@ -385,13 +386,37 @@ def create_submission():
     data = request.json
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("""
-        INSERT INTO submissions (id, campaign_id, user_id, created_at, completed_at, is_complete, total_points)
-        VALUES (UUID_SHORT(), %s, %s, %s, %s, %s, %s)
-    """, (data['campaign_id'], data['user_id'], data['created_at'], data['completed_at'], data['is_complete'], data['total_points']))
-    conn.commit()
-    conn.close()
-    return jsonify({"message": "Submission created successfully"}), 201
+    
+    try:
+        # First check if the user exists
+        cursor.execute("SELECT id FROM users WHERE id = %s", (data['user_id'],))
+        user = cursor.fetchone()
+        
+        # If user doesn't exist, create a demo user with that ID
+        if not user:
+            cursor.execute("""
+                INSERT INTO users (id, email, name, password_hash, is_admin)
+                VALUES (%s, %s, %s, %s, 0)
+            """, (data['user_id'], f"demo{data['user_id']}@example.com", f"Demo User {data['user_id']}", "demo_hash"))
+        
+        # Now create the submission
+        cursor.execute("""
+            INSERT INTO submissions (id, campaign_id, user_id, created_at, is_complete, total_points)
+            VALUES (UUID_SHORT(), %s, %s, CURRENT_TIMESTAMP(), %s, %s)
+        """, (data['campaign_id'], data['user_id'], data['is_complete'], data.get('total_points', None)))
+        
+        # Get the newly created submission ID
+        cursor.execute("SELECT LAST_INSERT_ID()")
+        submission_id = cursor.fetchone()[0]
+        
+        conn.commit()
+        conn.close()
+        return jsonify({"message": "Submission created successfully", "submission_id": submission_id}), 201
+    except Exception as e:
+        print(f"Error creating submission: {e}")
+        conn.rollback()
+        conn.close()
+        return jsonify({"error": str(e)}), 500
 
 @api_bp.route('/submission_answers', methods=['POST'])
 def create_submission_answer():
@@ -1131,3 +1156,65 @@ def health_check():
     Simple health check endpoint to verify the API is running
     """
     return jsonify({"status": "ok", "message": "API is operational"}), 200
+
+@api_bp.route('/upload_resume', methods=['POST'])
+def upload_resume():
+    """Upload a resume to S3, extract text, and update the submission"""
+    if 'resume' not in request.files:
+        return jsonify({"error": "No resume file provided"}), 400
+        
+    resume_file = request.files['resume']
+    user_id = request.form.get('user_id')
+    position_id = request.form.get('position_id')
+    submission_id = request.form.get('submission_id')
+    
+    if not resume_file.filename or not submission_id:
+        return jsonify({"error": "Missing required fields"}), 400
+        
+    # Ensure the filename is secure
+    filename = secure_filename(resume_file.filename)
+    
+    # Generate a unique filename to prevent overwrites
+    file_extension = os.path.splitext(filename)[1]
+    unique_filename = f"{user_id}_{submission_id}_{uuid.uuid4()}{file_extension}"
+    
+    # Create a temporary file to process the resume
+    with tempfile.NamedTemporaryFile(delete=False, suffix=file_extension) as temp_file:
+        resume_file.save(temp_file.name)
+        
+        try:
+            # Upload to S3
+            s3_path = f"resumes/{unique_filename}"
+            s3_client.upload_file(
+                temp_file.name,
+                S3_BUCKET,
+                s3_path,
+                ExtraArgs={'ContentType': resume_file.content_type}
+            )
+            
+            # Extract text from the resume
+            resume_text = extract_text_from_document(temp_file.name)
+            
+            # Update the submission with the resume path and text
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE submissions 
+                SET resume_path = %s, resume_text = %s 
+                WHERE id = %s
+            """, (s3_path, resume_text, submission_id))
+            conn.commit()
+            conn.close()
+            
+            # Clean up the temporary file
+            os.unlink(temp_file.name)
+            
+            return jsonify({
+                "message": "Resume uploaded successfully",
+                "resume_path": s3_path
+            }), 200
+            
+        except Exception as e:
+            # Clean up the temporary file in case of error
+            os.unlink(temp_file.name)
+            return jsonify({"error": f"Error processing resume: {str(e)}"}), 500

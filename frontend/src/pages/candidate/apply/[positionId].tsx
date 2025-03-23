@@ -21,16 +21,17 @@ const ApplicationPage = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(true);
-  const [userId, setUserId] = useState('');
+  // Set a default userId for demo purposes - using a numeric ID to match database expectations
+  const [userId, setUserId] = useState(1);
   const [existingSubmissions, setExistingSubmissions] = useState<number>(0);
   const [maxSubmissions, setMaxSubmissions] = useState<number>(1);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Fetch position details
+  // Fetch position details when positionId changes
   useEffect(() => {
     const fetchPositionDetails = async () => {
-      if (!positionId || !userId) return;
+      if (!positionId) return; // Only check for positionId, userId is pre-set
 
       try {
         setIsLoading(true);
@@ -39,7 +40,7 @@ const ApplicationPage = () => {
         // Fetch the position details
         const positionResponse = await axios.get(`${API_BASE_URL}/api/campaigns/${positionId}`);
         setPosition(positionResponse.data);
-        setMaxSubmissions(positionResponse.data.max_user_submissions);
+        setMaxSubmissions(positionResponse.data.max_user_submissions || 1);
         
         // Check if user has existing submissions for this position
         const submissionsResponse = await axios.get(
@@ -95,23 +96,27 @@ const ApplicationPage = () => {
       setIsUploading(true);
       setError('');
       
-      // Create a form data object to send the resume
-      const formData = new FormData();
-      formData.append('resume', resume);
-      formData.append('position_id', positionId as string);
-      formData.append('user_id', userId);
-      
-      // Create a new submission
+      // First, create a new submission
       const createSubmissionResponse = await axios.post(`${API_BASE_URL}/api/submissions`, {
         campaign_id: positionId,
         user_id: userId,
         created_at: new Date().toISOString(),
-        completed_at: null,
         is_complete: false,
         total_points: null
       });
       
       const submissionId = createSubmissionResponse.data.submission_id;
+      
+      if (!submissionId) {
+        throw new Error('Failed to create submission: No submission ID returned');
+      }
+      
+      // Then, upload the resume with the submission ID
+      const formData = new FormData();
+      formData.append('resume', resume);
+      formData.append('position_id', positionId as string);
+      formData.append('user_id', userId.toString());
+      formData.append('submission_id', submissionId.toString());
       
       // Upload the resume
       await axios.post(`${API_BASE_URL}/api/upload_resume`, formData, {

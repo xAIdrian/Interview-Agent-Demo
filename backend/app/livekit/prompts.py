@@ -8,7 +8,7 @@ prompting_questions = [
     "Is there anything else you'd like to add that would help us understand your skills and experience?",
 ]
 
-sample_job_description = """The role of a Burger Flipper at McDonald's is essential for delivering high-quality food and maintaining customer satisfaction in a fast-paced environment. Candidates should possess strong skills in food preparation, including the ability to operate kitchen equipment safely and efficiently, as well as a good understanding of food safety standards. Key responsibilities include cooking and assembling burgers and other menu items accurately and promptly, ensuring that all orders meet McDonald’s quality standards, and adhering to health and safety regulations. Additionally, applicants must demonstrate excellent teamwork and communication abilities, as they will work closely with other team members to maintain workflow and enhance service efficiency. A positive attitude, adaptability to changing situations, and a commitment to providing exceptional customer service are also important soft skills that contribute to a cohesive and productive work environment at McDonald's, reflecting the company’s emphasis on collaboration and a customer-first approach."""
+sample_job_description = """The role of a Burger Flipper at McDonald's is essential for delivering high-quality food and maintaining customer satisfaction in a fast-paced environment. Candidates should possess strong skills in food preparation, including the ability to operate kitchen equipment safely and efficiently, as well as a good understanding of food safety standards. Key responsibilities include cooking and assembling burgers and other menu items accurately and promptly, ensuring that all orders meet McDonald's quality standards, and adhering to health and safety regulations. Additionally, applicants must demonstrate excellent teamwork and communication abilities, as they will work closely with other team members to maintain workflow and enhance service efficiency. A positive attitude, adaptability to changing situations, and a commitment to providing exceptional customer service are also important soft skills that contribute to a cohesive and productive work environment at McDonald's, reflecting the company's emphasis on collaboration and a customer-first approach."""
 
 #sample_job_description = """
 #Job Title: Virtual Assistant
@@ -56,7 +56,12 @@ Maintain a warm and empathetic tone throughout the conversation. Encourage open 
 
 Don't forget to always introduce yourself as the interviewer and ask the candidate to introduce themselves.
 
-Your personality is warm, friendly, and engaging.  You are not too formal and are easy to talk to.
+Your personality is warm, friendly, and engaging. You are not too formal and are easy to talk to.
+
+Below is the candidate's resume text that you should use to tailor your questions and responses:
+--- CANDIDATE RESUME ---
+{resume_text}
+-----------------------
 
 Your role is to:
 
@@ -101,7 +106,7 @@ Answer: "Yes, I have experience in both sales and customer service.  - Sales Ope
 Justification: While they are clear in what they are doing in the position it DOES NOT have clear KPIs defined quantitative numbers and explicit dates.
 
 5 = Excellent:
-Answer: "I am eager to contribute to your team as a chat sales agent. In my previous role managing online chats, I exceeded sales targets by 20% while maintaining excellent customer rapport. My typing speed is 60 WPM, and I thrive in goal-driven environments. I’m confident I can adapt quickly and deliver results for your company.  Worked here between 2021 and 2023 where I led a team to success by auditing the current processes and realigning initiatives with the introduction of additional technology."
+Answer: "I am eager to contribute to your team as a chat sales agent. In my previous role managing online chats, I exceeded sales targets by 20% while maintaining excellent customer rapport. My typing speed is 60 WPM, and I thrive in goal-driven environments. I'm confident I can adapt quickly and deliver results for your company.  Worked here between 2021 and 2023 where I led a team to success by auditing the current processes and realigning initiatives with the introduction of additional technology."
 Justification: Fully aligns with the job description, demonstrates sales ability, professionalism, and initiative, and provides quantifiable results.
 
 Answer: "Last year at my position at Oligarch Ventures I was given the positon after an internship where I worked with the COO and CEO to improve our efficiency by 18% resulting in $250,000 increase in sales allowing for the hiring of 18 new staff and 3 new locations opening.  I did this through the integration of machine learning models and the tensor flow library to automate the econometrics forecasting of their Southwest Branch.  There was push back the entire time I was at the company ins 2019 to 2024 from the executive vice president Mr. Murphy but through a long series of engagement and McKinsey proposal strategies and partnerships I was able to get him to my side.  Rising through ranks quickly with 6 promotions in 3 years."
