@@ -45,8 +45,7 @@ export const getApiUrl = (endpoint: string): string => {
     pathOnly === '/login' || 
     pathOnly === '/register' || 
     pathOnly === '/logout' ||
-    pathOnly === '/refresh' ||
-    pathOnly === '/auth/me';
+    pathOnly === '/refresh';
   
   // Check if this is an API endpoint that should use the /api prefix
   const isApiEndpoint = 
@@ -86,13 +85,20 @@ export const checkBackendConnection = async (): Promise<boolean> => {
     
     const response = await fetch(`${API_BASE_URL}/health`, { 
       method: 'HEAD',
-      mode: 'no-cors',
       cache: 'no-cache',
+      credentials: 'include',
       signal: controller.signal
     });
     
     clearTimeout(timeoutId);
-    return true;
+    
+    // Check if we got a successful response
+    if (response.ok) {
+      return true;
+    } else {
+      console.error(`Backend health check returned status: ${response.status}`);
+      return false;
+    }
   } catch (error) {
     console.error('Backend connection check failed:', error);
     return false;

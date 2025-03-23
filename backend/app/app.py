@@ -27,8 +27,13 @@ import secrets
 
 app = Flask(__name__)
 
-# Initialize CORS to allow all origins
-CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
+# Configure CORS properly to accept credentials and specific origins
+CORS(app, 
+     resources={r"/*": {"origins": ["http://localhost:3000", "http://127.0.0.1:3000"]}}, 
+     supports_credentials=True,
+     allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
+     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+     expose_headers=["Authorization", "Content-Type"])
 
 app.config.from_object(Config)
 app.register_blueprint(api_bp, url_prefix='/api')
@@ -47,47 +52,55 @@ app.config['SESSION_COOKIE_SECURE'] = False  # Set to True in production with HT
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # Use 'Strict' in production
 
-# Set up CORS to allow credentials
-CORS(app, supports_credentials=True, origins=["http://localhost:3000", "http://127.0.0.1:3000"])
-
 # Add a root-level health endpoint
 @app.route('/health', methods=['GET', 'HEAD'])
 def health_check():
     """
-    Simple health check endpoint to verify the API is running
+    Simple health check endpoint to verify the API is running.
+    This doesn't check database connectivity to allow CORS preflight to succeed.
     """
-    return jsonify({"status": "ok", "message": "API is operational"}), 200
+    try:
+        return jsonify({"status": "ok", "message": "API is operational"}), 200
+    except Exception as e:
+        app.logger.error(f"Health check failed: {str(e)}")
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.before_first_request
 def create_tables_on_startup():
-    create_tables()
-    migrate_submissions_table_add_resume_columns()
-    
-    # Execute the migration to update total_points to allow NULL
-    conn = get_db_connection()
     try:
-        with conn.cursor() as cursor:
-            # Modify the total_points column to allow NULL values
-            cursor.execute("""
-                ALTER TABLE submissions
-                MODIFY COLUMN total_points INT DEFAULT NULL
-            """)
-            print("Successfully modified total_points column to allow NULL values")
-            
-            # Update existing submissions with total_points=0 to NULL
-            cursor.execute("""
-                UPDATE submissions 
-                SET total_points = NULL 
-                WHERE total_points = 0 AND is_complete = FALSE
-            """)
-            print(f"Updated {cursor.rowcount} submissions with total_points=0 to NULL")
-            
-        conn.commit()
+        create_tables()
+        migrate_submissions_table_add_resume_columns()
+        
+        # Execute the migration to update total_points to allow NULL
+        conn = get_db_connection()
+        try:
+            with conn.cursor() as cursor:
+                # Modify the total_points column to allow NULL values
+                cursor.execute("""
+                    ALTER TABLE submissions
+                    MODIFY COLUMN total_points INT DEFAULT NULL
+                """)
+                print("Successfully modified total_points column to allow NULL values")
+                
+                # Update existing submissions with total_points=0 to NULL
+                cursor.execute("""
+                    UPDATE submissions 
+                    SET total_points = NULL 
+                    WHERE total_points = 0 AND is_complete = FALSE
+                """)
+                print(f"Updated {cursor.rowcount} submissions with total_points=0 to NULL")
+                
+            conn.commit()
+        except Exception as e:
+            print(f"Error during migration: {e}")
+            conn.rollback()
+        finally:
+            conn.close()
     except Exception as e:
-        print(f"Error during migration: {e}")
-        conn.rollback()
-    finally:
-        conn.close()
+        app.logger.error(f"Error during startup database setup: {str(e)}")
+        print(f"Error during startup database setup: {e}")
+        # Don't crash the application - let it continue even with DB issues
+        # The health check will still work, but database operations will fail
 
 @app.route("/register", methods=["GET", "POST"])
 def register():

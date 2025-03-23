@@ -25,8 +25,10 @@ const ApplicationPage = () => {
   const [userId, setUserId] = useState(1);
   const [existingSubmissions, setExistingSubmissions] = useState<number>(0);
   const [maxSubmissions, setMaxSubmissions] = useState<number>(1);
+  const [isDragging, setIsDragging] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const dropAreaRef = useRef<HTMLDivElement>(null);
 
   // Fetch position details when positionId changes
   useEffect(() => {
@@ -44,7 +46,7 @@ const ApplicationPage = () => {
         
         // Check if user has existing submissions for this position
         const submissionsResponse = await axios.get(
-          `${API_BASE_URL}/api/submissions?campaign_id=${positionId}&user_id=${userId}`
+          `${API_BASE_URL}/api/submissions?campaign_id=${positionId}&user_id=${userId}&is_complete=1` // only track completed submissions
         );
         
         setExistingSubmissions(submissionsResponse.data.length);
@@ -73,9 +75,83 @@ const ApplicationPage = () => {
     fetchPositionDetails();
   }, [positionId, userId, router]);
 
+  // Set up drag and drop event listeners
+  useEffect(() => {
+    // Function to prevent default behavior for all drag events
+    const preventDefault = (e: Event) => {
+      e.preventDefault();
+      e.stopPropagation();
+    };
+
+    const handleDragOver = (e: DragEvent) => {
+      preventDefault(e);
+      setIsDragging(true);
+    };
+
+    const handleDragEnter = (e: DragEvent) => {
+      preventDefault(e);
+      setIsDragging(true);
+    };
+
+    const handleDragLeave = (e: DragEvent) => {
+      preventDefault(e);
+      setIsDragging(false);
+    };
+
+    const handleDrop = (e: DragEvent) => {
+      preventDefault(e);
+      setIsDragging(false);
+
+      if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
+        const file = e.dataTransfer.files[0];
+        const fileExtension = file.name.split('.').pop()?.toLowerCase();
+        
+        if (fileExtension && ['pdf', 'doc', 'docx'].includes(fileExtension)) {
+          setResume(file);
+        } else {
+          setError('Please upload a PDF, DOC, or DOCX file');
+        }
+      }
+    };
+
+    // Add global document event listeners
+    document.addEventListener('dragover', preventDefault);
+    document.addEventListener('drop', preventDefault);
+
+    const dropArea = dropAreaRef.current;
+    if (dropArea) {
+      dropArea.addEventListener('dragover', handleDragOver);
+      dropArea.addEventListener('dragenter', handleDragEnter);
+      dropArea.addEventListener('dragleave', handleDragLeave);
+      dropArea.addEventListener('drop', handleDrop);
+    }
+
+    return () => {
+      // Remove global document event listeners
+      document.removeEventListener('dragover', preventDefault);
+      document.removeEventListener('drop', preventDefault);
+
+      if (dropArea) {
+        dropArea.removeEventListener('dragover', handleDragOver);
+        dropArea.removeEventListener('dragenter', handleDragEnter);
+        dropArea.removeEventListener('dragleave', handleDragLeave);
+        dropArea.removeEventListener('drop', handleDrop);
+      }
+    };
+  }, []);
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      setResume(e.target.files[0]);
+      const file = e.target.files[0];
+      const fileExtension = file.name.split('.').pop()?.toLowerCase();
+      
+      if (fileExtension && ['pdf', 'doc', 'docx'].includes(fileExtension)) {
+        setResume(file);
+        setError(''); // Clear any previous errors
+      } else {
+        setResume(null);
+        setError('Please upload a PDF, DOC, or DOCX file');
+      }
     }
   };
 
@@ -92,6 +168,8 @@ const ApplicationPage = () => {
       return;
     }
     
+    let submissionId: string | null = null;
+
     try {
       setIsUploading(true);
       setError('');
@@ -105,7 +183,7 @@ const ApplicationPage = () => {
         total_points: null
       });
       
-      const submissionId = createSubmissionResponse.data.submission_id;
+      submissionId = createSubmissionResponse.data.submission_id;
       
       if (!submissionId) {
         throw new Error('Failed to create submission: No submission ID returned');
@@ -141,6 +219,14 @@ const ApplicationPage = () => {
         setError('An unexpected error occurred');
       }
       
+      // If upload fails, delete the submission
+      if (submissionId) {
+        try {
+          await axios.delete(`${API_BASE_URL}/api/submissions/${submissionId}`);
+        } catch (deleteErr) {
+          console.error('Failed to delete submission after upload error:', deleteErr);
+        }
+      }
       setIsUploading(false);
     }
   };
@@ -209,10 +295,15 @@ const ApplicationPage = () => {
                       Please upload your resume in PDF, DOC, or DOCX format.
                     </p>
                     <div className="mt-3">
-                      <div className="flex items-center justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
+                      <div 
+                        ref={dropAreaRef}
+                        className={`flex items-center justify-center px-6 pt-5 pb-6 border-2 ${
+                          isDragging ? 'border-indigo-300 bg-indigo-50' : 'border-gray-300'
+                        } border-dashed rounded-md transition-colors duration-200`}
+                      >
                         <div className="space-y-1 text-center">
                           <svg
-                            className="mx-auto h-12 w-12 text-gray-400"
+                            className={`mx-auto h-12 w-12 ${isDragging ? 'text-indigo-400' : 'text-gray-400'}`}
                             stroke="currentColor"
                             fill="none"
                             viewBox="0 0 48 48"
@@ -247,8 +338,10 @@ const ApplicationPage = () => {
                         </div>
                       </div>
                       {resume && (
-                        <div className="mt-3 text-sm text-gray-500">
-                          Selected file: <span className="font-medium text-gray-900">{resume.name}</span> ({(resume.size / 1024 / 1024).toFixed(2)} MB)
+                        <div className="mt-3 text-sm text-gray-500 flex items-center">
+                          <span className="flex-shrink-0">Selected file: </span>
+                          <span className="font-medium text-gray-900 ml-1 truncate">{resume.name}</span> 
+                          <span className="ml-1">({(resume.size / 1024 / 1024).toFixed(2)} MB)</span>
                         </div>
                       )}
                     </div>

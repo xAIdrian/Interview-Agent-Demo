@@ -1,5 +1,7 @@
 import mariadb
 from config import Config
+# Remove psycopg2 import as we're not using it
+# import psycopg2
 
 def build_filter_query(table_name, filters):
     query = f"SELECT * FROM {table_name} WHERE "
@@ -14,14 +16,20 @@ def build_filter_query(table_name, filters):
     return query, params
 
 def get_db_connection():
-    connection = mariadb.connect(
-        user=Config.DB_USER,
-        password=Config.DB_PASSWORD,
-        host=Config.DB_HOST,
-        port=Config.DB_PORT,
-        database=Config.DB_NAME
-    )
-    return connection
+    """Create a connection to the MariaDB database."""
+    try:
+        conn = mariadb.connect(
+            host=Config.DB_HOST,
+            user=Config.DB_USER,
+            password=Config.DB_PASSWORD,
+            database=Config.DB_NAME,
+            port=Config.DB_PORT
+        )
+        conn.autocommit = False
+        return conn
+    except mariadb.Error as e:
+        print(f"Error connecting to MariaDB: {e}")
+        raise
 
 def create_users_table():
     conn = get_db_connection()
@@ -178,3 +186,36 @@ def migrate_submissions_table_add_resume_columns():
     conn.commit()
     conn.close()
     print("Migrations completed successfully")
+
+def ensure_string_id(id_value):
+    """Convert any ID to a string to ensure consistent handling."""
+    if id_value is None:
+        return None
+    return str(id_value)
+
+def map_row_to_dict(row, columns, string_id_columns=None):
+    """
+    Map a database row to a dictionary, ensuring ID columns are strings.
+    
+    Args:
+        row: Database row (tuple)
+        columns: List of column names
+        string_id_columns: List of column names that should be converted to strings
+                          (default: ['id', 'user_id', 'campaign_id', 'submission_id', 'question_id'])
+    
+    Returns:
+        Dictionary with column names as keys and values from the row
+    """
+    if string_id_columns is None:
+        string_id_columns = ['id', 'user_id', 'campaign_id', 'submission_id', 'question_id']
+    
+    result = {}
+    for i, column in enumerate(columns):
+        if i < len(row):
+            # Convert ID columns to strings
+            if column in string_id_columns:
+                result[column] = ensure_string_id(row[i])
+            else:
+                result[column] = row[i]
+    
+    return result

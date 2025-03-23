@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 import axios from 'axios';
 import { PageTemplate } from '../../../components/PageTemplate';
 import Link from 'next/link';
-import { INTERNAL_API_TOKEN } from '../../../utils/internalApiToken';
+import { AuthLogger } from '../../../utils/logging';
 
 // Define API base URL for consistent usage
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
@@ -37,6 +37,8 @@ const CampaignDetailsPage = () => {
   const [error, setError] = useState('');
   const [submissionCount, setSubmissionCount] = useState(0);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [submissionId, setSubmissionId] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
 
   // Setup auth on component mount
   useEffect(() => {
@@ -54,60 +56,80 @@ const CampaignDetailsPage = () => {
     const fetchCampaignData = async () => {
       if (!campaignId) return;
 
+      // Ensure campaignId is treated as string
+      const campaignIdString = String(campaignId);
+
       try {
         setIsLoading(true);
         setError('');
         
-        // Always use admin token for these admin-only endpoints
-        const authHeader = {
-          headers: {
-            'Authorization': `Bearer ${INTERNAL_API_TOKEN}`
-          }
-        };
+        // Get the auth token from localStorage
+        const token = localStorage.getItem('access_token');
         
         // Fetch campaign details
         const campaignResponse = await axios.get(
-          `${API_BASE_URL}/api/campaigns/${campaignId}`, 
-          authHeader
+          `${API_BASE_URL}/api/campaigns/${campaignIdString}`,
+          {
+            headers: {
+              'Authorization': token ? `Bearer ${token}` : ''
+            }
+          }
         );
         
         setCampaign(campaignResponse.data);
+        AuthLogger.info('Campaign details loaded successfully');
         
         // Fetch questions for this campaign
         const questionsResponse = await axios.get(
-          `${API_BASE_URL}/api/questions?campaign_id=${campaignId}`, 
-          authHeader
+          `${API_BASE_URL}/api/questions?campaign_id=${campaignIdString}`,
+          {
+            headers: {
+              'Authorization': token ? `Bearer ${token}` : ''
+            }
+          }
         );
         
         setQuestions(questionsResponse.data);
+        AuthLogger.info(`Loaded ${questionsResponse.data.length} questions for campaign`);
         
         // Fetch submission count for this campaign
         try {
           const submissionsResponse = await axios.get(
-            `${API_BASE_URL}/api/submissions?campaign_id=${campaignId}`, 
-            authHeader
+            `${API_BASE_URL}/api/submissions?campaign_id=${campaignIdString}`,
+            {
+              headers: {
+                'Authorization': token ? `Bearer ${token}` : ''
+              }
+            }
           );
           
           setSubmissionCount(submissionsResponse.data.length);
+          AuthLogger.info(`Found ${submissionsResponse.data.length} submissions for campaign`);
         } catch (submissionErr) {
           console.error('Error fetching submissions:', submissionErr);
           // Don't set an error for this, just set count to 0
           setSubmissionCount(0);
+          AuthLogger.error('Failed to fetch submissions', submissionErr);
         }
       } catch (err) {
         console.error('Error fetching campaign data:', err);
         if (axios.isAxiosError(err)) {
           if (err.response?.status === 401) {
             router.push('/login');
+            AuthLogger.error('Authentication error fetching campaign', err.response?.status, err.response?.data);
           } else if (err.response?.status === 403) {
             setError('Admin access required to view campaign details');
+            AuthLogger.error('Permission error fetching campaign', err.response?.status, err.response?.data);
           } else if (err.response?.data?.error) {
             setError(err.response.data.error);
+            AuthLogger.error('API error fetching campaign', err.response?.status, err.response?.data);
           } else {
             setError('Failed to load campaign data');
+            AuthLogger.error('Unknown error fetching campaign', err.response?.status);
           }
         } else {
           setError('An unexpected error occurred');
+          AuthLogger.error('Unexpected error fetching campaign data', err);
         }
       } finally {
         setIsLoading(false);
@@ -116,6 +138,34 @@ const CampaignDetailsPage = () => {
 
     fetchCampaignData();
   }, [campaignId, router]);
+
+  const handleStartInterview = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Get the auth token from localStorage
+      const token = localStorage.getItem('access_token');
+      
+      // Create a submission for this campaign
+      const response = await axios.post('/api/submissions', {
+        campaign_id: String(campaignId)
+      }, {
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : ''
+        }
+      });
+      
+      // Ensure the submission ID is a string
+      const newSubmissionId = String(response.data.id);
+      
+      // Navigate to the interview page with the submission ID
+      router.push(`/interview/${newSubmissionId}`);
+    } catch (error) {
+      console.error('Error creating submission:', error);
+      setErrorMessage('Failed to start interview. Please try again.');
+      setIsLoading(false);
+    }
+  };
 
   return (
     <PageTemplate title="Campaign Details" maxWidth="lg">

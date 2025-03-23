@@ -45,8 +45,15 @@ const CampaignsPage = () => {
       try {
         setIsLoading(true);
         const response = await axios.get('/api/campaigns');
-        setCampaigns(response.data);
-        AuthLogger.info(`Loaded ${response.data.length} campaigns successfully`);
+        
+        // Ensure all campaign IDs are strings
+        const campaignsWithStringIds = response.data.map((campaign: any) => ({
+          ...campaign,
+          id: String(campaign.id)
+        }));
+        
+        setCampaigns(campaignsWithStringIds);
+        AuthLogger.info(`Loaded ${campaignsWithStringIds.length} campaigns successfully`);
       } catch (err) {
         console.error('Error fetching campaigns:', err);
         setError('Failed to load campaigns. Please try again.');
@@ -91,10 +98,13 @@ const CampaignsPage = () => {
       hozAlign: "center" as "center",
       widthGrow: 1,
       formatter: function(cell: any) {
-        return `<a href="/campaigns/${cell.getValue()}" class="text-blue-500 hover:text-blue-700">View</a>`;
+        // Ensure ID is a string
+        const id = String(cell.getValue());
+        return `<a href="/campaigns/${id}" class="text-blue-500 hover:text-blue-700">View</a>`;
       },
       cellClick: function(e: any, cell: any) {
-        const id = cell.getValue();
+        // Ensure ID is a string
+        const id = String(cell.getValue());
         window.location.href = `/campaigns/${id}`;
       }
     }
