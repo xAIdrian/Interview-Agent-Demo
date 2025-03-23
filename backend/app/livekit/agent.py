@@ -18,6 +18,13 @@ from livekit.agents.multimodal import MultimodalAgent
 from livekit.plugins import openai
 from livekit.agents import stt, transcription
 from livekit.plugins.deepgram import STT
+from prompts import sample_agent_prompt, sample_resume
+import asyncio
+import json
+
+# Store active tasks to prevent garbage collection
+_active_tasks = set()
+
 from prompts import agent_prompt_template, sample_resume, sample_job_description
 import requests
 
@@ -79,6 +86,8 @@ async def entrypoint(ctx: JobContext):
     
     stt_service = STT()
     tasks = []
+    _accumulated_questions = []
+
     
     logger.info("🚀 Initializing interview agent")
     
@@ -113,6 +122,47 @@ async def entrypoint(ctx: JobContext):
         if track.kind == rtc.TrackKind.KIND_AUDIO:
             logger.info(f"🎧 Audio track detected, setting up transcription")
             tasks.append(asyncio.create_task(transcribe_track(participant, track)))
+
+    async def async_handle_text_stream(reader, participant_identity):
+        info = reader.info
+
+        print(
+            f"🚀 ~ async_handle_text_stream ~ info:",
+            f"Text stream received from {participant_identity}\n" f"  {info.topic}",
+        )
+
+        async for chunk in reader:
+            print(f"🚀 ~ async_handle_text_stream ~ chunk:", chunk)
+            try:
+                # Try to parse each chunk as JSON
+                if chunk:
+                    parsed_chunk = json.loads(chunk)
+                    print(f"Successfully parsed JSON chunk: {parsed_chunk}")
+
+                    # If this chunk contains interview questions, process them
+                    if "questions" in parsed_chunk and isinstance(
+                        parsed_chunk["questions"], list
+                    ):
+                        _accumulated_questions.extend(parsed_chunk["questions"])
+                        print(
+                            f"Added {len(parsed_chunk['questions'])} questions to accumulated list"
+                        )
+
+            except json.JSONDecodeError as e:
+                print(f"Error parsing chunk as JSON: {e}")
+                # Continue processing other chunks even if one fails
+
+    def handle_text_stream(reader, participant_identity):
+        task = asyncio.create_task(
+            async_handle_text_stream(reader, participant_identity)
+        )
+        _active_tasks.add(task)
+        task.add_done_callback(lambda t: _active_tasks.remove(t))
+
+    ctx.room.register_text_stream_handler("interview-questions", handle_text_stream)
+    ctx.room.on("track_subscribed", on_track_subscribed)
+
+    logger.info(f"🚀 connecting to room {ctx.room.name}")
     
     @ctx.room.on("participant_disconnected")
     def on_participant_disconnected(participant: rtc.RemoteParticipant):
@@ -398,6 +448,7 @@ async def fetch_resume_text(submission_id):
     except Exception as e:
         logger.error(f"❌ Error fetching resume text: {e}")
         return sample_resume
+
 
 
 if __name__ == "__main__":
