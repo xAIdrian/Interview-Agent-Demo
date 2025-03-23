@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import Link from 'next/link';
+import Head from 'next/head';
 import { PageTemplate } from '../../components/PageTemplate';
 // Import Tabulator styles
 import 'react-tabulator/lib/styles.css';
@@ -128,52 +129,57 @@ const CampaignsPage = () => {
   }
 
   return (
-    <PageTemplate title="Campaigns" maxWidth="lg">
-      <div className="w-full bg-white shadow-md rounded-lg p-6">
-        <h2 className="text-2xl font-bold mb-6">Campaigns</h2>
+    <>
+      <Head>
+        <title>Campaigns | Gulpin AI Interview</title>
+      </Head>
+      <PageTemplate title="Campaigns" maxWidth="lg">
+        <div className="w-full bg-white shadow-md rounded-lg p-6">
+          <h2 className="text-2xl font-bold mb-6">Campaigns</h2>
 
-        {error && (
-          <div className="mb-4 p-2 bg-red-100 text-red-700 rounded">
-            {error}
+          {error && (
+            <div className="mb-4 p-2 bg-red-100 text-red-700 rounded">
+              {error}
+            </div>
+          )}
+
+          {isLoading ? (
+            <div className="flex justify-center items-center py-10">
+              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-700"></div>
+            </div>
+          ) : (
+            <>
+              {campaigns.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  No campaigns found. Create a new campaign to get started.
+                </div>
+              ) : (
+                <div className="overflow-x-auto tabulator-container">
+                  <ReactTabulator
+                    data={campaigns}
+                    columns={columns}
+                    options={options}
+                    className="campaigns-table"
+                  />
+                </div>
+              )}
+            </>
+          )}
+
+          <div className="flex space-x-4 mt-6">
+            <Link href="/campaigns/create" 
+              className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700">
+              Create Campaign from Scratch
+            </Link>
+            <Link href="/campaigns/create-from-doc" 
+              className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-700">
+              Create Campaign from Document
+            </Link>
           </div>
-        )}
-
-        {isLoading ? (
-          <div className="flex justify-center items-center py-10">
-            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-700"></div>
-          </div>
-        ) : (
-          <>
-            {campaigns.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                No campaigns found. Create a new campaign to get started.
-              </div>
-            ) : (
-              <div className="overflow-x-auto tabulator-container">
-                <ReactTabulator
-                  data={campaigns}
-                  columns={columns}
-                  options={options}
-                  className="campaigns-table"
-                />
-              </div>
-            )}
-          </>
-        )}
-
-        <div className="flex space-x-4 mt-6">
-          <Link href="/campaigns/create" 
-            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700">
-            Create Campaign from Scratch
-          </Link>
-          <Link href="/campaigns/create-from-doc" 
-            className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-700">
-            Create Campaign from Document
-          </Link>
         </div>
-      </div>
-      {/* Remove the inline styles since they're now in the external CSS file */}
-    </PageTemplate>
+        {/* Remove the inline styles since they're now in the external CSS file */}
+      </PageTemplate>
+    </>
   );
 };
 
