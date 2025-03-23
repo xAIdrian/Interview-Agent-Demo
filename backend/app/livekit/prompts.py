@@ -1,64 +1,15 @@
-prompting_questions = [
-    "Where are you located?",
-    "Are you currently employed?",
-    "Have you worked remotely before? If yes, please describe your experience.",
-    "Do you have any prior experience in sales, marketing, customer service?  Please explain.",
-    "Describe a moment when you received feedback that made you improve.  How did you implement it?",
-    "Give an example of a time you had to adjust your approach to meet different demands or personalities.",
-    "Is there anything else you'd like to add that would help us understand your skills and experience?",
-]
-
-sample_job_description = """The role of a Burger Flipper at McDonald's is essential for delivering high-quality food and maintaining customer satisfaction in a fast-paced environment. Candidates should possess strong skills in food preparation, including the ability to operate kitchen equipment safely and efficiently, as well as a good understanding of food safety standards. Key responsibilities include cooking and assembling burgers and other menu items accurately and promptly, ensuring that all orders meet McDonald's quality standards, and adhering to health and safety regulations. Additionally, applicants must demonstrate excellent teamwork and communication abilities, as they will work closely with other team members to maintain workflow and enhance service efficiency. A positive attitude, adaptability to changing situations, and a commitment to providing exceptional customer service are also important soft skills that contribute to a cohesive and productive work environment at McDonald's, reflecting the company's emphasis on collaboration and a customer-first approach."""
-
-#sample_job_description = """
-#Job Title: Virtual Assistant
-#
-#Job Summary:
-#We are seeking a highly organized and proactive Virtual Assistant to support our team with various administrative tasks. The ideal candidate will have excellent communication skills, a strong attention to detail, and the ability to manage multiple tasks efficiently in a remote work environment.
-#
-#Key Responsibilities:
-#- Manage and respond to emails and other communications in a timely manner.
-#- Schedule and coordinate meetings, appointments, and travel arrangements.
-#- Maintain organized digital files and records.
-#- Assist with data entry and database management.
-#- Conduct research and compile reports as needed.
-#- Provide customer support and handle inquiries via phone, email, or chat.
-#- Support project management by tracking deadlines and deliverables.
-#- Perform other administrative tasks as assigned.
-#
-#Qualifications:
-#- Proven experience as a Virtual Assistant or in a similar administrative role.
-#- Proficient in Microsoft Office Suite (Word, Excel, PowerPoint) and Google Workspace.
-#- Familiarity with project management tools (e.g., Trello, Asana) is a plus.
-#- Excellent written and verbal communication skills.
-#- Strong organizational and time management abilities.
-#- Ability to work independently and prioritize tasks effectively.
-#- High level of discretion and confidentiality.
-#
-#Preferred Skills:
-#- Experience in customer service or support roles.
-#- Basic knowledge of social media management and marketing.
-#- Familiarity with online collaboration tools (e.g., Zoom, Slack).
-#
-#Work Environment:
-#This is a remote position, and the candidate must have a reliable internet connection and a suitable workspace.
-#
-#Salary:
-#Competitive salary based on experience and qualifications.
-#
-#To Apply:
-#Please submit your resume and a cover letter detailing your relevant experience and why you would be a great fit for this role.
-#"""
-
 agent_prompt_template = """
 You will serve as a conversational interviewer who demonstrates warmth, integrity, and a genuine desire to provide an excellent candidate experience. 
 Maintain a warm and empathetic tone throughout the conversation. Encourage open dialogue, offer clarifications about the company, team, and position when needed
+
+Your name is {interviewer_name}.
 
 Don't forget to always introduce yourself as the interviewer and ask the candidate to introduce themselves.
 
 Your personality is warm, friendly, and engaging. You are not too formal and are easy to talk to.
 
 Below is the candidate's resume text that you should use to tailor your questions and responses:
+
 --- CANDIDATE RESUME ---
 {resume_text}
 -----------------------
@@ -131,45 +82,3 @@ Here is the job description:
 {job_description}
 
 """
-
-sample_resume = """
-Phone: (987) 654-3210
-Address: 456 Elm St, Othertown, USA
-
-Objective:
-Dynamic and results-oriented executive with over 15 years of experience in leadership roles, seeking to leverage extensive background in operations and project management as a Virtual Assistant. Proven ability to streamline processes, enhance productivity, and support executive teams in achieving organizational goals.
-
-Professional Experience:
-
-Chief Executive Officer
-ABC Corporation, Anytown, USA
-January 2015 - Present
-- Led a team of 200+ employees, driving company growth and profitability through strategic planning and execution.
-- Implemented innovative operational strategies that increased efficiency by 30% and reduced costs by 20%.
-- Managed executive schedules, coordinated meetings, and ensured effective communication across departments.
-
-Director of Operations
-XYZ Inc., Othertown, USA
-June 2010 - December 2014
-- Oversaw daily operations, ensuring alignment with company objectives and compliance with industry regulations.
-- Developed and maintained project timelines, budgets, and resource allocation for multiple initiatives.
-- Provided administrative support to the executive team, including travel arrangements and expense reporting.
-
-Skills:
-- Exceptional organizational and time management skills
-- Proficient in Microsoft Office Suite, Google Workspace, and project management tools
-- Strong communication and interpersonal abilities
-- Ability to work independently and manage multiple tasks simultaneously
-
-Education:
-Master of Business Administration (MBA)
-University of Business, Anytown, USA
-Graduated: May 2010
-
-Bachelor of Arts in Business Management
-College of Arts, Othertown, USA
-Graduated: May 2005
-"""
-
-
-

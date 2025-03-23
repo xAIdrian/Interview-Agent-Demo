@@ -21,28 +21,21 @@ import tempfile
 from create_campaign_from_doc import extract_text_from_file, generate_campaign_context, generate_interview_questions
 from utils.file_handling import SafeTemporaryFile, safe_delete
 from flask_cors import CORS
-from flask_jwt_extended import JWTManager, create_access_token, create_refresh_token, jwt_required, get_jwt_identity
 from datetime import timedelta
 import secrets
 
+
 app = Flask(__name__)
 
-# Configure CORS properly to accept credentials and specific origins
+# Configure CORS properly
 CORS(app, 
-     resources={r"/*": {"origins": ["http://localhost:3000", "http://127.0.0.1:3000"]}}, 
-     supports_credentials=True,
-     allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
-     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-     expose_headers=["Authorization", "Content-Type"])
+    origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    supports_credentials=True,
+    allow_headers=["Content-Type", "X-Requested-With", "x-retry-count"],
+    methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
 
 app.config.from_object(Config)
 app.register_blueprint(api_bp, url_prefix='/api')
-
-# Setup the Flask-JWT-Extended extension
-app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'dev-secret-key-change-in-production')  # Change in production!
-app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=1)
-app.config['JWT_REFRESH_TOKEN_EXPIRES'] = timedelta(days=30)
-jwt = JWTManager(app)
 
 # Configure the app for proper session handling
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', secrets.token_hex(16))
@@ -162,15 +155,11 @@ def login():
         conn.close()
         
         if user and check_password_hash(user["password_hash"], password):
-            # Create JWT tokens
-            user_identity = {
-                "id": str(user["id"]),
-                "email": user["email"],
-                "is_admin": user["is_admin"]
-            }
-            
-            access_token = create_access_token(identity=user_identity)
-            refresh_token = create_refresh_token(identity=user_identity)
+            # Store user info in session
+            session["user_id"] = user["id"]
+            session["email"] = user["email"]
+            session["name"] = user["name"]
+            session["is_admin"] = user["is_admin"]
             
             # For JSON requests (API)
             if request.is_json:
@@ -183,17 +172,11 @@ def login():
                 return jsonify({
                     "success": True,
                     "message": "Login successful!",
-                    "access_token": access_token,
-                    "refresh_token": refresh_token,
                     "user": user_data
                 }), 200
             
             # For form submissions (Web UI)
             else:
-                session["user_id"] = user["id"]
-                session["email"] = user["email"]
-                session["is_admin"] = user["is_admin"]
-                session["jwt_token"] = access_token  # Store JWT in session for web UI
                 flash("Login successful!", "success")
                 return redirect(url_for("index"))
         else:
@@ -222,48 +205,31 @@ def logout():
     flash("You have been logged out.", "success")
     return redirect(url_for("login"))
 
-@app.route("/api/refresh", methods=["POST"])
-@jwt_required(refresh=True)
-def refresh():
-    """Refresh access token using refresh token"""
-    current_user = get_jwt_identity()
-    new_access_token = create_access_token(identity=current_user)
-    return jsonify({"access_token": new_access_token}), 200
-
-# Updated decorator to check JWT token for API requests
+# Decorator for checking if a user is logged in
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        # For API requests, check JWT header
-        if request.is_json or request.headers.get('Authorization'):
-            @jwt_required()
-            def verify_jwt(*args, **kwargs):
-                return f(*args, **kwargs)
-            return verify_jwt(*args, **kwargs)
-        
-        # For web UI, check session
-        elif "user_id" not in session:
+        # Check if user is logged in via session
+        if "user_id" not in session:
+            # For API requests, return 401
+            if request.is_json or request.headers.get('Content-Type') == 'application/json':
+                return jsonify({"error": "Authentication required"}), 401
+            # For web UI, redirect to login
             return redirect(url_for("login"))
         
         return f(*args, **kwargs)
     return decorated_function
 
-# Updated decorator to check admin status
+# Decorator to check admin status
 def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        # For API requests, check JWT claims
-        if request.is_json or request.headers.get('Authorization'):
-            @jwt_required()
-            def verify_admin(*args, **kwargs):
-                current_user = get_jwt_identity()
-                if not current_user.get("is_admin"):
-                    return jsonify({"error": "Admin privileges required"}), 403
-                return f(*args, **kwargs)
-            return verify_admin(*args, **kwargs)
-        
-        # For web UI, check session
-        elif not session.get("is_admin"):
+        # Check if user is an admin via session
+        if not session.get("is_admin"):
+            # For API requests, return 403
+            if request.is_json or request.headers.get('Content-Type') == 'application/json':
+                return jsonify({"error": "Admin privileges required"}), 403
+            # For web UI, redirect to home
             return redirect(url_for("index"))
         
         return f(*args, **kwargs)
@@ -1067,4 +1033,4 @@ def test_session():
         })
 
 if __name__ == "__main__":
-    app.run()
+    app.run(debug=True)

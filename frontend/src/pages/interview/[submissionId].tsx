@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from 'next/router';
 import axios from 'axios';
+import Head from 'next/head';
 import { Modal } from "@/components/Modal";
 
 // Replace the react-icons with SVG components
@@ -255,163 +256,168 @@ export default function Page() {
   }, []);
 
   return (
-    <div className="w-full h-screen flex flex-col bg-gray-100">
-      {/* Custom header with position title */}
-      <div className="bg-white shadow-md p-4">
-        <div className="max-w-screen-xl mx-auto flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-blue-600">
-            {campaign ? `Interview: ${campaign.title}` : 'AI Interview'}
-          </h1>
-          <div className="flex space-x-4">
-            <button 
-              onClick={() => setShowCaptions(!showCaptions)}
-              className={`p-2 rounded-full ${showCaptions ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600'}`}
-              title="Toggle closed captions"
-            >
-              <CaptionsIcon />
-            </button>
-            <button 
-              onClick={() => setShowEndModal(true)}
-              className="p-2 rounded-full bg-red-100 text-red-600"
-              title="End interview"
-            >
-              <PhoneSlashIcon />
-            </button>
+    <>
+      <Head>
+        <title>{campaign?.title ? `Interview: ${campaign.title}` : 'AI Interview'} | Gulpin AI</title>
+      </Head>
+      <div className="w-full h-screen flex flex-col bg-gray-100">
+        {/* Custom header with position title */}
+        <div className="bg-white shadow-md p-4">
+          <div className="max-w-screen-xl mx-auto flex justify-between items-center">
+            <h1 className="text-2xl font-bold text-blue-600">
+              {campaign ? `Interview: ${campaign.title}` : 'AI Interview'}
+            </h1>
+            <div className="flex space-x-4">
+              <button 
+                onClick={() => setShowCaptions(!showCaptions)}
+                className={`p-2 rounded-full ${showCaptions ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600'}`}
+                title="Toggle closed captions"
+              >
+                <CaptionsIcon />
+              </button>
+              <button 
+                onClick={() => setShowEndModal(true)}
+                className="p-2 rounded-full bg-red-100 text-red-600"
+                title="End interview"
+              >
+                <PhoneSlashIcon />
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-      
-      <div className="flex-1 overflow-hidden">
-        <div className="bg-gray-100 h-full">
-          <div className="h-full flex flex-col">
-            <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
-              {/* Left side - Audio Visualization and Messages */}
-              <div className="flex flex-col h-full">
-                <div className="flex-1 flex items-center justify-center">
-                  {/* Simple audio visualizer placeholder */}
-                  <div className="w-full h-full min-h-[200px] flex items-center justify-center bg-gray-50 rounded-lg">
-                    {interviewStarted ? (
-                      <div className="flex space-x-2">
-                        {[...Array(8)].map((_, i) => (
-                          <div 
-                            key={i} 
-                            className="w-2 bg-blue-500 rounded-full animate-pulse"
-                            style={{
-                              height: `${20 + Math.random() * 40}px`,
-                              animationDelay: `${i * 0.1}s`
-                            }}
-                          ></div>
-                        ))}
+        
+        <div className="flex-1 overflow-hidden">
+          <div className="bg-gray-100 h-full">
+            <div className="h-full flex flex-col">
+              <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
+                {/* Left side - Audio Visualization and Messages */}
+                <div className="flex flex-col h-full">
+                  <div className="flex-1 flex items-center justify-center">
+                    {/* Simple audio visualizer placeholder */}
+                    <div className="w-full h-full min-h-[200px] flex items-center justify-center bg-gray-50 rounded-lg">
+                      {interviewStarted ? (
+                        <div className="flex space-x-2">
+                          {[...Array(8)].map((_, i) => (
+                            <div 
+                              key={i} 
+                              className="w-2 bg-blue-500 rounded-full animate-pulse"
+                              style={{
+                                height: `${20 + Math.random() * 40}px`,
+                                animationDelay: `${i * 0.1}s`
+                              }}
+                            ></div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center text-gray-500">
+                          Press "Start My Interview" to begin
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* Agent Messages */}
+                  <div className="mt-4 flex-grow overflow-y-auto bg-gray-50 p-4 rounded-lg shadow-inner">
+                    {agentMessages.length > 0 ? (
+                      <div className="text-md">
+                        <strong>Current Question:</strong>
+                        <p className="mt-2 text-lg">{agentMessages[agentMessages.length - 1]}</p>
                       </div>
                     ) : (
-                      <div className="text-center text-gray-500">
-                        Press "Start My Interview" to begin
+                      <div className="text-md text-gray-500 flex items-center justify-center h-full">
+                        {interviewStarted ? "Waiting for the first question..." : "Connect to start the interview"}
                       </div>
                     )}
                   </div>
                 </div>
                 
-                {/* Agent Messages */}
-                <div className="mt-4 flex-grow overflow-y-auto bg-gray-50 p-4 rounded-lg shadow-inner">
-                  {agentMessages.length > 0 ? (
-                    <div className="text-md">
-                      <strong>Current Question:</strong>
-                      <p className="mt-2 text-lg">{agentMessages[agentMessages.length - 1]}</p>
-                    </div>
-                  ) : (
-                    <div className="text-md text-gray-500 flex items-center justify-center h-full">
-                      {interviewStarted ? "Waiting for the first question..." : "Connect to start the interview"}
-                    </div>
-                  )}
+                {/* Right side - Candidate's Webcam */}
+                <div className="h-full flex items-center justify-center">
+                  <CandidateVideo 
+                    onTrackStarted={(track) => {
+                      // When video track starts, we can simulate candidate responses
+                      if (interviewStarted) {
+                        // For testing, simulate a response after 5 seconds
+                        setTimeout(() => {
+                          handleCandidateResponse("Hi there! I'm excited to be here. I have five years of experience in software development...");
+                        }, 5000);
+                      }
+                    }}
+                  />
                 </div>
               </div>
               
-              {/* Right side - Candidate's Webcam */}
-              <div className="h-full flex items-center justify-center">
-                <CandidateVideo 
-                  onTrackStarted={(track) => {
-                    // When video track starts, we can simulate candidate responses
-                    if (interviewStarted) {
-                      // For testing, simulate a response after 5 seconds
-                      setTimeout(() => {
-                        handleCandidateResponse("Hi there! I'm excited to be here. I have five years of experience in software development...");
-                      }, 5000);
-                    }
-                  }}
-                />
-              </div>
-            </div>
-            
-            {/* Closed captions overlay */}
-            {showCaptions && transcript.length > 0 && (
-              <div className="absolute bottom-24 left-0 right-0 bg-black bg-opacity-70 text-white p-4 text-center transition-opacity duration-300">
-                {transcript[transcript.length - 1].text}
-              </div>
-            )}
-            
-            {/* Control Bar */}
-            <div className="relative h-[100px] flex items-center justify-center bg-gray-50 border-t border-gray-200">
-              {!interviewStarted ? (
-                <button
-                  className="mx-auto px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-md text-lg font-medium transition-all"
-                  onClick={startInterview}
-                >
-                  Start My Interview
-                </button>
-              ) : (
-                <div className="flex space-x-4">
-                  <button
-                    className="p-2 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200"
-                    onClick={() => {
-                      // Simulate sending a candidate response
-                      handleCandidateResponse("I believe my strongest skill is problem-solving. In my previous role...");
-                    }}
-                  >
-                    Test Response
-                  </button>
-                  <button
-                    className="bg-red-100 hover:bg-red-200 text-red-600 p-2 rounded-full"
-                    onClick={() => setShowEndModal(true)}
-                  >
-                    <PhoneSlashIcon />
-                  </button>
+              {/* Closed captions overlay */}
+              {showCaptions && transcript.length > 0 && (
+                <div className="absolute bottom-24 left-0 right-0 bg-black bg-opacity-70 text-white p-4 text-center transition-opacity duration-300">
+                  {transcript[transcript.length - 1].text}
                 </div>
               )}
+              
+              {/* Control Bar */}
+              <div className="relative h-[100px] flex items-center justify-center bg-gray-50 border-t border-gray-200">
+                {!interviewStarted ? (
+                  <button
+                    className="mx-auto px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-md text-lg font-medium transition-all"
+                    onClick={startInterview}
+                  >
+                    Start My Interview
+                  </button>
+                ) : (
+                  <div className="flex space-x-4">
+                    <button
+                      className="p-2 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      onClick={() => {
+                        // Simulate sending a candidate response
+                        handleCandidateResponse("I believe my strongest skill is problem-solving. In my previous role...");
+                      }}
+                    >
+                      Test Response
+                    </button>
+                    <button
+                      className="bg-red-100 hover:bg-red-200 text-red-600 p-2 rounded-full"
+                      onClick={() => setShowEndModal(true)}
+                    >
+                      <PhoneSlashIcon />
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
-      </div>
-      
-      {/* End Interview Confirmation Modal */}
-      {showEndModal && (
-        <Modal
-          isOpen={showEndModal}
-          onClose={() => setShowEndModal(false)}
-          title="End Interview"
-        >
-          <div className="p-6">
-            <p className="mb-6">Are you sure you want to end this interview? This action cannot be undone.</p>
-            <div className="flex justify-end space-x-4">
-              <button 
-                onClick={() => setShowEndModal(false)}
-                className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300"
-              >
-                Cancel
-              </button>
-              <button 
-                onClick={() => {
-                  setShowEndModal(false);
-                  handleInterviewComplete();
-                }}
-                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 flex items-center"
-              >
-                <PhoneIcon className="mr-2" /> End Interview
-              </button>
+        
+        {/* End Interview Confirmation Modal */}
+        {showEndModal && (
+          <Modal
+            isOpen={showEndModal}
+            onClose={() => setShowEndModal(false)}
+            title="End Interview"
+          >
+            <div className="p-6">
+              <p className="mb-6">Are you sure you want to end this interview? This action cannot be undone.</p>
+              <div className="flex justify-end space-x-4">
+                <button 
+                  onClick={() => setShowEndModal(false)}
+                  className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={() => {
+                    setShowEndModal(false);
+                    handleInterviewComplete();
+                  }}
+                  className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 flex items-center"
+                >
+                  <PhoneIcon className="mr-2" /> End Interview
+                </button>
+              </div>
             </div>
-          </div>
-        </Modal>
-      )}
-    </div>
+          </Modal>
+        )}
+      </div>
+    </>
   );
 }
 

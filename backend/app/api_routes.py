@@ -1,5 +1,6 @@
 from database import get_db_connection, build_filter_query, ensure_string_id, map_row_to_dict
 from flask import Blueprint, request, jsonify, session, redirect, url_for, render_template
+from flask_cors import CORS, cross_origin
 from functools import wraps
 import boto3
 import uuid
@@ -10,7 +11,6 @@ import os
 from werkzeug.utils import secure_filename
 from werkzeug.security import check_password_hash, generate_password_hash  # Add generate_password_hash
 from document_processor import generate_campaign_context, generate_interview_questions, extract_text_from_document, generate_campaign_description
-from flask_jwt_extended import create_access_token, create_refresh_token, jwt_required, get_jwt_identity
 import json
 import re
 import bcrypt
@@ -18,17 +18,24 @@ import bcrypt
 # Create a Blueprint for the API routes
 api_bp = Blueprint('api', __name__)
 
+CORS(api_bp, 
+    origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    supports_credentials=True,
+    allow_headers=["Content-Type", "X-Requested-With", "x-retry-count"],
+    methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
+
 # Configure your S3 bucket name (already created)
 S3_BUCKET = Config.S3_BUCKET_NAME
 
 # Initialize S3 client
 s3_client = boto3.client("s3")
 
+# Decorator to check admin status via session
 def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        auth_header = request.headers.get('Authorization')
-        if auth_header != 'Bearer dVCjV5QO8t' and not session.get('is_admin'):
+        # Check if user is an admin via session
+        if not session.get('is_admin'):
             return jsonify({"error": "Admin access required"}), 403
         return f(*args, **kwargs)
     return decorated_function
@@ -43,26 +50,6 @@ def build_filter_query(args):
     if filter_query:
         filter_query = "WHERE " + filter_query
     return filter_query, filter_values
-
-# Helper function to verify JWT token
-def jwt_token_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        auth_header = request.headers.get('Authorization')
-        if not auth_header or not auth_header.startswith('Bearer '):
-            return jsonify({"error": "Valid token is required"}), 401
-        
-        # Extract the token
-        token = auth_header.split('Bearer ')[1]
-        
-        # This will be handled by flask_jwt_extended
-        @jwt_required()
-        def verify_jwt_token(*args, **kwargs):
-            # If we get here, the token is valid
-            return f(*args, **kwargs)
-            
-        return verify_jwt_token(*args, **kwargs)
-    return decorated_function
 
 # GET routes
 @api_bp.route('/users', methods=['GET'])
@@ -172,148 +159,76 @@ def get_questions():
     return jsonify(result)
 
 @api_bp.route('/submissions', methods=['GET'])
-@jwt_required()
+@admin_required
 def get_submissions():
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    # Get user identity from JWT
-    current_user = get_jwt_identity()
-    user_id = str(current_user.get("id"))
-    is_admin = current_user.get("is_admin", False)
+    # Get user identity from session
+    user_id = session.get('user_id')
+    is_admin = session.get('is_admin', False)
     
-    # Process filter parameters from request
-    filter_data = dict(request.args)
+    # Build query with filters
+    args = request.args.to_dict()
+    base_query = "SELECT * FROM submissions"
     
-    # For non-admins, force filter by user_id to ensure they only see their own submissions
-    if not is_admin:
-        # Override any user_id in the filter to prevent access to other users' submissions
-        filter_data['submissions.user_id'] = user_id
-    
-    # Build filter string and values
-    filter_clauses = []
-    filter_values = []
-    
-    for key, value in filter_data.items():
-        # Make sure to prefix with table name for clarity
-        if not key.startswith('submissions.') and not key.startswith('users.') and not key.startswith('campaigns.'):
-            key = f"submissions.{key}"
-        
-        filter_clauses.append(f"{key} = %s")
-        filter_values.append(value)
-    
-    filter_query = " AND ".join(filter_clauses)
-    if filter_query:
-        filter_query = f"WHERE {filter_query}"
-    
-    # Execute the query with proper filtering
-    cursor.execute(f"""
-        SELECT submissions.id, submissions.campaign_id, submissions.user_id, submissions.created_at, 
-               submissions.is_complete, submissions.total_points, 
-               users.email, campaigns.title AS campaign_name
-        FROM submissions
-        JOIN users ON submissions.user_id = users.id
-        JOIN campaigns ON submissions.campaign_id = campaigns.id
-        {filter_query}
-    """, filter_values)
+    # If not admin, limit to own submissions
+    if not is_admin and 'user_id' not in args:
+        if 'campaign_id' in args:
+            base_query += " WHERE campaign_id = %s AND user_id = %s"
+            cursor.execute(base_query, (args['campaign_id'], user_id))
+        else:
+            base_query += " WHERE user_id = %s"
+            cursor.execute(base_query, (user_id,))
+    else:
+        filter_query, filter_values = build_filter_query(args)
+        cursor.execute(f"{base_query} {filter_query}", filter_values)
     
     submissions = cursor.fetchall()
-    columns = ["id", "campaign_id", "user_id", "created_at", "is_complete", "total_points", "email", "campaign_name"]
+    columns = ["id", "campaign_id", "user_id", "created_at", "total_points", "is_complete"]
     
-    # Use the helper function to map rows to dictionaries with string IDs
+    # Map rows to dictionaries with string IDs
     result = [map_row_to_dict(submission, columns) for submission in submissions]
     
     conn.close()
     return jsonify(result)
 
 @api_bp.route('/submission_answers', methods=['GET'])
-@jwt_required()
+@admin_required
 def get_submission_answers():
-    # Get user identity from JWT
-    current_user = get_jwt_identity()
-    user_id = str(current_user.get("id"))
-    is_admin = current_user.get("is_admin", False)
+    # Get user identity from session
+    user_id = session.get('user_id')
+    is_admin = session.get('is_admin', False)
     
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    # Replace the previous code to avoid ambiguous column references
-    if request.args.get('submission_id'):
-        # Case when specifically querying by submission_id
-        submission_id = str(request.args.get('submission_id'))  # Ensure string ID
+    # Build query with filters
+    args = request.args.to_dict()
+    
+    # If not admin, validate ownership of submissions before fetching answers
+    if not is_admin and 'submission_id' in args:
+        # Check if the submission belongs to the current user
+        submission_id = args['submission_id']
+        cursor.execute("SELECT user_id FROM submissions WHERE id = %s", (submission_id,))
+        submission = cursor.fetchone()
         
-        if is_admin:
-            # Admins can access any submission's answers
-            query = """
-                SELECT sa.id, sa.submission_id, sa.question_id, sa.video_path, 
-                       sa.transcript, sa.score, sa.score_rationale
-                FROM submission_answers sa
-                WHERE sa.submission_id = %s
-            """
-            cursor.execute(query, (submission_id,))
-        else:
-            # Regular users can only access their own submissions' answers
-            query = """
-                SELECT sa.id, sa.submission_id, sa.question_id, sa.video_path, 
-                       sa.transcript, sa.score, sa.score_rationale
-                FROM submission_answers sa
-                JOIN submissions s ON sa.submission_id = s.id
-                WHERE sa.submission_id = %s AND s.user_id = %s
-            """
-            cursor.execute(query, (submission_id, user_id))
+        if not submission or submission[0] != user_id:
+            conn.close()
+            return jsonify({"error": "Access denied"}), 403
+    
+    # Build and execute query
+    base_query = "SELECT * FROM submission_answers"
+    if args:
+        filter_query, filter_values = build_filter_query(args)
+        cursor.execute(f"{base_query} {filter_query}", filter_values)
     else:
-        # For general queries without a specific submission_id
-        if is_admin:
-            # Admins get all results with filters
-            filter_query, filter_values = build_filter_query(request.args)
-            
-            # Make sure the table alias is used for all columns in the filter
-            if filter_query:
-                # Replace 'WHERE ' with 'WHERE sa.' and add 'sa.' before each 'AND'
-                filter_query = filter_query.replace('WHERE ', 'WHERE sa.').replace(' AND ', ' AND sa.')
-            
-            query = f"""
-                SELECT sa.id, sa.submission_id, sa.question_id, sa.video_path, 
-                       sa.transcript, sa.score, sa.score_rationale
-                FROM submission_answers sa
-                {filter_query}
-            """
-            cursor.execute(query, filter_values)
-        else:
-            # Regular users only get answers for their own submissions
-            # Start with an empty WHERE clause
-            where_clauses = []
-            params = []
-            
-            # Add user_id restriction
-            where_clauses.append("s.user_id = %s")
-            params.append(user_id)
-            
-            # Add any other filter parameters
-            for key, value in request.args.items():
-                if key != 'user_id':  # Skip user_id as we already added it
-                    if key.startswith('sa.'):
-                        where_clauses.append(f"{key} = %s")
-                    else:
-                        where_clauses.append(f"sa.{key} = %s")
-                    params.append(value)
-            
-            # Combine all WHERE clauses
-            where_clause = " AND ".join(where_clauses)
-            
-            query = f"""
-                SELECT sa.id, sa.submission_id, sa.question_id, sa.video_path, 
-                       sa.transcript, sa.score, sa.score_rationale
-                FROM submission_answers sa
-                JOIN submissions s ON sa.submission_id = s.id
-                WHERE {where_clause}
-            """
-            cursor.execute(query, params)
+        cursor.execute(base_query)
     
     submission_answers = cursor.fetchall()
     columns = ["id", "submission_id", "question_id", "video_path", "transcript", "score", "score_rationale"]
     
-    # Use the helper function to map rows to dictionaries with string IDs
+    # Map rows to dictionaries with string IDs
     result = [map_row_to_dict(answer, columns) for answer in submission_answers]
     
     conn.close()
@@ -334,57 +249,62 @@ def get_public_campaigns():
     return jsonify(result)
 
 @api_bp.route('/submissions/<string:id>', methods=['GET'])
-@jwt_required()
+@admin_required
 def get_submission_by_id(id):
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    # Get user identity from JWT
-    current_user = get_jwt_identity()
-    user_id = str(current_user.get("id"))
-    is_admin = current_user.get("is_admin", False)
+    # Get user identity from session
+    user_id = session.get('user_id')
+    is_admin = session.get('is_admin', False)
     
-    # Ensure ID is a string
-    submission_id = str(id)
+    # Verify that the ID is a string
+    submission_id = ensure_string_id(id)
     
-    # Build the SQL query - admins can access any submission, regular users only their own
-    if is_admin:
-        query = """
-            SELECT s.*, c.title AS campaign_title, u.email 
-            FROM submissions s
-            JOIN campaigns c ON s.campaign_id = c.id
-            JOIN users u ON s.user_id = u.id
-            WHERE s.id = %s
-        """
-        params = (submission_id,)
-    else:
-        # For regular users, include user_id check to ensure they can only access their own submissions
-        query = """
-            SELECT s.*, c.title AS campaign_title, u.email 
-            FROM submissions s
-            JOIN campaigns c ON s.campaign_id = c.id
-            JOIN users u ON s.user_id = u.id
-            WHERE s.id = %s AND s.user_id = %s
-        """
-        params = (submission_id, user_id)
+    # Check if user has access to this submission
+    if not is_admin:
+        cursor.execute("SELECT user_id FROM submissions WHERE id = %s", (submission_id,))
+        submission = cursor.fetchone()
+        if not submission or submission[0] != user_id:
+            conn.close()
+            return jsonify({"error": "Access denied"}), 403
     
-    cursor.execute(query, params)
+    # Get submission details
+    cursor.execute("""
+        SELECT s.*, u.email, c.title AS campaign_title
+        FROM submissions s
+        JOIN users u ON s.user_id = u.id
+        JOIN campaigns c ON s.campaign_id = c.id
+        WHERE s.id = %s
+    """, (submission_id,))
+    
     submission = cursor.fetchone()
+    if not submission:
+        conn.close()
+        return jsonify({"error": "Submission not found"}), 404
+    
+    # Get submission answers
+    cursor.execute("""
+        SELECT sa.*, q.title AS question_title
+        FROM submission_answers sa
+        JOIN questions q ON sa.question_id = q.id
+        WHERE sa.submission_id = %s
+    """, (submission_id,))
+    
+    answers = cursor.fetchall()
+    
     conn.close()
     
-    if submission:
-        # Define all columns including joined ones
-        columns = [
-            "id", "campaign_id", "user_id", "created_at", "is_complete", 
-            "completed_at", "total_points", "resume_path", "resume_text", 
-            "transcript", "campaign_title", "email"
-        ]
-        
-        # Use the helper function to create the response with string IDs
-        result = map_row_to_dict(submission, columns)
-        return jsonify(result)
-    else:
-        return jsonify({"error": "Submission not found or you don't have permission to access it"}), 404
+    # Format response
+    columns_submission = ["id", "campaign_id", "user_id", "created_at", "total_points", "is_complete", "email", "campaign_title"]
+    columns_answers = ["id", "submission_id", "question_id", "video_path", "transcript", "score", "score_rationale", "question_title"]
+    
+    result = {
+        "submission": map_row_to_dict(submission, columns_submission),
+        "answers": [map_row_to_dict(answer, columns_answers) for answer in answers]
+    }
+    
+    return jsonify(result)
 
 # Add a public endpoint to get submission by ID for the interview page
 @api_bp.route('/submissions/<string:id>', methods=['GET'])
@@ -631,15 +551,15 @@ def create_question():
         return jsonify({"error": f"Failed to create question: {str(e)}"}), 500
 
 @api_bp.route('/submissions', methods=['POST'])
-@jwt_required()
+@admin_required
 def create_submission():
     # Validate request data
     data = request.get_json()
     if not data or 'campaign_id' not in data:
         return jsonify({"error": "campaign_id is required"}), 400
     
-    # Get user identity from JWT
-    current_user = get_jwt_identity()
+    # Get user identity from session
+    current_user = session.get('user_identity')
     user_id = str(current_user.get("id"))
     
     # Ensure campaign_id is a string
@@ -695,6 +615,7 @@ def create_submission():
         return jsonify({"error": str(e)}), 500
 
 @api_bp.route('/submission_answers', methods=['POST'])
+@admin_required
 def create_submission_answer():
     data = request.json
     conn = get_db_connection()
@@ -1113,52 +1034,62 @@ def optimize_prompt_api():
         return jsonify({"error": str(e)}), 500
 
 @api_bp.route('/profile', methods=['GET'])
-@jwt_required()
 def get_current_user_profile():
-    # Get the current user's identity from JWT
-    current_user_id = get_jwt_identity()
-    
-    # Ensure ID is a string
-    user_id = str(current_user_id)
+    # Get the current user's identity from session
+    user_id = session.get('user_id')
+    if not user_id:
+        return jsonify({"error": "Authentication required"}), 401
     
     try:
+        # Get user data from database
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        
+        cursor.execute("""
+            SELECT id, email, name, is_admin, created_at
+            FROM users
+            WHERE id = %s
+        """, (user_id,))
+        
+        user = cursor.fetchone()
+        conn.close()
+        
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+        
+        # Convert ID to string for frontend consistency
+        user['id'] = str(user['id'])
+        
+        # Get user's submissions count
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Get user data (excluding password hash for security)
-        cursor.execute(
-            "SELECT id, email, name, is_admin FROM users WHERE id = %s", 
-            (user_id,)
-        )
-        user = cursor.fetchone()
+        cursor.execute("""
+            SELECT COUNT(*) AS submission_count
+            FROM submissions
+            WHERE user_id = %s
+        """, (user_id,))
         
-        if not user:
-            conn.close()
-            return jsonify({
-                "error": "User not found. The user may have been deleted."
-            }), 404
-        
-        columns = ["id", "email", "name", "is_admin"]
-        # Use the helper function to create the response with string IDs
-        result = map_row_to_dict(user, columns)
-        
-        # Get user's submissions count
-        cursor.execute(
-            "SELECT COUNT(*) FROM submissions WHERE user_id = %s", 
-            (user_id,)
-        )
         submission_count = cursor.fetchone()[0]
-        result["submission_count"] = submission_count
+        user['submission_count'] = submission_count
+        
+        # Get user's completed submissions
+        cursor.execute("""
+            SELECT COUNT(*) AS completed_count
+            FROM submissions
+            WHERE user_id = %s AND is_complete = TRUE
+        """, (user_id,))
+        
+        completed_count = cursor.fetchone()[0]
+        user['completed_submissions'] = completed_count
         
         conn.close()
-        return jsonify(result)
-    
+        
+        return jsonify(user)
+        
     except Exception as e:
-        if conn:
-            conn.close()
-        return jsonify({
-            "error": f"Failed to get user profile: {str(e)}"
-        }), 500
+        print(f"Error retrieving user profile: {e}")
+        return jsonify({"error": "Failed to retrieve user profile"}), 500
 
 # Add a session debug endpoint
 @api_bp.route('/debug/session', methods=['GET'])
@@ -1225,15 +1156,15 @@ def login():
     })
 
 @api_bp.route('/profile', methods=['PUT'])
-@jwt_required()
+@admin_required
 def update_current_user_profile():
     """
     Update the profile information for a user
     If user_id is provided and the requester is an admin, update that user's profile
     Otherwise update the current user's profile
     """
-    # Get user identity from JWT
-    current_user = get_jwt_identity()
+    # Get user identity from session
+    current_user = session.get('user_identity')
     current_user_id = current_user.get("id")
     is_admin = current_user.get("is_admin", False)
     
@@ -1301,15 +1232,15 @@ def update_current_user_profile():
         return jsonify({"error": str(e)}), 500
 
 @api_bp.route('/change-password', methods=['POST'])
-@jwt_required()
+@admin_required
 def change_current_user_password():
     """
     Change the password for a user
     If user_id is provided and the requester is an admin, change that user's password
     Otherwise change the current user's password
     """
-    # Get user identity from JWT
-    current_user = get_jwt_identity()
+    # Get user identity from session
+    current_user = session.get('user_identity')
     current_user_id = current_user.get("id")
     is_admin = current_user.get("is_admin", False)
     
@@ -1427,15 +1358,11 @@ def register():
         cursor.execute("SELECT id FROM users WHERE email = %s", (email,))
         user_id = cursor.fetchone()["id"]
         
-        # Create JWT tokens for the new user
-        user_identity = {
-            "id": str(user_id),
-            "email": email,
-            "is_admin": False
-        }
-        
-        access_token = create_access_token(identity=user_identity)
-        refresh_token = create_refresh_token(identity=user_identity)
+        # Set up user session
+        session["user_id"] = user_id
+        session["email"] = email
+        session["name"] = name
+        session["is_admin"] = False
         
         conn.close()
         
@@ -1444,9 +1371,7 @@ def register():
             "id": str(user_id),
             "name": name,
             "email": email,
-            "is_admin": False,
-            "access_token": access_token,
-            "refresh_token": refresh_token
+            "is_admin": False
         }), 201
         
     except Exception as e:
@@ -1535,11 +1460,11 @@ def upload_resume():
                 print(f"Warning: Could not remove temporary file: {str(cleanup_error)}")
 
 @api_bp.route('/submissions/<string:id>/complete', methods=['POST'])
-@jwt_required()
+@admin_required
 def complete_submission(id):
     try:
-        # Get user identity from JWT
-        current_user = get_jwt_identity()
+        # Get user identity from session
+        current_user = session.get('user_identity')
         user_id = str(current_user.get("id"))
         is_admin = current_user.get("is_admin", False)
         

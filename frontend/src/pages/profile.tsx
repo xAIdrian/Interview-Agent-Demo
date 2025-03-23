@@ -6,6 +6,7 @@ import { useAuth } from '../app/components/AuthProvider';
 import { Spinner } from '../components/ui/Spinner';
 import ProtectedRoute from '../components/auth/ProtectedRoute';
 import { AuthLogger } from '../utils/logging';
+import Head from 'next/head';
 
 // Define API base URL for consistent usage
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
@@ -223,154 +224,159 @@ const ProfilePage = () => {
 
   // Render the component inside a ProtectedRoute
   return (
-    <ProtectedRoute>
-      <PageTemplate title="Edit Profile" maxWidth="md">
-        <div className="w-full bg-white shadow-md rounded-lg p-6">
-          <h1 className="text-2xl font-bold mb-6">Edit Profile</h1>
-          
-          {error && (
-            <div className="mb-4 p-2 bg-red-100 text-red-700 rounded">
-              {error}
-            </div>
-          )}
-          
-          {success && (
-            <div className="mb-4 p-2 bg-green-100 text-green-700 rounded">
-              {success}
-            </div>
-          )}
+    <>
+      <Head>
+        <title>My Profile | Gulpin AI Interview</title>
+      </Head>
+      <ProtectedRoute>
+        <PageTemplate title="Edit Profile" maxWidth="md">
+          <div className="w-full bg-white shadow-md rounded-lg p-6">
+            <h1 className="text-2xl font-bold mb-6">Edit Profile</h1>
+            
+            {error && (
+              <div className="mb-4 p-2 bg-red-100 text-red-700 rounded">
+                {error}
+              </div>
+            )}
+            
+            {success && (
+              <div className="mb-4 p-2 bg-green-100 text-green-700 rounded">
+                {success}
+              </div>
+            )}
 
-          {isLoading ? (
-            <div className="flex justify-center items-center py-10">
-              <Spinner />
-            </div>
-          ) : user ? (
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-                  Name:
-                </label>
-                <input
-                  type="text"
-                  id="name"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleChange}
-                  required
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
-                />
+            {isLoading ? (
+              <div className="flex justify-center items-center py-10">
+                <Spinner />
               </div>
-              
-              <div className="space-y-2">
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                  Email:
-                </label>
-                <input
-                  type="email"
-                  id="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  required
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
-                />
-              </div>
-              
-              {/* Admin toggle (only visible to admins editing other users) */}
-              {isAdmin && !viewingOwnProfile && (
+            ) : user ? (
+              <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      name="is_admin"
-                      checked={formData.is_admin}
-                      onChange={handleChange}
-                      className="h-4 w-4 text-blue-600 border-gray-300 rounded"
-                    />
-                    <span className="ml-2 text-sm font-medium text-gray-700">Admin User</span>
+                  <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+                    Name:
                   </label>
+                  <input
+                    type="text"
+                    id="name"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleChange}
+                    required
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+                  />
                 </div>
-              )}
-              
-              <div className="pt-4 border-t border-gray-200">
-                <h2 className="text-lg font-medium mb-2">Change Password</h2>
                 
-                {viewingOwnProfile && (
+                <div className="space-y-2">
+                  <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                    Email:
+                  </label>
+                  <input
+                    type="email"
+                    id="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    required
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+                  />
+                </div>
+                
+                {/* Admin toggle (only visible to admins editing other users) */}
+                {isAdmin && !viewingOwnProfile && (
                   <div className="space-y-2">
-                    <label htmlFor="current_password" className="block text-sm font-medium text-gray-700">
-                      Current Password:
+                    <label className="flex items-center">
+                      <input
+                        type="checkbox"
+                        name="is_admin"
+                        checked={formData.is_admin}
+                        onChange={handleChange}
+                        className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+                      />
+                      <span className="ml-2 text-sm font-medium text-gray-700">Admin User</span>
+                    </label>
+                  </div>
+                )}
+                
+                <div className="pt-4 border-t border-gray-200">
+                  <h2 className="text-lg font-medium mb-2">Change Password</h2>
+                  
+                  {viewingOwnProfile && (
+                    <div className="space-y-2">
+                      <label htmlFor="current_password" className="block text-sm font-medium text-gray-700">
+                        Current Password:
+                      </label>
+                      <input
+                        type="password"
+                        id="current_password"
+                        name="current_password"
+                        value={formData.current_password}
+                        onChange={handleChange}
+                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+                      />
+                    </div>
+                  )}
+                  
+                  <div className="space-y-2">
+                    <label htmlFor="new_password" className="block text-sm font-medium text-gray-700">
+                      New Password:
                     </label>
                     <input
                       type="password"
-                      id="current_password"
-                      name="current_password"
-                      value={formData.current_password}
+                      id="new_password"
+                      name="new_password"
+                      value={formData.new_password}
                       onChange={handleChange}
                       className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
                     />
                   </div>
-                )}
-                
-                <div className="space-y-2">
-                  <label htmlFor="new_password" className="block text-sm font-medium text-gray-700">
-                    New Password:
-                  </label>
-                  <input
-                    type="password"
-                    id="new_password"
-                    name="new_password"
-                    value={formData.new_password}
-                    onChange={handleChange}
-                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
-                  />
+                  
+                  <div className="space-y-2">
+                    <label htmlFor="confirm_password" className="block text-sm font-medium text-gray-700">
+                      Confirm New Password:
+                    </label>
+                    <input
+                      type="password"
+                      id="confirm_password"
+                      name="confirm_password"
+                      value={formData.confirm_password}
+                      onChange={handleChange}
+                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+                    />
+                  </div>
                 </div>
                 
-                <div className="space-y-2">
-                  <label htmlFor="confirm_password" className="block text-sm font-medium text-gray-700">
-                    Confirm New Password:
-                  </label>
-                  <input
-                    type="password"
-                    id="confirm_password"
-                    name="confirm_password"
-                    value={formData.confirm_password}
-                    onChange={handleChange}
-                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
-                  />
+                <div className="pt-4 flex space-x-4">
+                  <button 
+                    type="submit" 
+                    className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:bg-blue-300"
+                    disabled={isSaving}
+                  >
+                    {isSaving ? (
+                      <span className="flex items-center">
+                        <Spinner size="small" />
+                        <span className="ml-2">Updating...</span>
+                      </span>
+                    ) : 'Update Profile'}
+                  </button>
+                  
+                  <button 
+                    type="button"
+                    onClick={() => router.push(isAdmin ? '/admin/users' : '/dashboard')}
+                    className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-700"
+                  >
+                    Cancel
+                  </button>
                 </div>
+              </form>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                Profile not found. Please login again.
               </div>
-              
-              <div className="pt-4 flex space-x-4">
-                <button 
-                  type="submit" 
-                  className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:bg-blue-300"
-                  disabled={isSaving}
-                >
-                  {isSaving ? (
-                    <span className="flex items-center">
-                      <Spinner size="small" />
-                      <span className="ml-2">Updating...</span>
-                    </span>
-                  ) : 'Update Profile'}
-                </button>
-                
-                <button 
-                  type="button"
-                  onClick={() => router.push(isAdmin ? '/admin/users' : '/dashboard')}
-                  className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-700"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          ) : (
-            <div className="text-center py-8 text-gray-500">
-              Profile not found. Please login again.
-            </div>
-          )}
-        </div>
-      </PageTemplate>
-    </ProtectedRoute>
+            )}
+          </div>
+        </PageTemplate>
+      </ProtectedRoute>
+    </>
   );
 };
 

@@ -1,12 +1,9 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import axios from 'axios';
+import axios from '../../utils/axios';
 import { useRouter } from 'next/navigation';
 import { AuthLogger } from '../../utils/logging';
-
-// Define API base URL for consistent usage
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
 interface User {
   id: string;
@@ -38,129 +35,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Function to clear error state
   const clearError = () => setError(null);
 
-  // Function to set cookies with more reliable expiration
-  const setCookie = (name: string, value: string, days: number) => {
-    let expires = '';
-    if (days) {
-      const date = new Date();
-      date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
-      expires = `; expires=${date.toUTCString()}`;
-    }
-    document.cookie = `${name}=${value}${expires}; path=/`;
-    AuthLogger.debug(`Cookie set: ${name}`);
-  };
-
-  // Setup axios interceptors for JWT handling
-  useEffect(() => {
-    // Response interceptor to handle token refresh on 401 errors
-    const responseInterceptor = axios.interceptors.response.use(
-      (response) => response, 
-      async (error) => {
-        const originalRequest = error.config;
-        
-        // If error is 401 or 422 (unprocessable entity) and we haven't retried yet
-        if ((error.response?.status === 401 || error.response?.status === 422) && !originalRequest._retry) {
-          originalRequest._retry = true;
-          
-          try {
-            // Try to refresh the token
-            const refreshToken = localStorage.getItem('refresh_token');
-            if (!refreshToken) {
-              throw new Error('No refresh token available');
-            }
-            
-            AuthLogger.info('Attempting to refresh token');
-            
-            // Flask JWT expects the refresh token in the Authorization header with Bearer prefix
-            const response = await axios.post('/refresh', {}, {
-              headers: { 
-                'Authorization': `Bearer ${refreshToken}`,
-                'Content-Type': 'application/json'
-              }
-            });
-            
-            // Get new access token
-            const { access_token } = response.data;
-            if (!access_token) {
-              throw new Error('Refresh response missing access token');
-            }
-            
-            AuthLogger.info('Token refreshed successfully');
-            localStorage.setItem('access_token', access_token);
-            
-            // Set cookie with proper expiration
-            setCookie('access_token', access_token, 1); // 1 day
-            
-            // Update Authorization header for the retry
-            originalRequest.headers['Authorization'] = `Bearer ${access_token}`;
-            return axios(originalRequest);
-          } catch (refreshError) {
-            // Log the refresh error
-            AuthLogger.error('Token refresh failed:', refreshError);
-            
-            // Refresh token failed, force logout
-            await handleLogout(false); // silent logout (don't call API)
-            return Promise.reject(refreshError);
-          }
-        }
-        
-        return Promise.reject(error);
-      }
-    );
-
-    // Cleanup function to remove interceptors when component unmounts
-    return () => {
-      axios.interceptors.response.eject(responseInterceptor);
-    };
-  }, []);
-
   // Check for existing authentication on component mount
   useEffect(() => {
     const checkAuth = async () => {
       setLoading(true);
       
       try {
-        // First try to get token from localStorage
-        let accessToken = localStorage.getItem('access_token');
+        // Get user profile from the server
+        const response = await axios.get('/api/profile');
         
-        // If not in localStorage, check for cookies
-        if (!accessToken) {
-          const cookies = document.cookie.split(';');
-          const tokenCookie = cookies.find(c => c.trim().startsWith('access_token='));
-          if (tokenCookie) {
-            accessToken = tokenCookie.split('=')[1];
-            // Sync the token back to localStorage
-            localStorage.setItem('access_token', accessToken);
-            AuthLogger.info('Retrieved token from cookie');
-          }
-        }
-        
-        if (!accessToken) {
-          AuthLogger.info('No access token found in localStorage or cookies');
-          setLoading(false);
-          return;
-        }
-        
-        AuthLogger.info('Verifying authentication from stored user data');
-        
-        // Get user data from localStorage
-        const cachedUserData = localStorage.getItem('user');
-        if (cachedUserData) {
-          try {
-            const userData = JSON.parse(cachedUserData);
-            setUser(userData);
-            AuthLogger.info('Using cached user data', userData);
-          } catch (parseError) {
-            AuthLogger.error('Failed to parse cached user data', parseError);
-            setUser(null);
-          }
+        if (response.data && response.data.id) {
+          setUser(response.data);
+          AuthLogger.info('User authenticated from session');
         } else {
           setUser(null);
-          AuthLogger.info('No cached user data found');
+          AuthLogger.info('No authenticated user');
         }
       } catch (err) {
-        AuthLogger.error('General error in authentication check:', err);
         setUser(null);
+        AuthLogger.info('No authenticated user or session expired');
       } finally {
         setLoading(false);
       }
@@ -168,6 +61,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     
     checkAuth();
   }, []);
+
+  // Function to check if API is available
+  const checkApiStatus = async () => {
+    try {
+      const response = await fetch(`${axios.defaults.baseURL}/health`, {
+        method: 'HEAD',
+        mode: 'cors',
+        credentials: 'include',
+      });
+      return response.ok;
+    } catch {
+      return false;
+    }
+  };
 
   // Login function
   const login = async (email: string, password: string): Promise<boolean> => {
@@ -183,7 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 3000);
         
-        const response = await fetch(`${API_BASE_URL}/health`, {
+        const response = await fetch(`${axios.defaults.baseURL}/health`, {
           method: 'HEAD',
           cache: 'no-cache',
           credentials: 'include',
@@ -216,38 +123,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         AuthLogger.debug('Login response received:', JSON.stringify(response.data, null, 2));
       }
       
-      if (response.data && response.data.access_token) {
+      if (response.data && response.data.success) {
         // Store user data
-        const userData = response.data.user || {
-          id: response.data.id,
-          email: response.data.email,
-          name: response.data.name,
-          is_admin: response.data.is_admin
-        };
-        
+        const userData = response.data.user;
         setUser(userData);
         
-        // Store tokens and user data in localStorage
-        localStorage.setItem('access_token', response.data.access_token);
-        localStorage.setItem('refresh_token', response.data.refresh_token || '');
-        localStorage.setItem('user', JSON.stringify(userData));
-        localStorage.setItem('userId', userData.id);
-        localStorage.setItem('userName', userData.name || '');
-        localStorage.setItem('isAdmin', userData.is_admin ? 'true' : 'false');
-        
-        // Set cookies with proper expiration
-        setCookie('access_token', response.data.access_token, 1); // 1 day
-        if (response.data.refresh_token) {
-          setCookie('refresh_token', response.data.refresh_token, 30); // 30 days
-        }
-        
         AuthLogger.info('Login successful', userData);
-        AuthLogger.logAuthState();
-        
         return true;
       } else {
-        AuthLogger.warn('Login response missing token', response.data);
-        setError(response.data.message || 'Login failed - No token received');
+        AuthLogger.warn('Login response missing success flag', response.data);
+        setError(response.data.message || 'Login failed');
         return false;
       }
     } catch (err) {
@@ -264,16 +149,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setError('Too many login attempts. Please wait a moment before trying again.');
         } else {
           setError(err.response?.data?.error || err.response?.data?.message || 'Login failed for an unknown reason');
-        }
-        
-        // Log detailed error information in development
-        if (process.env.NODE_ENV === 'development') {
-          AuthLogger.debug('Login error details:', {
-            code: err.code,
-            status: err.response?.status,
-            data: err.response?.data,
-            message: err.message
-          });
         }
       } else {
         setError('An unexpected error occurred during login');
@@ -298,7 +173,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         password 
       });
       
-      if (response.data.success) {
+      if (response.data.message && response.data.message.includes('success')) {
         return true;
       } else {
         setError(response.data.message || 'Registration failed');
@@ -324,37 +199,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   // Logout function
-  const handleLogout = async (callApi = true) => {
-    // Call the API logout endpoint if requested
-    if (callApi) {
-      try {
-        await axios.post('/logout'); // Use '/logout' instead of '/api/logout'
-      } catch (err) {
-        console.error('Logout API error:', err);
+  const handleLogout = async () => {
+    // Call the API logout endpoint
+    try {
+      await axios.post('/logout');
+      setUser(null);
+      
+      // Return to login page
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login';
       }
-    }
-    
-    // Clear all auth data from localStorage
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
-    localStorage.removeItem('user');
-    localStorage.removeItem('userId');
-    localStorage.removeItem('userName');
-    localStorage.removeItem('isAdmin');
-    
-    // Clear cookies by setting expired date
-    document.cookie = 'access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT';
-    document.cookie = 'remember_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT';
-    document.cookie = 'refresh_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT';
-    
-    // Reset user state
-    setUser(null);
-    
-    // Return to login page if not already there
-    if (typeof window !== 'undefined') {
-      const path = window.location.pathname;
-      if (path !== '/login' && path !== '/register' && path !== '/') {
-        router.push('/login');
+    } catch (err) {
+      console.error('Logout error:', err);
+      // Even if the API call fails, clear the user locally
+      setUser(null);
+      
+      // Return to login page
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login';
       }
     }
   };
