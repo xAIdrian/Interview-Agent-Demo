@@ -32,7 +32,7 @@ interface Submission {
 // Transcriptions component
 function Transcriptions() {
   const room = useMaybeRoomContext();
-  const [transcriptions, setTranscriptions] = useState<{ [id: string]: TranscriptionSegment }>({});
+  const [transcriptions, setTranscriptions] = useState<{ [id: string]: TranscriptionSegment & { isCandidate?: boolean } }>({});
   const [fullTranscript, setFullTranscript] = useState<string>("");
   
   // Store transcripts in localStorage for retrieval when submitting
@@ -56,18 +56,32 @@ function Transcriptions() {
       setTranscriptions((prev) => {
         const newTranscriptions = { ...prev };
         for (const segment of segments) {
-          newTranscriptions[segment.id] = segment;
+          // Determine if this is the candidate speaking (local participant)
+          // or the AI interviewer (remote participant)
+          const isCandidate = participant?.identity === room.localParticipant.identity;
+          
+          newTranscriptions[segment.id] = {
+            ...segment,
+            isCandidate
+          };
+          
           // Log each time something is spoken
-          console.log(`Transcription: ${segment.text}`);
+          console.log(`Transcription (${isCandidate ? 'Candidate' : 'Interviewer'}): ${segment.text}`);
         }
         return newTranscriptions;
       });
 
       // Update the full transcript for submission
-      const sortedSegments = [...Object.values(transcriptions), ...segments]
+      const sortedSegments = [...Object.values(transcriptions), ...segments.map(segment => ({
+        ...segment,
+        isCandidate: participant?.identity === room.localParticipant.identity
+      }))]
         .sort((a, b) => a.firstReceivedTime - b.firstReceivedTime);
       
-      const transcript = sortedSegments.map(segment => segment.text).join(' ');
+      const transcript = sortedSegments.map(segment => 
+        `${segment.isCandidate ? 'Candidate' : 'Interviewer'}: ${segment.text}`
+      ).join('\n');
+      
       setFullTranscript(transcript);
     };
 
@@ -87,7 +101,13 @@ function Transcriptions() {
         {Object.values(transcriptions)
           .sort((a, b) => a.firstReceivedTime - b.firstReceivedTime)
           .map((segment) => (
-            <li key={segment.id} className="text-sm">
+            <li 
+              key={segment.id} 
+              className={`text-sm p-1 ${segment.isCandidate ? 'text-blue-700' : 'text-green-700'}`}
+            >
+              <span className="font-medium">
+                {segment.isCandidate ? 'You: ' : 'Interviewer: '}
+              </span>
               {segment.text}
             </li>
           ))}

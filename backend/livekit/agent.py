@@ -3,6 +3,11 @@ from __future__ import annotations
 import logging
 from dotenv import load_dotenv
 import asyncio
+import json
+import random
+import requests
+import time
+import os
 from livekit import rtc
 from livekit.agents import (
     AutoSubscribe,
@@ -15,21 +20,26 @@ from livekit.agents.multimodal import MultimodalAgent
 from livekit.plugins import openai
 from livekit.agents import stt, transcription
 from livekit.plugins.deepgram import STT
-#from prompts import sample_agent_prompt, sample_resume
-import asyncio
-import json
+from prompts import agent_prompt_template
 
 # Store active tasks to prevent garbage collection
 _active_tasks = set()
-
 
 load_dotenv()
 logger = logging.getLogger("livekit-agent-worker")
 logger.setLevel(logging.INFO)
 
-prompting_questions = []
-global_ctx = None
+# List of female names to use for the AI interviewer
+FEMALE_INTERVIEWER_NAMES = [
+    "Emma", "Olivia", "Ava", "Isabella", "Sophia", 
+    "Charlotte", "Amelia", "Mia", "Harper", "Evelyn",
+    "Abigail", "Emily", "Elizabeth", "Sofia", "Ella", 
+    "Madison", "Scarlett", "Victoria", "Aria", "Grace"
+]
 
+def generate_interviewer_name():
+    """Generate a random female name for the AI interviewer"""
+    return random.choice(FEMALE_INTERVIEWER_NAMES)
 
 async def _forward_transcription(
     stt_stream: stt.SpeechStream,
@@ -50,9 +60,14 @@ async def _forward_transcription(
 
 
 async def entrypoint(ctx: JobContext):
+    # Generate a random interviewer name
+    interviewer_name = generate_interviewer_name()
+    logger.info(f"Using interviewer name: {interviewer_name}")
+    
     stt = STT()
     tasks = []
     _accumulated_questions = []
+    submission_data = None
 
     async def transcribe_track(participant: rtc.RemoteParticipant, track: rtc.Track):
         audio_stream = stt.AudioStream(track)
@@ -78,6 +93,7 @@ async def entrypoint(ctx: JobContext):
 
     async def async_handle_text_stream(reader, participant_identity):
         info = reader.info
+        global submission_data
 
         print(
             f"🚀 ~ async_handle_text_stream ~ info:",
@@ -91,6 +107,29 @@ async def entrypoint(ctx: JobContext):
                 if chunk:
                     parsed_chunk = json.loads(chunk)
                     print(f"Successfully parsed JSON chunk: {parsed_chunk}")
+
+                    # Store submission data
+                    if "submission_id" in parsed_chunk:
+                        submission_data = parsed_chunk
+                        logger.info(f"Received submission data with ID: {parsed_chunk['submission_id']}")
+                        
+                        # Extract campaign ID if present
+                        if "submission" in parsed_chunk and "campaign_id" in parsed_chunk["submission"]:
+                            campaign_id = parsed_chunk["submission"]["campaign_id"]
+                            logger.info(f"Extracted campaign ID: {campaign_id}")
+                            
+                            # Fetch additional data if needed
+                            try:
+                                # Fetch questions
+                                questions_url = f"http://localhost:5000/api/questions?campaign_id={campaign_id}"
+                                questions_response = requests.get(questions_url)
+                                if questions_response.ok:
+                                    questions = questions_response.json()
+                                    question_titles = [q["title"] for q in questions]
+                                    _accumulated_questions.extend(question_titles)
+                                    logger.info(f"Fetched {len(question_titles)} questions")
+                            except Exception as e:
+                                logger.error(f"Error fetching additional data: {e}")
 
                     # If this chunk contains interview questions, process them
                     if "questions" in parsed_chunk and isinstance(
@@ -119,16 +158,90 @@ async def entrypoint(ctx: JobContext):
     await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
 
     participant = await ctx.wait_for_participant()
-    run_multimodal_agent(ctx, participant)
+    
+    # Extract submission ID from participant identity if possible
+    submission_id = None
+    try:
+        submission_id = participant.identity.split('_')[0]
+        logger.info(f"Extracted submission ID from participant identity: {submission_id}")
+        
+        # Fetch submission data if not received via text stream
+        if not submission_data:
+            try:
+                submission_url = f"http://localhost:5000/api/submissions/{submission_id}"
+                submission_response = requests.get(submission_url)
+                if submission_response.ok:
+                    submission_data = submission_response.json()
+                    logger.info(f"Fetched submission data for ID: {submission_id}")
+                    
+                    # Extract campaign ID
+                    campaign_id = submission_data.get("campaign_id") or (
+                        submission_data.get("submission", {}).get("campaign_id")
+                    )
+                    
+                    if campaign_id:
+                        # Fetch campaign details
+                        campaign_url = f"http://localhost:5000/api/campaigns/{campaign_id}"
+                        campaign_response = requests.get(campaign_url)
+                        if campaign_response.ok:
+                            campaign_data = campaign_response.json()
+                            submission_data["job_description"] = campaign_data.get("job_description", "")
+                            submission_data["campaign_context"] = campaign_data.get("campaign_context", "")
+                            
+                        # Fetch questions if not already loaded
+                        if not _accumulated_questions:
+                            questions_url = f"http://localhost:5000/api/questions?campaign_id={campaign_id}"
+                            questions_response = requests.get(questions_url)
+                            if questions_response.ok:
+                                questions = questions_response.json()
+                                question_titles = [q["title"] for q in questions]
+                                _accumulated_questions.extend(question_titles)
+                                logger.info(f"Fetched {len(question_titles)} questions")
+            except Exception as e:
+                logger.error(f"Error fetching submission data: {e}")
+    except Exception as e:
+        logger.error(f"Error processing participant identity: {e}")
+    
+    # Use default questions if none were loaded
+    if not _accumulated_questions:
+        _accumulated_questions = [
+            "Tell me about yourself",
+            "What are your strengths and weaknesses?",
+            "Why are you interested in this position?",
+            "Describe a challenge you've faced and how you overcame it"
+        ]
+        logger.info("Using default questions as none were provided")
+    
+    # Start the multimodal agent
+    run_multimodal_agent(ctx, participant, _accumulated_questions, submission_data, interviewer_name)
 
     logger.info("agent started")
 
 
-def run_multimodal_agent(ctx: JobContext, participant: rtc.RemoteParticipant):
+def run_multimodal_agent(ctx: JobContext, participant: rtc.RemoteParticipant, questions, submission_data, interviewer_name):
     logger.info("starting multimodal agent")
+    
+    # Extract necessary data with fallbacks
+    resume_text = submission_data.get("resume_text", "Not provided")
+    job_description = submission_data.get("job_description", "Not provided")
+    campaign_context = submission_data.get("campaign_context", "")
+    
+    # Format the question list
+    formatted_questions = "\n".join([f"- {q}" for q in questions])
+    
+    # Build the full prompt
+    full_prompt = agent_prompt_template.format(
+        interviewer_name=interviewer_name,
+        questions=formatted_questions,
+        job_description=job_description,
+        resume_text=resume_text,
+        campaign_context=campaign_context
+    )
+    
+    logger.info(f"Using prompt template with interviewer {interviewer_name} and {len(questions)} questions")
 
     model = openai.realtime.RealtimeModel(
-        instructions=("Say hello"),
+        instructions=full_prompt,
         modalities=["audio", "text"],
     )
 
@@ -136,7 +249,7 @@ def run_multimodal_agent(ctx: JobContext, participant: rtc.RemoteParticipant):
     # upon session establishment
     chat_ctx = llm.ChatContext()
     chat_ctx.append(
-        text=f"Context about the user: he's 6ft tall",
+        text=f"You are {interviewer_name}, an AI interviewer. You are conducting an interview for a job position. The candidate's resume says: {resume_text}. The job description is: {job_description}",
         role="assistant",
     )
 

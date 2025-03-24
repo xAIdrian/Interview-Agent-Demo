@@ -1534,9 +1534,106 @@ def complete_submission(id):
 
 @api_bp.route('/submit_interview', methods=['POST'])
 def submit_interview():
+    from scoring_agent import generate_submission_scoring
+
     try:
         data = request.json
         transcript = data.get('transcript')
+        submission_id = data.get('submission_id')
+
+        # Get submission details including campaign_id
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute(
+            "SELECT campaign_id FROM submissions WHERE id = %s",
+            (submission_id,)
+        )
+        submission = cursor.fetchone()
+        
+        if not submission:
+            conn.close()
+            return jsonify({"error": "Submission not found"}), 404
+            
+        campaign_id = submission[0]
+        
+        # Get campaign details
+        cursor.execute(
+            "SELECT title, campaign_context, job_description FROM campaigns WHERE id = %s",
+            (campaign_id,)
+        )
+        campaign_row = cursor.fetchone()
+        
+        if not campaign_row:
+            conn.close() 
+            return jsonify({"error": "Campaign not found"}), 404
+            
+        campaign = {
+            "title": campaign_row[0],
+            "campaign_context": campaign_row[1], 
+            "job_description": campaign_row[2]
+        }
+        
+        # Get questions for this campaign
+        cursor.execute(
+            "SELECT body, scoring_prompt, max_points FROM questions WHERE campaign_id = %s ORDER BY question_order",
+            (campaign_id,)
+        )
+        questions = [
+            {
+                "body": row[0],
+                "scoring_prompt": row[1],
+                "max_points": row[2]
+            }
+            for row in cursor.fetchall()
+        ]
+        
+        conn.close()
+
+        scores = generate_submission_scoring(campaign, questions, transcript)
+
+        # Get new connection since we closed the previous one
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        try:
+            # Calculate total score
+            total_score = sum(score["score"] for score in scores)
+            
+            # Update each answer in submission_answers
+            for score in scores:
+                cursor.execute("""
+                    UPDATE submission_answers 
+                    SET answer = %s,
+                        score = %s,
+                        scoring_rationale = %s
+                    WHERE submission_id = %s
+                    AND question = %s
+                """, (
+                    score["response"],
+                    score["score"], 
+                    score["rationale"],
+                    submission_id,
+                    score["question"]
+                ))
+            
+            # Mark submission as complete and update total score
+            cursor.execute("""
+                UPDATE submissions
+                SET is_complete = 1,
+                    total_score = %s,
+                    completed_at = CURRENT_TIMESTAMP
+                WHERE id = %s
+            """, (total_score, submission_id))
+            
+            conn.commit()
+            
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()
+        
         print('Received transcript:', transcript)
         return jsonify({'success': True}), 200
     except Exception as e:
