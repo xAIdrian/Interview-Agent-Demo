@@ -138,14 +138,6 @@ axios.interceptors.response.use(
         AuthLogger.error('Network error - Backend may be down');
       }
       
-      // Handle 401 Unauthorized errors - redirect to login
-      if (error.response?.status === 401) {
-        AuthLogger.warn('Unauthorized API access (401) - redirecting to login');
-        if (typeof window !== 'undefined') {
-          window.location.href = '/login';
-        }
-      }
-      
       // Handle 422 Unprocessable Entity (often related to auth)
       if (error.response?.status === 422) {
         AuthLogger.warn('Unprocessable entity (422) - Check request format');

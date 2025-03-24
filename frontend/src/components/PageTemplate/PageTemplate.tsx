@@ -71,9 +71,6 @@ export const PageTemplate: React.FC<PageTemplateProps> = ({
                 
                 {isAuthenticated && isAdmin && (
                   <>
-                    <Link href="/admin/dashboard" className="inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700">
-                      Dashboard
-                    </Link>
                     <Link href="/admin/users" className="inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700">
                       Users
                     </Link>
@@ -180,9 +177,6 @@ export const PageTemplate: React.FC<PageTemplateProps> = ({
             
             {isAuthenticated && isAdmin && (
               <>
-                <Link href="/admin/dashboard" className="block pl-3 pr-4 py-2 border-l-4 border-transparent text-base font-medium text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800">
-                  Dashboard
-                </Link>
                 <Link href="/admin/users" className="block pl-3 pr-4 py-2 border-l-4 border-transparent text-base font-medium text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800">
                   Users
                 </Link>

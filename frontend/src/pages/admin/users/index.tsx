@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import Link from 'next/link';
-import { AdminLayout } from '../../../components/Layout/AdminLayout';
+import { PageTemplate } from '../../../components/PageTemplate';
 import { AuthLogger } from '../../../utils/logging';
 // Import Tabulator styles
 import 'react-tabulator/lib/styles.css';
@@ -117,7 +117,7 @@ const UsersPage = () => {
   }
 
   return (
-    <AdminLayout title="User Management">
+    <PageTemplate title="User Management">
       <div className="bg-white shadow-md rounded-lg p-6">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold">User Management</h1>
@@ -158,7 +158,7 @@ const UsersPage = () => {
           </>
         )}
       </div>
-    </AdminLayout>
+    </PageTemplate>
   );
 };
 
