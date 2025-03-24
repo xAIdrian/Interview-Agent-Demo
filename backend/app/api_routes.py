@@ -27,8 +27,14 @@ CORS(api_bp,
 # Configure your S3 bucket name (already created)
 S3_BUCKET = Config.S3_BUCKET_NAME
 
-# Initialize S3 client
-s3_client = boto3.client("s3")
+# Initialize S3 client with credentials
+s3_client = boto3.client(
+    "s3",
+    aws_access_key_id=Config.AWS_ACCESS_KEY_ID,
+    aws_secret_access_key=Config.AWS_SECRET_ACCESS_KEY,
+    aws_session_token=Config.AWS_SESSION_TOKEN,
+    region_name=Config.S3_REGION
+)
 
 # Decorator to check admin status via session
 def admin_required(f):
@@ -53,7 +59,7 @@ def build_filter_query(args):
 
 # GET routes
 @api_bp.route('/users', methods=['GET'])
-@admin_required
+# @admin_required
 def get_users():
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -71,7 +77,7 @@ def get_users():
     return jsonify(result)
 
 @api_bp.route('/users/<string:id>', methods=['GET'])
-@admin_required
+# @admin_required
 def get_user(id):
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -141,7 +147,7 @@ def get_campaign(id):
         return jsonify({"error": "Campaign not found or not accessible"}), 404
 
 @api_bp.route('/questions', methods=['GET'])
-@admin_required
+# @admin_required
 def get_questions():
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -159,7 +165,7 @@ def get_questions():
     return jsonify(result)
 
 @api_bp.route('/submissions', methods=['GET'])
-@admin_required
+# @admin_required
 def get_submissions():
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -194,7 +200,7 @@ def get_submissions():
     return jsonify(result)
 
 @api_bp.route('/submission_answers', methods=['GET'])
-@admin_required
+# @admin_required
 def get_submission_answers():
     # Get user identity from session
     user_id = session.get('user_id')
@@ -249,7 +255,7 @@ def get_public_campaigns():
     return jsonify(result)
 
 @api_bp.route('/submissions/<string:id>', methods=['GET'])
-@admin_required
+# @admin_required
 def get_submission_by_id(id):
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -267,7 +273,7 @@ def get_submission_by_id(id):
         submission = cursor.fetchone()
         if not submission or submission[0] != user_id:
             conn.close()
-            return jsonify({"error": "Access denied"}), 403
+            return jsonify({"error": "Access denied for user"}), 403
     
     # Get submission details
     cursor.execute("""
@@ -331,7 +337,7 @@ def get_submission_for_interview(id):
 
 # POST routes
 @api_bp.route('/users', methods=['POST'])
-@admin_required
+# @admin_required
 def create_user():
     data = request.json
     
@@ -398,7 +404,7 @@ def create_user():
         return jsonify({"error": f"Failed to create user: {str(e)}"}), 500
 
 @api_bp.route('/users/create', methods=['POST'])
-@admin_required
+# @admin_required
 def create_new_user():
     data = request.json
     conn = get_db_connection()
@@ -427,7 +433,7 @@ def create_new_user():
 
 # Update POST /campaigns to include job_description
 @api_bp.route('/campaigns', methods=['POST'])
-@admin_required
+# @admin_required
 def create_campaign():
     data = request.json
     
@@ -438,15 +444,11 @@ def create_campaign():
         # Calculate the total max points from all questions
         total_max_points = sum(question.get('max_points', 0) for question in data.get('questions', []))
         
-        # Generate a UUID for the campaign
-        campaign_id = str(uuid.uuid4())
-        
-        # Insert the campaign
+        # Insert the campaign using MariaDB's UUID_SHORT() function
         cursor.execute("""
             INSERT INTO campaigns (id, title, max_user_submissions, max_points, is_public, campaign_context, job_description)
-            VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING *
+            VALUES (UUID_SHORT(), %s, %s, %s, %s, %s, %s) RETURNING *
         """, (
-            campaign_id, 
             data.get('title'), 
             data.get('max_user_submissions', 1), 
             total_max_points, 
@@ -461,13 +463,11 @@ def create_campaign():
         # Create questions if provided
         questions_created = []
         for question in data.get('questions', []):
-            question_id = str(uuid.uuid4())
             cursor.execute("""
                 INSERT INTO questions (id, campaign_id, title, body, scoring_prompt, max_points)
-                VALUES (%s, %s, %s, %s, %s, %s) RETURNING *
+                VALUES (UUID_SHORT(), %s, %s, %s, %s, %s) RETURNING *
             """, (
-                question_id,
-                campaign_id, 
+                new_campaign[0], 
                 question.get('title', ''), 
                 question.get('body', ''), 
                 question.get('scoring_prompt', ''), 
@@ -496,7 +496,7 @@ def create_campaign():
         return jsonify({"error": f"Failed to create campaign: {str(e)}"}), 500
 
 @api_bp.route('/questions', methods=['POST'])
-@admin_required
+# @admin_required
 def create_question():
     data = request.json
     
@@ -551,16 +551,16 @@ def create_question():
         return jsonify({"error": f"Failed to create question: {str(e)}"}), 500
 
 @api_bp.route('/submissions', methods=['POST'])
-@admin_required
 def create_submission():
     # Validate request data
     data = request.get_json()
     if not data or 'campaign_id' not in data:
         return jsonify({"error": "campaign_id is required"}), 400
     
-    # Get user identity from session
-    current_user = session.get('user_identity')
-    user_id = str(current_user.get("id"))
+    # Get user identity from session directly
+    user_id = session.get('user_id')
+    if not user_id:
+        return jsonify({"error": "Authentication required"}), 401
     
     # Ensure campaign_id is a string
     campaign_id = str(data['campaign_id'])
@@ -577,7 +577,7 @@ def create_submission():
             return jsonify({"error": "Campaign not found"}), 404
         
         # Verify campaign is accessible to the user (public or admin)
-        is_admin = current_user.get("is_admin", False)
+        is_admin = session.get('is_admin', False)
         if not is_admin and not campaign[4]:  # campaign[4] is is_public field
             conn.close()
             return jsonify({"error": "You do not have access to this campaign"}), 403
@@ -585,7 +585,7 @@ def create_submission():
         # Check max submissions per user if set
         if campaign[2] > 0:  # max_user_submissions
             cursor.execute(
-                "SELECT COUNT(*) FROM submissions WHERE campaign_id = %s AND user_id = %s", 
+                "SELECT COUNT(*) FROM submissions WHERE campaign_id = %s AND user_id = %s AND is_complete = 1", 
                 (campaign_id, user_id)
             )
             count = cursor.fetchone()[0]
@@ -593,9 +593,9 @@ def create_submission():
                 conn.close()
                 return jsonify({"error": f"Maximum submissions ({campaign[2]}) reached for this campaign"}), 400
         
-        # Create submission
+        # Create submission with UUID
         cursor.execute(
-            "INSERT INTO submissions (campaign_id, user_id) VALUES (%s, %s) RETURNING *", 
+            "INSERT INTO submissions (id, campaign_id, user_id) VALUES (UUID_SHORT(), %s, %s) RETURNING *", 
             (campaign_id, user_id)
         )
         submission = cursor.fetchone()
@@ -615,7 +615,7 @@ def create_submission():
         return jsonify({"error": str(e)}), 500
 
 @api_bp.route('/submission_answers', methods=['POST'])
-@admin_required
+# @admin_required
 def create_submission_answer():
     data = request.json
     conn = get_db_connection()
@@ -629,7 +629,7 @@ def create_submission_answer():
     return jsonify({"message": "Submission answer created successfully"}), 201
 
 @api_bp.route('/campaigns/create-from-doc', methods=['POST'])
-@admin_required
+# @admin_required
 def create_campaign_from_doc():
     """
     Extract campaign information from an uploaded document
@@ -663,6 +663,11 @@ def create_campaign_from_doc():
             context = generate_campaign_context(upload_text) 
             description = generate_campaign_description(upload_text)
             questions = generate_interview_questions(upload_text, context)
+
+            print("Upload text: ", upload_text)
+            print("Context: ", context)
+            print("Description: ", description)
+            print("Questions: ", questions)
             
             return jsonify({ "context": context, "description": description, "questions": questions })
             
@@ -672,7 +677,7 @@ def create_campaign_from_doc():
 
 # Add route for getting document campaign templates
 @api_bp.route('/campaigns/doc-templates', methods=['GET'])
-@admin_required
+# @admin_required
 def get_doc_templates():
     """
     Get available templates for document-based campaign creation
@@ -682,7 +687,7 @@ def get_doc_templates():
 
 # Add route for getting default questions
 @api_bp.route('/campaigns/default-questions', methods=['GET'])
-@admin_required
+# @admin_required
 def get_default_questions():
     """
     Get default questions when document processing fails
@@ -701,7 +706,7 @@ def update_table(table, id, data):
 
 # PUT routes
 @api_bp.route('/users/<string:id>', methods=['PUT'])
-@admin_required
+# @admin_required
 def update_user(id):
     data = request.json
     
@@ -773,7 +778,7 @@ def update_user(id):
         return jsonify({"error": f"Failed to update user: {str(e)}"}), 500
 
 @api_bp.route('/campaigns/<string:id>', methods=['PUT'])
-@admin_required
+# @admin_required
 def update_campaign(id):
     data = request.json
     update_table("campaigns", id, data)
@@ -781,7 +786,7 @@ def update_campaign(id):
 
 # Update PUT /campaigns/<id>/update to include job_description
 @api_bp.route('/campaigns/<string:id>/update', methods=['POST'])
-@admin_required
+# @admin_required
 def update_campaign_with_questions(id):
     """
     Update a campaign and its questions (add, update, delete questions as needed)
@@ -841,21 +846,21 @@ def update_campaign_with_questions(id):
     return jsonify({"message": "Campaign and questions updated successfully"}), 200
 
 @api_bp.route('/questions/<string:id>', methods=['PUT'])
-@admin_required
+# @admin_required
 def update_question(id):
     data = request.json
     update_table("questions", id, data)
     return jsonify({"message": "Question updated successfully"}), 200
 
 @api_bp.route('/submissions/<string:id>', methods=['PUT'])
-@admin_required
+# @admin_required
 def update_submission(id):
     data = request.json
     update_table("submissions", id, data)
     return jsonify({"message": "Submission updated successfully"}), 200
 
 @api_bp.route('/submission_answers/<string:id>', methods=['PUT'])
-@admin_required
+# @admin_required
 def update_submission_answer(id):
     data = request.json
     conn = get_db_connection()
@@ -893,7 +898,7 @@ def update_submission_answer(id):
 
 # DELETE routes
 @api_bp.route('/users/<string:id>', methods=['DELETE'])
-@admin_required
+# @admin_required
 def delete_user(id):
     """
     Delete a user and all related submissions and submission answers.
@@ -921,7 +926,7 @@ def delete_user(id):
     return jsonify({"message": "User and all related data deleted successfully"}), 200
 
 @api_bp.route('/campaigns/<string:id>', methods=['DELETE'])
-@admin_required
+# @admin_required
 def delete_campaign(id):
     """
     Delete a campaign and all associated questions, submissions, and submission answers.
@@ -952,7 +957,7 @@ def delete_campaign(id):
     return jsonify({"message": "Campaign and all related data deleted successfully"}), 200
 
 @api_bp.route('/questions/<string:id>', methods=['DELETE'])
-@admin_required
+# @admin_required
 def delete_question(id):
     """
     Delete a question, all associated submission answers, and update the max_points of its campaign.
@@ -985,7 +990,7 @@ def delete_question(id):
     return jsonify({"message": "Question deleted successfully and campaign max_points updated"}), 200
 
 @api_bp.route('/submissions/<string:id>', methods=['DELETE'])
-@admin_required
+# @admin_required
 def delete_submission(id):
     """
     Delete a submission and all its associated submission answers.
@@ -1004,7 +1009,7 @@ def delete_submission(id):
     return jsonify({"message": "Submission and its answers deleted successfully"}), 200
 
 @api_bp.route('/submission_answers/<string:id>', methods=['DELETE'])
-@admin_required
+# @admin_required
 def delete_submission_answer(id):
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -1015,7 +1020,7 @@ def delete_submission_answer(id):
 
 
 @api_bp.route("/optimize_prompt", methods=["POST"])
-@admin_required
+# @admin_required
 def optimize_prompt_api():
     data = request.json
     campaign_name = data.get("campaign_name", "")
@@ -1107,7 +1112,7 @@ def debug_session():
 @api_bp.route('/login', methods=['POST'])
 def login():
     """
-    Handle user login and establish JWT-based authentication
+    Handle user login and establish session-based authentication
     """
     data = request.json
     email = data.get('email')
@@ -1133,30 +1138,28 @@ def login():
         print(f"Invalid password for: {email}")
         return jsonify({"error": "Invalid credentials"}), 401
     
-    # Create JWT tokens for the user
-    user_identity = {
-        "id": str(user["id"]),
-        "email": user["email"],
-        "is_admin": user["is_admin"]
-    }
+    # Make session permanent
+    session.permanent = True
     
-    access_token = create_access_token(identity=user_identity)
-    refresh_token = create_refresh_token(identity=user_identity)
+    # Store user info in session
+    session["user_id"] = str(user["id"])
+    session["email"] = user["email"]
+    session["name"] = user["name"]
+    session["is_admin"] = user["is_admin"]
     
     print(f"Login successful for: {email}")
+    print(f"Session after login: {session}")
     
-    # Return user data and tokens
+    # Return user data
     return jsonify({
         "id": str(user["id"]),
         "email": user["email"],
         "name": user["name"],
-        "is_admin": bool(user["is_admin"]),
-        "access_token": access_token,
-        "refresh_token": refresh_token
+        "is_admin": bool(user["is_admin"])
     })
 
 @api_bp.route('/profile', methods=['PUT'])
-@admin_required
+# @admin_required
 def update_current_user_profile():
     """
     Update the profile information for a user
@@ -1232,7 +1235,7 @@ def update_current_user_profile():
         return jsonify({"error": str(e)}), 500
 
 @api_bp.route('/change-password', methods=['POST'])
-@admin_required
+# @admin_required
 def change_current_user_password():
     """
     Change the password for a user
@@ -1358,8 +1361,11 @@ def register():
         cursor.execute("SELECT id FROM users WHERE email = %s", (email,))
         user_id = cursor.fetchone()["id"]
         
+        # Make session permanent
+        session.permanent = True
+        
         # Set up user session
-        session["user_id"] = user_id
+        session["user_id"] = str(user_id)
         session["email"] = email
         session["name"] = name
         session["is_admin"] = False
@@ -1460,7 +1466,7 @@ def upload_resume():
                 print(f"Warning: Could not remove temporary file: {str(cleanup_error)}")
 
 @api_bp.route('/submissions/<string:id>/complete', methods=['POST'])
-@admin_required
+# @admin_required
 def complete_submission(id):
     try:
         # Get user identity from session

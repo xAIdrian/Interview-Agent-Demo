@@ -3,7 +3,6 @@ import axios from 'axios';
 import { useRouter } from 'next/router';
 import { PrimaryButton } from '../../components/Button';
 import { PageTemplate } from '../../components/PageTemplate';
-import { INTERNAL_API_TOKEN } from '../../utils/internalApiToken';
 
 // Define interfaces similar to create.tsx
 interface Question {
@@ -120,16 +119,25 @@ const CreateCampaignFromDocPage = () => {
     formData.append('template_type', selectedTemplate);
     
     try {
-      const response = await axios.post(
-        'http://127.0.0.1:5000/api/campaigns/create-from-doc',
-        formData,
-        {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-            'Authorization': `Bearer ${INTERNAL_API_TOKEN}`
+      let response;
+      try {
+        response = await axios.post(
+          'http://127.0.0.1:5000/api/campaigns/create-from-doc',
+          formData,
+          {
+            timeout: 60000 // 60 second timeout
           }
+        );
+      } catch (err) {
+        console.error('Error extracting text from document:', err);
+        if (axios.isAxiosError(err) && err.code === 'ECONNABORTED') {
+          setError('Request timed out. Please try uploading a smaller document or try again later.');
+        } else {
+          setError('No text could be extracted from the document. Please ensure you\'re not using "Print to PDF" as this converts text to images. Try a different document format.');
         }
-      );
+        setIsProcessing(false);
+        return;
+      }
       
       // Get the response data with context, description and questions
       const extractedData = response.data;
@@ -254,11 +262,6 @@ const CreateCampaignFromDocPage = () => {
           campaign_context,
           question: questionTitle,
           prompt: scoring_prompt
-        },
-        {
-          headers: {
-            'Authorization': `Bearer ${INTERNAL_API_TOKEN}`
-          }
         }
       );
       
@@ -367,13 +370,7 @@ const CreateCampaignFromDocPage = () => {
     try {
       const response = await axios.post(
         'http://127.0.0.1:5000/api/campaigns',
-        formData,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${INTERNAL_API_TOKEN}`
-          }
-        }
+        formData
       );
       
       if (response.status === 201) {

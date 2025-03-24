@@ -38,12 +38,17 @@ app.config.from_object(Config)
 app.register_blueprint(api_bp, url_prefix='/api')
 
 # Configure the app for proper session handling
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', secrets.token_hex(16))
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', Config.SECRET_KEY)
 app.config['SESSION_TYPE'] = 'filesystem'
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=1)
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)  # Extend to 30 days
 app.config['SESSION_COOKIE_SECURE'] = False  # Set to True in production with HTTPS
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # Use 'Strict' in production
+
+# Make sessions permanent by default
+@app.before_request
+def make_session_permanent():
+    session.permanent = True
 
 # Add a root-level health endpoint
 @app.route('/health', methods=['GET', 'HEAD'])

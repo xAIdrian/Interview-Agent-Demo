@@ -7,6 +7,7 @@ import json
 from openai import OpenAI
 from config import Config
 from dotenv import load_dotenv
+import io
 
 # Initialize OpenAI client
 load_dotenv()
@@ -88,56 +89,51 @@ def get_campaign_templates():
 
 # ===== DOCUMENT PROCESSING FUNCTIONS =====
 
-def extract_text_from_pdf(file_path: str) -> str:
-    """Extract text from a PDF file"""
-    text = ""
-    try:
-        with open(file_path, 'rb') as file:
-            pdf_reader = PyPDF2.PdfReader(file)
-            for page_num in range(len(pdf_reader.pages)):
-                page = pdf_reader.pages[page_num]
-                text += page.extract_text()
-    except Exception as e:
-        print(f"Error extracting text from PDF: {e}")
-    return text
-
-def extract_text_from_docx(file_path: str) -> str:
-    """Extract text from a DOCX file"""
-    text = ""
-    try:
-        doc = docx.Document(file_path)
-        for para in doc.paragraphs:
-            text += para.text + "\n"
-    except Exception as e:
-        print(f"Error extracting text from DOCX: {e}")
-    return text
-
-def extract_text_from_txt(file_path: str) -> str:
-    """Extract text from a TXT file"""
-    text = ""
-    try:
-        with open(file_path, 'r', encoding='utf-8') as file:
-            text = file.read()
-    except UnicodeDecodeError:
-        # Try with a different encoding if UTF-8 fails
-        with open(file_path, 'r', encoding='latin-1') as file:
-            text = file.read()
-    except Exception as e:
-        print(f"Error extracting text from TXT: {e}")
-    return text
-
 def extract_text_from_document(file_path: str) -> str:
-    """Extract text from various document formats"""
-    extension = os.path.splitext(file_path)[1].lower()
+    """Extract text from various document formats (PDF, DOCX, DOC, TXT)"""
+    import os
+    import docx
+    import pymupdf
     
-    if extension == '.pdf':
-        return extract_text_from_pdf(file_path)
-    elif extension in ['.docx', '.doc']:
-        return extract_text_from_docx(file_path)
-    elif extension == '.txt':
-        return extract_text_from_txt(file_path)
-    else:
-        raise ValueError(f"Unsupported file format: {extension}")
+    extension = os.path.splitext(file_path)[1].lower()
+    text = ""
+    
+    try:
+        if extension == '.pdf':
+            # Extract text from PDF using PyMuPDF
+            doc = pymupdf.open(file_path)
+            for page_num in range(len(doc)):
+                page = doc[page_num]
+                text += page.get_text()
+            doc.close()
+                    
+        elif extension in ['.docx', '.doc']:
+            # Extract text from DOCX/DOC
+            doc = docx.Document(file_path)
+            for para in doc.paragraphs:
+                text += para.text + "\n"
+                
+        elif extension == '.txt':
+            # Extract text from TXT
+            try:
+                with open(file_path, 'r', encoding='utf-8') as file:
+                    text = file.read()
+            except UnicodeDecodeError:
+                # Try with a different encoding if UTF-8 fails
+                with open(file_path, 'r', encoding='latin-1') as file:
+                    text = file.read()
+        else:
+            raise ValueError(f"Unsupported file format: {extension}")
+            
+        if not text.strip():
+            raise ValueError(f"No text could be extracted from the file")
+            
+        return text
+        
+    except Exception as e:
+        error_message = f"Error extracting text from {extension} file: {str(e)}"
+        print(error_message)
+        raise ValueError(error_message)
 
 
 def generate_campaign_context(text):
@@ -201,7 +197,7 @@ def generate_interview_questions(text, campaign_context):
 
     By default, make each question 10 points max. Make more important questions worth 20 points max.
 
-    Create your output as a JSON array containing dictionaries without markdown. Each dictionary must include the keys: question, max_points, scoring_prompt
+    Create your output as a JSON array containing dictionaries without markdown. Each dictionary must include the keys: title, max_points, scoring_prompt
     
     Output ONLY the JSON array with no markdown.
     """

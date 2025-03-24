@@ -95,17 +95,19 @@ export default function Page() {
         const stringSubmissionId = String(submissionId);
         
         // Use the stringSubmissionId in the API call with proper authorization
-        const response = await axios.get(`/api/submissions/${stringSubmissionId}`, {
-          headers: {
-            'Authorization': token ? `Bearer ${token}` : ''
-          }
-        });
+        const response = await axios.get(`/api/submissions/${stringSubmissionId}`);
+        
+        if (response.status === 403) {
+          setError('Access denied for user');
+          router.push('/login');
+          return null;
+        }
         
         // Ensure IDs are strings
         const data = response.data;
         data.id = String(data.id);
-        data.campaign_id = String(data.campaign_id);
-        data.user_id = String(data.user_id);
+        data.campaign_id = String(data.submission.campaign_id);
+        data.user_id = String(data.submission.user_id);
         
         setSubmission(data);
         
@@ -145,11 +147,7 @@ export default function Page() {
       const stringCampaignId = String(campaignId);
       
       // Use the stringCampaignId in the API call with proper authorization
-      const response = await axios.get(`/api/campaigns/${stringCampaignId}`, {
-        headers: {
-          'Authorization': token ? `Bearer ${token}` : ''
-        }
-      });
+      const response = await axios.get(`/api/campaigns/${stringCampaignId}`);
       
       // Ensure IDs are strings
       const data = response.data;
@@ -446,9 +444,14 @@ function CandidateVideo({ onTrackStarted }: { onTrackStarted?: (track: any) => v
         // Store stream reference for cleanup
         streamRef.current = stream;
         
+        // Check if video element exists before setting properties
+        if (!videoElement || !canvasElement) return;
+        
         // Set the video source to the camera stream
         videoElement.srcObject = stream;
         videoElement.onloadedmetadata = () => {
+          if (!videoElement || !canvasElement) return;
+          
           videoElement.play().catch(err => console.error('Error playing video:', err));
           setHasCamera(true);
           

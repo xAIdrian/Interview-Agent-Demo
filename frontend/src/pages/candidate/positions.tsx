@@ -42,18 +42,7 @@ const PositionsPage = () => {
         setPositions(data);
       } catch (err) {
         console.error('Error fetching positions:', err);
-        
-        if (axios.isAxiosError(err)) {
-          if (err.response?.status === 401) {
-            router.push('/login');
-          } else if (err.response?.data?.error) {
-            setError(err.response.data.error);
-          } else {
-            setError('Failed to load available positions');
-          }
-        } else {
-          setError('An unexpected error occurred');
-        }
+        setError('Failed to load positions. Please try again later.');
       } finally {
         setIsLoading(false);
       }
