@@ -42,7 +42,7 @@ def submit_interview_transcript(submission_id: str, transcript: str) -> bool:
         response = requests.post(
             f"{API_BASE_URL}/submit_interview", 
             json={
-                "submissionId": submission_id,
+                "submission_id": str(submission_id),
                 "transcript": transcript
             }
         )
