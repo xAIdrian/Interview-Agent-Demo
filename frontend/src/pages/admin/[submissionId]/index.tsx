@@ -317,10 +317,10 @@ const SubmissionPage = () => {
             </Link>
           )}
           <button 
-            onClick={() => router.push('/dashboard')}
+            onClick={() => router.push('/')}
             className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-700"
           >
-            Back to Dashboard
+            Home
           </button>
         </div>
       </div>
