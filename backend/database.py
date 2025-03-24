@@ -124,7 +124,7 @@ def create_submission_answers_table():
                 id BIGINT UNSIGNED PRIMARY KEY,
                 submission_id BIGINT UNSIGNED NOT NULL,
                 question_id BIGINT UNSIGNED NOT NULL,
-                video_path VARCHAR(255) NOT NULL,
+                video_path VARCHAR(255) DEFAULT NULL,
                 transcript TEXT NOT NULL,
                 score INT DEFAULT NULL,
                 score_rationale TEXT DEFAULT NULL,

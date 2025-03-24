@@ -47,17 +47,17 @@ const CampaignSubmissionsPage = () => {
   const tabulatorRef = useRef<Tabulator | null>(null);
 
   // Setup auth on component mount
-  useEffect(() => {
-    const token = localStorage.getItem('accessToken');
-    const isAdminUser = localStorage.getItem('isAdmin') === 'true';
-    setIsAdmin(isAdminUser);
+  //useEffect(() => {
+    //const token = localStorage.getItem('accessToken');
+    //const isAdminUser = localStorage.getItem('isAdmin') === 'true';
+    //setIsAdmin(isAdminUser);
     
-    if (token) {
-      // Don't set default axios headers here
-    } else {
-      router.push('/login');
-    }
-  }, [router]);
+    //if (token) {
+      //// Don't set default axios headers here
+    //} else {
+      //router.push('/login');
+    //}
+  //}, [router]);
 
   // Fetch campaign data
   useEffect(() => {
@@ -83,12 +83,7 @@ const CampaignSubmissionsPage = () => {
         
         // Fetch all submissions for this campaign
         const submissionsResponse = await axios.get(
-          `${API_BASE_URL}/api/submissions?campaign_id=${campaignIdString}`,
-          {
-            headers: {
-              'Authorization': localStorage.getItem('access_token') ? `Bearer ${localStorage.getItem('access_token')}` : ''
-            }
-          }
+          `${API_BASE_URL}/api/submissions?campaign_id=${campaignIdString}`
         );
         
         // Ensure all IDs in the submissions are strings

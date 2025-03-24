@@ -1559,7 +1559,7 @@ def submit_interview():
         
         # Get campaign details
         cursor.execute(
-            "SELECT title, campaign_context, job_description FROM campaigns WHERE id = %s",
+            "SELECT title, campaign_context, description FROM campaigns WHERE id = %s",
             (campaign_id,)
         )
         campaign_row = cursor.fetchone()
@@ -1576,14 +1576,15 @@ def submit_interview():
         
         # Get questions for this campaign
         cursor.execute(
-            "SELECT body, scoring_prompt, max_points FROM questions WHERE campaign_id = %s ORDER BY question_order",
+            "SELECT id, body, scoring_prompt, max_points FROM questions WHERE campaign_id = %s",
             (campaign_id,)
         )
         questions = [
             {
-                "body": row[0],
-                "scoring_prompt": row[1],
-                "max_points": row[2]
+                "id": row[0],
+                "body": row[1],
+                "scoring_prompt": row[2],
+                "max_points": row[3]
             }
             for row in cursor.fetchall()
         ]
@@ -1591,6 +1592,7 @@ def submit_interview():
         conn.close()
 
         scores = generate_submission_scoring(campaign, questions, transcript)
+        print(scores)
 
         # Get new connection since we closed the previous one
         conn = get_db_connection()
@@ -1603,26 +1605,22 @@ def submit_interview():
             # Update each answer in submission_answers
             for score in scores:
                 cursor.execute("""
-                    UPDATE submission_answers 
-                    SET answer = %s,
-                        score = %s,
-                        scoring_rationale = %s
-                    WHERE submission_id = %s
-                    AND question = %s
+                    INSERT INTO submission_answers 
+                    (id, submission_id, question_id, transcript, score, score_rationale)
+                    VALUES (uuid_short(), %s, %s, %s, %s, %s)
                 """, (
+                    submission_id,
+                    score["question_id"],
                     score["response"],
                     score["score"], 
-                    score["rationale"],
-                    submission_id,
-                    score["question"]
+                    score["rationale"]
                 ))
             
             # Mark submission as complete and update total score
             cursor.execute("""
                 UPDATE submissions
                 SET is_complete = 1,
-                    total_score = %s,
-                    completed_at = CURRENT_TIMESTAMP
+                    total_points = %s
                 WHERE id = %s
             """, (total_score, submission_id))
             

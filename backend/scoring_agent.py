@@ -8,6 +8,7 @@ def format_questions(questions):
 
     for question in questions:
         prompt += f"Question: {question['body']}\n"
+        prompt += f"Question ID: {question['id']}\n"
         prompt += f"Scoring Criteria: {question['scoring_prompt']}\n"
         prompt += f"Maximum # of points: {question['max_points']}\n"
         prompt += "\n"
@@ -40,7 +41,7 @@ The company is running virtual interviews for a {campaign_title} position.
 Context: {campaign_context}
 Job Description: {job_description}
 
-# SCORING CRITERIA
+# QUESTIONS, IDS, SCORING CRITERIA
 {format_questions(questions)}
 
 # TASK/OVERVIEW
@@ -50,6 +51,7 @@ For each question, you will be given a scoring criteria, maximum number of point
 
 You will create a JSON array containing a dictionary representing each of your answers. Within each dictionary, include the following keys in this order:
 - question: Repeat the original question prompt.
+- question_id: The ID of the question. Match this to the question ID in the questions array.
 - response: Provide the candidate's response. Copy and paste the transcript segment that corresponds to the question.
 - rationale: Provide an in-depth analysis of the candidate's response and whether it satisfies the scoring criteria given the context described above.
 - score: Provide a numerical score between 0 and the maximum number of points based on your rationale. Full points should be awarded for responses that fully satisfy the scoring criteria.
