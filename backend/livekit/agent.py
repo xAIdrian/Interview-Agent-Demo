@@ -68,6 +68,23 @@ async def entrypoint(ctx: JobContext):
     tasks = []
     _accumulated_questions = []
     submission_data = None
+    
+    # Keep-alive mechanism to prevent disconnection
+    async def keep_alive_task():
+        """Send periodic pings to keep the connection alive"""
+        while True:
+            try:
+                logger.debug("Sending keep-alive ping")
+                await asyncio.sleep(30)  # Send a ping every 30 seconds
+            except asyncio.CancelledError:
+                logger.info("Keep-alive task cancelled")
+                break
+            except Exception as e:
+                logger.error(f"Error in keep-alive task: {e}")
+    
+    # Start keep-alive task
+    keep_alive = asyncio.create_task(keep_alive_task())
+    tasks.append(keep_alive)
 
     async def transcribe_track(participant: rtc.RemoteParticipant, track: rtc.Track):
         audio_stream = stt.AudioStream(track)
@@ -234,9 +251,45 @@ async def entrypoint(ctx: JobContext):
         ]
         logger.info("Using default questions as none were provided")
     
+    # Add monitoring for agent state to help with debugging
+    last_activity_time = time.time()
+    agent_instance = None
+    
+    async def monitor_agent_activity():
+        """Monitor agent activity and re-prompt if necessary"""
+        nonlocal last_activity_time, agent_instance
+        
+        while True:
+            try:
+                current_time = time.time()
+                # If more than 45 seconds have passed without activity
+                if agent_instance and current_time - last_activity_time > 45:
+                    logger.warning("Agent appears to be inactive, attempting to re-prompt...")
+                    try:
+                        # Reset the last activity time
+                        last_activity_time = current_time
+                        # Generate a continuation prompt
+                        agent_instance.generate_reply()
+                        logger.info("Successfully re-prompted the agent")
+                    except Exception as e:
+                        logger.error(f"Failed to re-prompt agent: {e}")
+                
+                await asyncio.sleep(15)  # Check every 15 seconds
+            except asyncio.CancelledError:
+                logger.info("Agent monitoring task cancelled")
+                break
+            except Exception as e:
+                logger.error(f"Error in agent monitoring: {e}")
+    
+    # Start the agent monitoring task
+    monitor_task = asyncio.create_task(monitor_agent_activity())
+    tasks.append(monitor_task)
+
     # Start the multimodal agent
     try:
-        run_multimodal_agent(ctx, participant, _accumulated_questions, submission_data, interviewer_name)
+        agent_instance = run_multimodal_agent(ctx, participant, _accumulated_questions, submission_data, interviewer_name)
+        # Update last activity time when the agent starts
+        last_activity_time = time.time()
         logger.info("agent started successfully")
     except Exception as e:
         logger.error(f"Error starting multimodal agent: {e}")
@@ -246,11 +299,25 @@ async def entrypoint(ctx: JobContext):
                 "resume_text": "Not available",
                 "job_description": "Not available"
             }
-            run_multimodal_agent(ctx, participant, _accumulated_questions, fallback_data, interviewer_name)
+            agent_instance = run_multimodal_agent(ctx, participant, _accumulated_questions, fallback_data, interviewer_name)
+            last_activity_time = time.time()
             logger.info("agent started with fallback data")
         except Exception as e2:
             logger.error(f"Critical error starting agent even with fallback data: {e2}")
 
+    try:
+        # Wait for all tasks to complete
+        await asyncio.gather(*tasks, return_exceptions=True)
+    except Exception as e:
+        logger.error(f"Error in task execution: {e}")
+    finally:
+        # Clean up tasks
+        for task in tasks:
+            if not task.done():
+                task.cancel()
+        
+        logger.info("All tasks completed or cancelled")
+    
     logger.info("agent initialization completed")
 
 
@@ -270,7 +337,7 @@ def run_multimodal_agent(ctx: JobContext, participant: rtc.RemoteParticipant, qu
     # Format the question list
     formatted_questions = "\n".join([f"- {q}" for q in questions])
     
-    # Build the full prompt
+    # Build the full prompt with additional instruction to keep conversation going
     full_prompt = agent_prompt_template.format(
         interviewer_name=interviewer_name,
         questions=formatted_questions,
@@ -279,29 +346,106 @@ def run_multimodal_agent(ctx: JobContext, participant: rtc.RemoteParticipant, qu
         campaign_context=campaign_context
     )
     
+    # Add explicit instructions to continue the conversation
+    full_prompt += """
+IMPORTANT: Always continue the conversation. If the candidate doesn't respond within 10 seconds, gently prompt them again.
+If you've asked a question and there's silence, wait briefly then rephrase the question or ask if they need clarification.
+Never end the interview abruptly. Keep the conversation flowing naturally and wait for the candidate to fully answer each question.
+
+Your first message should be a friendly introduction as {interviewer_name}, welcoming the candidate and explaining that you'll be conducting the interview today.
+"""
+    
     logger.info(f"Using prompt template with interviewer {interviewer_name} and {len(questions)} questions")
 
+    # Create an event handler to track when the agent speaks or listens
+    def on_agent_state_change(state):
+        logger.info(f"Agent state changed to: {state}")
+        # Update activity timestamp whenever the agent changes state
+        nonlocal last_activity_time
+        last_activity_time = time.time()
+    
+    # Create a message handler to ensure audio conversion happens
+    def on_message_generated(message):
+        logger.info(f"Agent generated message: {message}")
+        nonlocal last_activity_time
+        last_activity_time = time.time()
+
+        # Special handling to ensure the message is spoken
+        try:
+            if hasattr(agent, "_tts") and agent._tts:
+                logger.info("Explicitly calling TTS to ensure speech")
+                # Directly force speaking the message if possible
+                if hasattr(agent, "_speak_text") and callable(agent._speak_text):
+                    asyncio.create_task(agent._speak_text(str(message)))
+        except Exception as e:
+            logger.error(f"Error during message handling: {e}")
+    
+    last_activity_time = time.time()
+    
     model = openai.realtime.RealtimeModel(
         instructions=full_prompt,
         modalities=["audio", "text"],
     )
 
-    # create a chat context with chat history, these will be synchronized with the server
-    # upon session establishment
+    # Register any available message handlers on the model
+    if hasattr(model, "on_message_generated"):
+        model.on_message_generated = on_message_generated
+    elif hasattr(model, "on_response"):
+        model.on_response = on_message_generated
+
+    # Create a chat context with chat history
     chat_ctx = llm.ChatContext()
     chat_ctx.append(
-        text=f"You are {interviewer_name}, an AI interviewer. You are conducting an interview for a job position. The candidate's resume says: {resume_text}. The job description is: {job_description}",
+        text=f"You are {interviewer_name}, an AI interviewer. You are conducting an interview for a job position. The candidate's resume says: {resume_text}. The job description is: {job_description}. Remember to maintain the conversation flow and continue asking questions even if there are pauses. Always speak your responses clearly.",
         role="assistant",
     )
-
+    
     agent = MultimodalAgent(
         model=model,
         chat_ctx=chat_ctx,
     )
+    
+    # Try to attach state change handler if the method exists
+    if hasattr(agent, "on_state_change"):
+        agent.on_state_change = on_agent_state_change
+        
+    # Try to attach message handler if the method exists on the agent
+    if hasattr(agent, "on_message_generated"):
+        agent.on_message_generated = on_message_generated
+    elif hasattr(agent, "set_on_message_generated"):
+        agent.set_on_message_generated(on_message_generated)
+    
     agent.start(ctx.room, participant)
 
-    # to enable the agent to speak first
-    agent.generate_reply()
+    # Define a retry function for initial generation
+    async def generate_with_retry():
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                logger.info(f"Generating initial reply (attempt {attempt+1}/{max_retries})")
+                agent.generate_reply()
+                
+                # Wait a bit to see if the state changes to speaking
+                await asyncio.sleep(5)
+                
+                # If no state change, try a different approach on next attempt
+                if attempt < max_retries - 1:
+                    logger.info("Trying alternative prompt approach")
+                    # Force a message if available
+                    if hasattr(agent, "send_text") and callable(agent.send_text):
+                        intro_text = f"Hello, I'm {interviewer_name}. Welcome to your interview today! I'll be asking you some questions about your experience and qualifications."
+                        await agent.send_text(intro_text)
+                
+                return
+            except Exception as e:
+                logger.error(f"Error generating initial reply (attempt {attempt+1}): {e}")
+                await asyncio.sleep(2)
+    
+    # Run the async function in a task
+    asyncio.create_task(generate_with_retry())
+    
+    # Return the agent instance so we can reference it later if needed
+    return agent
 
 
 if __name__ == "__main__":
