@@ -68,12 +68,7 @@ const CampaignDetailsPage = () => {
         
         // Fetch campaign details
         const campaignResponse = await axios.get(
-          `${API_BASE_URL}/api/campaigns/${campaignIdString}`,
-          {
-            headers: {
-              'Authorization': token ? `Bearer ${token}` : ''
-            }
-          }
+          `${API_BASE_URL}/api/campaigns/${campaignIdString}`
         );
         
         setCampaign(campaignResponse.data);
@@ -81,12 +76,7 @@ const CampaignDetailsPage = () => {
         
         // Fetch questions for this campaign
         const questionsResponse = await axios.get(
-          `${API_BASE_URL}/api/questions?campaign_id=${campaignIdString}`,
-          {
-            headers: {
-              'Authorization': token ? `Bearer ${token}` : ''
-            }
-          }
+          `${API_BASE_URL}/api/questions?campaign_id=${campaignIdString}`
         );
         
         setQuestions(questionsResponse.data);
@@ -95,12 +85,7 @@ const CampaignDetailsPage = () => {
         // Fetch submission count for this campaign
         try {
           const submissionsResponse = await axios.get(
-            `${API_BASE_URL}/api/submissions?campaign_id=${campaignIdString}`,
-            {
-              headers: {
-                'Authorization': token ? `Bearer ${token}` : ''
-              }
-            }
+            `${API_BASE_URL}/api/submissions?campaign_id=${campaignIdString}`
           );
           
           setSubmissionCount(submissionsResponse.data.length);
@@ -149,10 +134,6 @@ const CampaignDetailsPage = () => {
       // Create a submission for this campaign
       const response = await axios.post('/api/submissions', {
         campaign_id: String(campaignId)
-      }, {
-        headers: {
-          'Authorization': token ? `Bearer ${token}` : ''
-        }
       });
       
       // Ensure the submission ID is a string

@@ -183,7 +183,7 @@ const ApplicationPage = () => {
         total_points: null
       });
       
-      submissionId = createSubmissionResponse.data.submission_id;
+      submissionId = createSubmissionResponse.data.id;
       
       if (!submissionId) {
         throw new Error('Failed to create submission: No submission ID returned');
@@ -216,7 +216,7 @@ const ApplicationPage = () => {
           setError('Failed to submit your application');
         }
       } else {
-        setError('An unexpected error occurred');
+        setError('An unexpected error occurred: ' + err);
       }
       
       // If upload fails, delete the submission

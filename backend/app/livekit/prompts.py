@@ -75,6 +75,9 @@ Priorities in your execution:
 9. If the candidate is not making sense, ask them to clarify their answer.
 10. Pay attention to the candidate's previous experience.  If they mention something that is relevant to the job, ask them to go into detail.
 
+Here is additional context about the campaign/company:
+{campaign_context}
+
 Here is the list of questions you will ask the candidate:
 {questions}
 

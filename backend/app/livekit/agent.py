@@ -6,6 +6,7 @@ import asyncio
 import json
 import time
 import os
+import random
 from livekit import rtc
 from livekit.agents import (
     AutoSubscribe,
@@ -18,7 +19,7 @@ from livekit.agents.multimodal import MultimodalAgent
 from livekit.plugins import openai
 from livekit.agents import stt, transcription
 from livekit.plugins.deepgram import STT
-from prompts import agent_prompt_template, sample_resume, sample_job_description
+from prompts import agent_prompt_template
 import requests
 
 load_dotenv()
@@ -40,6 +41,24 @@ QUESTIONS_API_URL = "http://localhost:5000/api/questions?campaign_id={campaign_i
 
 # Store transcript entries
 transcript_entries = []
+
+# List of female names to use for the AI interviewer
+FEMALE_INTERVIEWER_NAMES = [
+    "Emma", "Olivia", "Ava", "Isabella", "Sophia", 
+    "Charlotte", "Amelia", "Mia", "Harper", "Evelyn",
+    "Abigail", "Emily", "Elizabeth", "Sofia", "Ella", 
+    "Madison", "Scarlett", "Victoria", "Aria", "Grace", 
+    "Chloe", "Camila", "Penelope", "Riley", "Layla",
+    "Zoe", "Nora", "Lily", "Eleanor", "Hannah",
+    "Lillian", "Addison", "Aubrey", "Ellie", "Stella", 
+    "Natalie", "Zoe", "Leah", "Hazel", "Violet",
+    "Aurora", "Savannah", "Audrey", "Brooklyn", "Bella", 
+    "Claire", "Skylar", "Lucy", "Paisley", "Maya"
+]
+
+def generate_interviewer_name():
+    """Generate a random female name for the AI interviewer"""
+    return random.choice(FEMALE_INTERVIEWER_NAMES)
 
 async def _forward_transcription(
     stt_stream: stt.SpeechStream,
@@ -76,6 +95,10 @@ async def entrypoint(ctx: JobContext):
     # Reset transcript entries at the start of each session
     transcript_entries = []
     logger.info("🧹 Cleared previous transcript entries")
+    
+    # Generate a random interviewer name
+    interviewer_name = generate_interviewer_name()
+    logger.info(f"👩 Using interviewer name: {interviewer_name}")
     
     stt_service = STT()
     tasks = []
@@ -138,8 +161,8 @@ async def entrypoint(ctx: JobContext):
         submission_id = participant.identity.split('_')[0]
         logger.info(f"🆔 Extracted submission ID: {submission_id}")
         
-        # Fetch submission details (including resume_text)
-        resume_text = await fetch_resume_text(submission_id)
+        # Fetch submission details (including resume_text and campaign details)
+        submission_data = await fetch_submission_data(submission_id)
         
         # Fetch questions from API
         try:
@@ -157,19 +180,25 @@ async def entrypoint(ctx: JobContext):
             question_titles = ["Tell me about yourself", "What are your strengths?"]
     except Exception as e:
         logger.error(f"❌ Error processing participant identity: {e}")
-        # Fallback questions
-        question_titles = ["Tell me about yourself", "What are your strengths?"]
-        resume_text = sample_resume
+        # Don't continue with fallback data, raise the error to stop execution
+        logger.critical("Cannot proceed without valid participant identity and submission data")
+        raise ValueError(f"Failed to process participant identity: {e}")
 
     # Start the multimodal agent with the questions
     try:
-        agent = run_multimodal_agent(ctx, participant, question_titles, resume_text)
+        agent = run_multimodal_agent(
+            ctx, 
+            participant, 
+            question_titles, 
+            submission_data, 
+            interviewer_name
+        )
         logger.info("✅ Agent started successfully")
         
         # Add an initial AI message to the transcript
         initial_message = {
             "speaker": "AI",
-            "text": "Hello! I'm Gulpin, an AI interviewer. I'll be asking you a few questions today. Let's get started!",
+            "text": f"Hello! I'm {interviewer_name}, an AI interviewer. I'll be asking you a few questions today. Let's get started!",
             "timestamp": time.time()
         }
         transcript_entries.append(initial_message)
@@ -245,25 +274,43 @@ def save_transcript():
         logger.info("📝 ===============================================")
 
 
-def run_multimodal_agent(ctx: JobContext, participant: rtc.RemoteParticipant, questions, resume_text):
+def run_multimodal_agent(ctx: JobContext, participant: rtc.RemoteParticipant, questions, submission_data, interviewer_name):
     global transcript_entries
     logger.info(f"🤖 Starting multimodal agent with {len(questions)} questions")
 
     try:
+        # Create a comprehensive prompt that includes all relevant information
+        full_prompt = agent_prompt_template.format(
+            interviewer_name=interviewer_name,
+            questions="\n".join([f"- {q}" for q in questions]),
+            job_description=submission_data['job_description'],
+            resume_text=submission_data['resume_text'],
+            campaign_context=submission_data.get('campaign_context', '')
+        )
+        
+        # Log the full prompt for debugging
+        logger.debug(f"Full agent prompt: {full_prompt}")
+        
         model = openai.realtime.RealtimeModel(
-            instructions=(agent_prompt_template.format(
-                questions="\n".join(questions),
-                job_description=sample_job_description,
-                resume_text=resume_text
-            )),
+            instructions=full_prompt,
             modalities=["audio", "text"],
         )
         logger.debug("✅ Realtime model created")
 
         # create a chat context with chat history
         chat_ctx = llm.ChatContext()
+        
+        # Add initial context for the AI
+        initial_context = (
+            f"You are {interviewer_name}, an AI interviewer conducting a job interview. "
+            f"The candidate has applied for a position and submitted their resume. "
+            f"Resume text: {submission_data['resume_text']}\n"
+            f"Job description: {submission_data['job_description']}\n"
+            f"Use this information to provide a personalized interview experience."
+        )
+        
         chat_ctx.append(
-            text=f"Context about the user: {resume_text}",
+            text=initial_context,
             role="assistant",
         )
         logger.debug("✅ Chat context initialized")
@@ -378,26 +425,44 @@ def run_multimodal_agent(ctx: JobContext, participant: rtc.RemoteParticipant, qu
         raise
 
 
-async def fetch_resume_text(submission_id):
-    """Fetch the resume text for a submission"""
+async def fetch_submission_data(submission_id):
+    """Fetch submission data including resume text and campaign details"""
     try:
-        logger.info(f"📄 Fetching resume text for submission: {submission_id}")
+        logger.info(f"📄 Fetching submission data for ID: {submission_id}")
         submission_url = f"http://localhost:5000/api/submissions/{submission_id}"
         response = requests.get(submission_url)
         response.raise_for_status()
         
         submission_data = response.json()
         
-        if submission_data.get('resume_text'):
-            logger.info("✅ Found resume text in submission")
-            return submission_data['resume_text']
+        # Get campaign details
+        campaign_id = submission_data.get('campaign_id')
+        if campaign_id:
+            campaign_url = f"http://localhost:5000/api/campaigns/{campaign_id}"
+            campaign_response = requests.get(campaign_url)
+            campaign_response.raise_for_status()
+            campaign_data = campaign_response.json()
+            
+            # Add campaign details to the submission data
+            submission_data['job_description'] = campaign_data.get('job_description')
+            submission_data['campaign_context'] = campaign_data.get('campaign_context', '')
+            
+            if not submission_data['job_description']:
+                raise ValueError("Missing job description in campaign data")
+            
+            logger.info(f"✅ Retrieved campaign details for campaign ID: {campaign_id}")
         else:
-            logger.warning("⚠️ No resume text found in submission")
-            return sample_resume
+            raise ValueError("No campaign ID found in submission data")
+        
+        # Use provided resume text or raise error
+        if not submission_data.get('resume_text'):
+            raise ValueError("No resume text found in submission")
+            
+        return submission_data
             
     except Exception as e:
-        logger.error(f"❌ Error fetching resume text: {e}")
-        return sample_resume
+        logger.error(f"❌ Error fetching submission data: {e}")
+        raise  # Re-raise the exception to stop execution
 
 
 if __name__ == "__main__":

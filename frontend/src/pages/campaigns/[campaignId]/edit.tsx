@@ -3,7 +3,6 @@ import axios from 'axios';
 import { useRouter } from 'next/router';
 import { PrimaryButton } from '../../../components/Button';
 import { PageTemplate } from '../../../components/PageTemplate';
-import { INTERNAL_API_TOKEN } from '../../../utils/internalApiToken';
 
 // Define interface for Question object
 interface Question {
@@ -69,22 +68,12 @@ const EditCampaignPage = () => {
       
       // Fetch campaign details
       const campaignResponse = await axios.get(
-        `http://127.0.0.1:5000/api/campaigns/${campaignId}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${INTERNAL_API_TOKEN}`
-          }
-        }
+        `http://127.0.0.1:5000/api/campaigns/${campaignId}`
       );
       
       // Fetch questions for this campaign
       const questionsResponse = await axios.get(
-        `http://127.0.0.1:5000/api/questions?campaign_id=${campaignId}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${INTERNAL_API_TOKEN}`
-          }
-        }
+        `http://127.0.0.1:5000/api/questions?campaign_id=${campaignId}`
       );
       
       const campaignData = campaignResponse.data;
@@ -225,11 +214,6 @@ const EditCampaignPage = () => {
           campaign_context,
           question: questionTitle,
           prompt: scoring_prompt
-        },
-        {
-          headers: {
-            'Authorization': `Bearer ${INTERNAL_API_TOKEN}`
-          }
         }
       );
       
@@ -345,13 +329,7 @@ const EditCampaignPage = () => {
       
       const response = await axios.post(
         `http://127.0.0.1:5000/api/campaigns/${campaignId}/update`,
-        formData,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${INTERNAL_API_TOKEN}`
-          }
-        }
+        formData
       );
       
       if (response.status === 200) {
