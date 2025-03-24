@@ -3,12 +3,17 @@ import axios from 'axios';
 import Link from 'next/link';
 import Head from 'next/head';
 import { PageTemplate } from '../../components/PageTemplate';
+// Import Tabulator config
+import configureTabulatorDependencies from '../../utils/tabulator-config';
 // Import Tabulator styles
 import 'react-tabulator/lib/styles.css';
 import 'react-tabulator/lib/css/tabulator.min.css';
 // Import custom tabulator styles
 import '../../styles/tabulator.css';
 import { AuthLogger } from '../../utils/logging';
+
+// Initialize Tabulator with required dependencies
+configureTabulatorDependencies();
 
 // Need to conditionally import for SSR compatibility
 import dynamic from 'next/dynamic';

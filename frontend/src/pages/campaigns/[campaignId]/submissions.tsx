@@ -3,10 +3,15 @@ import { useRouter } from 'next/router';
 import axios from 'axios';
 import { PageTemplate } from '../../../components/PageTemplate';
 import Link from 'next/link';
+// Import tabulator config before Tabulator
+import configureTabulatorDependencies from '../../../utils/tabulator-config';
 import { TabulatorFull as Tabulator } from 'tabulator-tables';
 import { AuthLogger } from '../../../utils/logging';
 import "tabulator-tables/dist/css/tabulator.min.css";
 import "../../../styles/tabulator.css"; // Import custom tabulator styles
+
+// Initialize Tabulator with required dependencies
+configureTabulatorDependencies();
 
 // Define API base URL for consistent usage
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
@@ -192,17 +197,17 @@ const CampaignSubmissionsPage = () => {
               
               // Create View button
               const viewButton = document.createElement("a");
-              viewButton.innerHTML = "View";
+              viewButton.innerHTML = "View Answers";
               viewButton.className = "px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm";
               viewButton.href = `/submissions/${submissionId}`;
               container.appendChild(viewButton);
               
-              // Create Interview button
-              const interviewButton = document.createElement("a");
-              interviewButton.innerHTML = "Interview";
-              interviewButton.className = "px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600 text-sm";
-              interviewButton.href = `/interview/${submissionId}`;
-              container.appendChild(interviewButton);
+              //// Create Interview button
+              //const interviewButton = document.createElement("a");
+              //interviewButton.innerHTML = "Interview";
+              //interviewButton.className = "px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600 text-sm";
+              //interviewButton.href = `/interview/${submissionId}`;
+              //container.appendChild(interviewButton);
               
               return container;
             },

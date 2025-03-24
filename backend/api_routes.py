@@ -164,6 +164,27 @@ def get_questions():
     conn.close()
     return jsonify(result)
 
+@api_bp.route('/questions/<string:id>', methods=['GET'])
+# @admin_required
+def get_question(id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    # Ensure ID is a string
+    question_id = str(id)
+    
+    cursor.execute("SELECT * FROM questions WHERE id = %s", (question_id,))
+    question = cursor.fetchone()
+    conn.close()
+    
+    if question:
+        columns = ["id", "campaign_id", "title", "body", "scoring_prompt", "max_points"]
+        # Use the helper function to create the response with string IDs
+        result = map_row_to_dict(question, columns)
+        return jsonify(result)
+    else:
+        return jsonify({"error": "Question not found"}), 404
+
+
 @api_bp.route('/submissions', methods=['GET'])
 # @admin_required
 def get_submissions():

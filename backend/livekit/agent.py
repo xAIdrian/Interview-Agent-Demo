@@ -381,7 +381,7 @@ Your first message should be a friendly introduction as {interviewer_name}, welc
             logger.error(f"Error during message handling: {e}")
     
     last_activity_time = time.time()
-    
+
     model = openai.realtime.RealtimeModel(
         instructions=full_prompt,
         modalities=["audio", "text"],
@@ -399,7 +399,7 @@ Your first message should be a friendly introduction as {interviewer_name}, welc
         text=f"You are {interviewer_name}, an AI interviewer. You are conducting an interview for a job position. The candidate's resume says: {resume_text}. The job description is: {job_description}. Remember to maintain the conversation flow and continue asking questions even if there are pauses. Always speak your responses clearly.",
         role="assistant",
     )
-    
+
     agent = MultimodalAgent(
         model=model,
         chat_ctx=chat_ctx,
@@ -423,7 +423,7 @@ Your first message should be a friendly introduction as {interviewer_name}, welc
         for attempt in range(max_retries):
             try:
                 logger.info(f"Generating initial reply (attempt {attempt+1}/{max_retries})")
-                agent.generate_reply()
+    agent.generate_reply()
                 
                 # Wait a bit to see if the state changes to speaking
                 await asyncio.sleep(5)
