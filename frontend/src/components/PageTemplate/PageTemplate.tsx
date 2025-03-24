@@ -18,7 +18,7 @@ export const PageTemplate: React.FC<PageTemplateProps> = ({
   maxWidth = 'lg',
 }) => {
   const router = useRouter();
-  const { user, isAuthenticated, isAdmin, handleLogout } = useAuth();
+  const { user, isAuthenticated, isAdmin, logout } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   // Function to generate breadcrumbs from path
@@ -44,7 +44,7 @@ export const PageTemplate: React.FC<PageTemplateProps> = ({
 
   const onLogout = async () => {
     AuthLogger.info('User logging out from PageTemplate');
-    await handleLogout();
+    await logout();
     router.push('/login');
   };
 
