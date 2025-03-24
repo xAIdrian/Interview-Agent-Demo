@@ -493,12 +493,12 @@ export default function Page() {
     
     const connectWithRetry = async () => {
       try {
-        const response = await fetch(url.toString());
+    const response = await fetch(url.toString());
         if (!response.ok) {
           throw new Error('Failed to get connection details');
         }
-        const connectionDetailsData = await response.json();
-        updateConnectionDetails(connectionDetailsData);
+    const connectionDetailsData = await response.json();
+    updateConnectionDetails(connectionDetailsData);
 
         const room = new Room({
           // Add configuration for better connection stability
@@ -534,7 +534,7 @@ export default function Page() {
           console.log(`Subscribed to track: ${track.kind} from ${participant.identity}`);
         });
         
-        await room.connect(connectionDetailsData.serverUrl, connectionDetailsData.participantToken);
+    await room.connect(connectionDetailsData.serverUrl, connectionDetailsData.participantToken);
 
         // Send both submission and campaign data to the voice assistant
         const interviewContext = {
@@ -543,8 +543,8 @@ export default function Page() {
         };
         
         await room.localParticipant.sendText(JSON.stringify(interviewContext), {
-          topic: 'interview-questions',
-        });
+            topic: 'interview-questions',
+          });
         setInterviewData(interviewContext);
         setIsInterviewActive(true); // Set interview as active
         setLastActiveTimestamp(Date.now()); // Initialize activity timestamp
@@ -628,7 +628,7 @@ export default function Page() {
             // Only reset if still disconnected
             if (isInterviewActive && roomRef.current?.state !== 'connected') {
               console.log("Connection not recovered after timeout, resetting state");
-              updateConnectionDetails(undefined);
+          updateConnectionDetails(undefined);
               setIsInterviewActive(false);
               alert("The connection to the interview was lost. Please try reconnecting.");
             }
@@ -650,7 +650,7 @@ export default function Page() {
           {/* Left column - Agent and Transcription */}
           <div className="flex-1 flex flex-col gap-4">
             <div>
-              <SimpleVoiceAssistant onStateChange={setAgentState} />
+        <SimpleVoiceAssistant onStateChange={setAgentState} />
             </div>
             
             {/* Show timer when interview is active */}
@@ -659,10 +659,10 @@ export default function Page() {
             {isInterviewActive && <Transcriptions />}
             
             {isInterviewActive ? (
-              <ControlBar
-                onConnectButtonClicked={onConnectButtonClicked}
-                agentState={agentState}
-              />
+        <ControlBar
+          onConnectButtonClicked={onConnectButtonClicked}
+          agentState={agentState}
+        />
             ) : (
               <div className="flex justify-center items-center p-4">
                 <button
@@ -687,8 +687,8 @@ export default function Page() {
               </div>
             )}
             
-            <RoomAudioRenderer />
-            <NoAgentNotification state={agentState} />
+        <RoomAudioRenderer />
+        <NoAgentNotification state={agentState} />
           </div>
           
           {/* Right column - Webcam */}
@@ -768,7 +768,7 @@ function SimpleVoiceAssistant(props: {
     // Only trigger state change when the state actually changes
     if (prevStateRef.current !== state) {
       console.log(`Agent state changed: ${prevStateRef.current} -> ${state}`);
-      props.onStateChange(state);
+    props.onStateChange(state);
       prevStateRef.current = state;
       
       // If the agent is speaking, add a timeout to check if it stops speaking
