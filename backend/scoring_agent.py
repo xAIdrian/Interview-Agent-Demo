@@ -3,18 +3,13 @@ import json
 
 client = OpenAI()
 
-def format_questions(questions, answers):
-    prompt = "# QUESTIONS AND RESPONSES"
+def format_questions(questions):
+    prompt = "# QUESTIONS AND SCORING CRITERIA"
 
     for question in questions:
         prompt += f"Question: {question['body']}\n"
         prompt += f"Scoring Criteria: {question['scoring_prompt']}\n"
         prompt += f"Maximum # of points: {question['max_points']}\n"
-        answer = next((a for a in answers if a['question_id'] == question['id']), None)
-        if answer:
-            prompt += f"Response: {answer['transcript']}\n"
-        else:
-            prompt += "Response: No response provided.\n"
         prompt += "\n"
     return prompt
 
@@ -31,9 +26,10 @@ def openai_response(system_prompt, user_prompt):
     )
     return completion.choices[0].message.content
 
-def generate_submission_scoring(campaign, questions, answers):
+def generate_submission_scoring(campaign, questions, transcript):
     campaign_title = campaign["title"]
     campaign_context = campaign["campaign_context"]
+    job_description = campaign["job_description"]
 
     system_prompt = f"""# CONTEXT
 
@@ -41,7 +37,11 @@ You are an interview scoring agent.
 
 The company is running virtual interviews for a {campaign_title} position.
 
-Their requirements are: {campaign_context}
+Context: {campaign_context}
+Job Description: {job_description}
+
+# SCORING CRITERIA
+{format_questions(questions)}
 
 # TASK/OVERVIEW
 A candidate has submitted a video interview answering a series of questions.
@@ -50,7 +50,7 @@ For each question, you will be given a scoring criteria, maximum number of point
 
 You will create a JSON array containing a dictionary representing each of your answers. Within each dictionary, include the following keys in this order:
 - question: Repeat the original question prompt.
-- response: Provide the candidate's response.
+- response: Provide the candidate's response. Copy and paste the transcript segment that corresponds to the question.
 - rationale: Provide an in-depth analysis of the candidate's response and whether it satisfies the scoring criteria given the context described above.
 - score: Provide a numerical score between 0 and the maximum number of points based on your rationale. Full points should be awarded for responses that fully satisfy the scoring criteria.
 
@@ -58,12 +58,18 @@ Your rationale should take into consideration the requirements of the {campaign_
 
 Provide only the JSON array in plaintext. Do not use any markdown functionality.
 
+# INTERVIEW TRANSCRIPT
+{transcript}
+
 \n\n"""
 
-    user_prompt = format_questions(questions, answers)
+    user_prompt = format_questions(questions)
     scores = openai_response(system_prompt, user_prompt)
     scores_json = json.loads(scores)
     return scores_json
+
+
+
 
 
 scoring_prompt_optimization_system = """Optimize this scoring prompt created by an admin to score a candidate's response.
