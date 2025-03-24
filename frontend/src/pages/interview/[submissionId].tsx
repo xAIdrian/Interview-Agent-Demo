@@ -258,9 +258,13 @@ export default function Page() {
   const [submission, setSubmission] = useState<Submission | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [lastActiveTimestamp, setLastActiveTimestamp] = useState<number>(Date.now());
+  const [inactivePrompt, setInactivePrompt] = useState<boolean>(false);
+  const [noActivityTime, setNoActivityTime] = useState<number>(0);
   
   // Track if interview is active
   const [isInterviewActive, setIsInterviewActive] = useState(false);
+  const roomRef = useRef<Room | null>(null);
   
   const router = useRouter();
   const { submissionId } = router.query;
@@ -296,6 +300,172 @@ export default function Page() {
 
     fetchSubmission();
   }, [router.isReady, submissionId]);
+
+  // More aggressive activity monitoring
+  useEffect(() => {
+    if (!isInterviewActive || !roomRef.current) return;
+    
+    console.log("Setting up activity monitoring");
+    
+    // Check every 10 seconds for inactivity and increase counter
+    const intervalCheck = setInterval(() => {
+      // If agent is speaking or listening, reset counter
+      if (agentState === 'speaking' || agentState === 'listening') {
+        if (noActivityTime > 0) {
+          console.log("Resetting inactivity counter due to agent state");
+          setNoActivityTime(0);
+        }
+        return;
+      }
+      
+      // Otherwise, increment counter
+      setNoActivityTime(prev => prev + 10);
+      
+      // Every 30 seconds of inactivity, take action
+      if (noActivityTime > 0 && noActivityTime % 30 === 0) {
+        console.log(`${noActivityTime}s of inactivity detected, sending activity signal`);
+        
+        try {
+          // Send artificial activity to keep connection alive
+          if (roomRef.current && roomRef.current.state === 'connected') {
+            // Option 1: Send data as if user clicked something
+            roomRef.current.localParticipant.publishData(
+              new TextEncoder().encode(JSON.stringify({
+                type: 'user-activity',
+                timestamp: Date.now()
+              })),
+              { reliable: true }
+            );
+            
+            // Option 2: If appropriate, play a short sound
+            // This can sometimes help wake up audio processing
+            if (noActivityTime > 60) {
+              const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+              const oscillator = audioContext.createOscillator();
+              oscillator.type = 'sine';
+              oscillator.frequency.setValueAtTime(220, audioContext.currentTime);
+              
+              const gainNode = audioContext.createGain();
+              gainNode.gain.setValueAtTime(0.01, audioContext.currentTime); // Very quiet
+              
+              oscillator.connect(gainNode);
+              gainNode.connect(audioContext.destination);
+              
+              oscillator.start();
+              setTimeout(() => {
+                oscillator.stop();
+                setTimeout(() => audioContext.close(), 100);
+              }, 100);
+              
+              console.log("Played audio ping to wake up audio context");
+            }
+          }
+        } catch (e) {
+          console.error("Error sending activity signal:", e);
+        }
+      }
+    }, 10000);
+    
+    return () => {
+      clearInterval(intervalCheck);
+      setNoActivityTime(0);
+    };
+  }, [isInterviewActive, agentState, noActivityTime, roomRef.current]);
+
+  // Set up watchdog timer for agent inactivity
+  useEffect(() => {
+    if (!isInterviewActive) return;
+
+    // Update timestamp when agent changes state
+    if (agentState === 'speaking' || agentState === 'listening') {
+      console.log(`Agent state changed to ${agentState}, updating activity timestamp`);
+      setLastActiveTimestamp(Date.now());
+      setInactivePrompt(false);
+      setNoActivityTime(0); // Reset inactivity counter
+    }
+
+    // Check for inactivity
+    const inactivityInterval = setInterval(() => {
+      const currentTime = Date.now();
+      const inactiveTime = currentTime - lastActiveTimestamp;
+
+      // If agent has been inactive for more than 20 seconds
+      if (inactiveTime > 20000 && !inactivePrompt) {
+        console.log(`Agent appears inactive for ${inactiveTime/1000}s, attempting to prompt activity`);
+        setInactivePrompt(true);
+        
+        // Try to prompt the agent by simulating user interaction
+        if (roomRef.current && agentState !== 'speaking') {
+          try {
+            console.log('Sending prompt to agent...');
+            
+            // Send a brief "I'm here" message to wake up the agent
+            roomRef.current.localParticipant.publishData(
+              new TextEncoder().encode(JSON.stringify({
+                type: 'prompt',
+                message: 'continue',
+                timestamp: Date.now()
+              })),
+              { reliable: true }
+            );
+            
+            // Dispatch event for good measure
+            const promptEvent = new Event('prompt');
+            document.dispatchEvent(promptEvent);
+            
+            // Force reconnect if needed after 5 more seconds of inactivity
+            setTimeout(() => {
+              if (Date.now() - lastActiveTimestamp > 25000) {
+                console.log("Still inactive, forcing audio reconnection");
+                // Toggle audio to force reconnection
+                if (roomRef.current) {
+                  const localParticipant = roomRef.current.localParticipant;
+                  
+                  // Toggle audio without checking audioTracks
+                  navigator.mediaDevices.getUserMedia({ audio: true })
+                    .then(stream => {
+                      const track = stream.getAudioTracks()[0];
+                      if (track) {
+                        const pub = localParticipant.publishTrack(track);
+                        setTimeout(() => {
+                          localParticipant.unpublishTrack(track);
+                          stream.getTracks().forEach(t => t.stop());
+                        }, 1000);
+                      }
+                    })
+                    .catch(err => console.error("Error toggling audio:", err));
+                }
+              }
+            }, 5000);
+          } catch (err) {
+            console.error('Error prompting agent:', err);
+          }
+        }
+      }
+    }, 5000);
+
+    return () => clearInterval(inactivityInterval);
+  }, [isInterviewActive, agentState, lastActiveTimestamp, inactivePrompt]);
+
+  // Handle possible reconnection
+  useEffect(() => {
+    if (!isInterviewActive || !connectionDetails) return;
+
+    // Set up a ping to keep the connection active
+    const pingInterval = setInterval(() => {
+      if (roomRef.current && roomRef.current.state === 'connected') {
+        console.log('Sending periodic ping to keep connection alive');
+        // Send empty data to keep connection alive
+        try {
+          roomRef.current.localParticipant.publishData(new Uint8Array([0]), { reliable: true });
+        } catch (err) {
+          console.error('Error sending ping:', err);
+        }
+      }
+    }, 30000);
+
+    return () => clearInterval(pingInterval);
+  }, [isInterviewActive, connectionDetails]);
 
   const onConnectButtonClicked = useCallback(async () => {
     let campaignId = submission?.submission.campaign_id;
@@ -334,6 +504,34 @@ export default function Page() {
           // Add configuration for better connection stability
           adaptiveStream: false,
           dynacast: false,
+          disconnectOnPageLeave: false, // Don't disconnect on tab blur/visibility change
+          stopLocalTrackOnUnpublish: false,
+        });
+        
+        roomRef.current = room;
+        
+        // Setup event listeners for better debugging
+        room.on(RoomEvent.Disconnected, () => {
+          console.log('Room disconnected, attempting to reconnect...');
+          
+          // Try to reconnect if interview is still active
+          if (isInterviewActive) {
+            setTimeout(() => {
+              if (isInterviewActive) {
+                console.log('Attempting to reconnect to room...');
+                room.connect(connectionDetailsData.serverUrl, connectionDetailsData.participantToken)
+                  .catch(err => console.error('Reconnection failed:', err));
+              }
+            }, 2000);
+          }
+        });
+        
+        room.on(RoomEvent.Connected, () => {
+          console.log('Successfully connected to room');
+        });
+        
+        room.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
+          console.log(`Subscribed to track: ${track.kind} from ${participant.identity}`);
         });
         
         await room.connect(connectionDetailsData.serverUrl, connectionDetailsData.participantToken);
@@ -349,6 +547,7 @@ export default function Page() {
         });
         setInterviewData(interviewContext);
         setIsInterviewActive(true); // Set interview as active
+        setLastActiveTimestamp(Date.now()); // Initialize activity timestamp
         setIsLoading(false);
       } catch (err) {
         console.error(`Connection attempt ${retries + 1} failed:`, err);
@@ -422,12 +621,29 @@ export default function Page() {
         video={false}
         onMediaDeviceFailure={onDeviceFailure}
         onDisconnected={() => {
-          updateConnectionDetails(undefined);
-          setIsInterviewActive(false);
+          console.log("LiveKit room disconnected, attempting to recover");
+          // Don't immediately reset connection details
+          // Instead, set a timeout to allow for potential reconnection
+          setTimeout(() => {
+            // Only reset if still disconnected
+            if (isInterviewActive && roomRef.current?.state !== 'connected') {
+              console.log("Connection not recovered after timeout, resetting state");
+              updateConnectionDetails(undefined);
+              setIsInterviewActive(false);
+              alert("The connection to the interview was lost. Please try reconnecting.");
+            }
+          }, 5000);
         }}
         options={{
           adaptiveStream: false,
           dynacast: false,
+        }}
+        // Add event handlers to track connection state
+        onConnected={() => {
+          console.log("LiveKit room connected successfully");
+          // Reset any error states that might have been set
+          setError(null);
+          setLastActiveTimestamp(Date.now());
         }}
       >
         <div className="flex flex-col md:flex-row p-4 gap-4">
@@ -501,13 +717,88 @@ function SimpleVoiceAssistant(props: {
   onStateChange: (state: AgentState) => void;
 }) {
   const { state } = useVoiceAssistant();
+  const prevStateRef = useRef<AgentState>("disconnected");
+  const [stuckCounter, setStuckCounter] = useState(0);
+  const [showRecoveryButton, setShowRecoveryButton] = useState(false);
+  const room = useMaybeRoomContext();
+  
+  // Reset stuck counter when state changes
+  useEffect(() => {
+    if (prevStateRef.current !== state) {
+      setStuckCounter(0);
+      setShowRecoveryButton(false);
+    }
+  }, [state]);
+  
+  // Try to recover if stuck
+  const attemptRecovery = useCallback(() => {
+    if (!room) return;
+    
+    console.log("Attempting to recover agent state");
+    
+    // Try to manually trigger the agent to continue
+    try {
+      // Send a small data packet to wake up the connection
+      room.localParticipant.publishData(new Uint8Array([1, 2, 3]), { reliable: true });
+      
+      // Try to publish some audio to wake up audio processing
+      navigator.mediaDevices.getUserMedia({ audio: true })
+        .then(stream => {
+          const track = stream.getAudioTracks()[0];
+          if (track) {
+            // Use the track directly instead of creating a new MediaStreamTrack
+            const pub = room.localParticipant.publishTrack(track);
+            // Unpublish after a moment
+            setTimeout(() => {
+              room.localParticipant.unpublishTrack(track);
+              // Release the media stream
+              stream.getTracks().forEach(track => track.stop());
+            }, 500);
+          }
+        })
+        .catch(err => console.error("Error accessing audio for recovery:", err));
+      
+      setShowRecoveryButton(false);
+    } catch (err) {
+      console.error("Recovery attempt failed:", err);
+    }
+  }, [room]);
   
   useEffect(() => {
-    props.onStateChange(state);
-  }, [props, state]);
+    // Only trigger state change when the state actually changes
+    if (prevStateRef.current !== state) {
+      console.log(`Agent state changed: ${prevStateRef.current} -> ${state}`);
+      props.onStateChange(state);
+      prevStateRef.current = state;
+      
+      // If the agent is speaking, add a timeout to check if it stops speaking
+      if (state === 'speaking') {
+        const speakingTimeout = setTimeout(() => {
+          // Check if we're still in the speaking state after timeout
+          if (prevStateRef.current === 'speaking') {
+            console.log('Agent may be stuck in speaking state, trying to recover...');
+            // Increment stuck counter
+            setStuckCounter(prev => prev + 1);
+            
+            // After multiple stuck events, show recovery button
+            if (stuckCounter >= 2) {
+              setShowRecoveryButton(true);
+            }
+            
+            // Dispatch a custom event that our activity monitoring can detect
+            document.dispatchEvent(new CustomEvent('agent-state-stuck', { 
+              detail: { state: 'speaking' } 
+            }));
+          }
+        }, 30000); // 30 seconds timeout
+        
+        return () => clearTimeout(speakingTimeout);
+      }
+    }
+  }, [props, state, stuckCounter]);
 
   return (
-    <div className="h-[200px] flex items-center justify-center">
+    <div className="h-[200px] flex flex-col items-center justify-center">
       <div 
         className={`w-24 h-24 rounded-full flex items-center justify-center transition-all duration-500 ${
           state === 'speaking' ? 'bg-blue-500 scale-110' : 
@@ -521,6 +812,15 @@ function SimpleVoiceAssistant(props: {
            state === 'connecting' ? 'Connecting' : 'Ready'}
         </div>
       </div>
+      
+      {showRecoveryButton && (
+        <button
+          onClick={attemptRecovery}
+          className="mt-4 px-4 py-2 bg-yellow-500 text-white rounded-md hover:bg-yellow-600 transition-colors"
+        >
+          Resume Conversation
+        </button>
+      )}
     </div>
   );
 }
