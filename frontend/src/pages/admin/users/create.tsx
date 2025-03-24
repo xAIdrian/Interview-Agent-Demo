@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
-import { AdminLayout } from '../../../components/Layout/AdminLayout';
+import { PageTemplate } from '../../../components/PageTemplate';
 import { AuthLogger } from '../../../utils/logging';
 
 const CreateUserPage = () => {
@@ -66,7 +66,7 @@ const CreateUserPage = () => {
   };
 
   return (
-    <AdminLayout title="Create New User">
+    <PageTemplate title="Create New User">
       <div className="bg-white shadow-md rounded-lg p-6">
         <h1 className="text-2xl font-bold mb-6">Create New User</h1>
         
@@ -155,7 +155,7 @@ const CreateUserPage = () => {
           </div>
         </form>
       </div>
-    </AdminLayout>
+    </PageTemplate>
   );
 };
 

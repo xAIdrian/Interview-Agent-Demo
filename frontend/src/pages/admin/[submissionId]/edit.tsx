@@ -79,18 +79,9 @@ const EditSubmissionPage = () => {
         setIsLoading(true);
         setError('');
         
-        // Get token from localStorage
-        const token = localStorage.getItem('accessToken');
-        const authHeader = {
-          headers: {
-            'Authorization': `Bearer ${INTERNAL_API_TOKEN}`
-          }
-        };
-        
-        // Use the new direct endpoint to fetch a submission by ID
+        // Use the new direct endpoint to fetch a submission by ID without authorization
         const submissionResponse = await axios.get(
-          `${API_BASE_URL}/api/submissions/${submissionId}`, 
-          authHeader
+          `${API_BASE_URL}/api/submissions/${submissionId}`
         );
         
         if (submissionResponse.data) {
@@ -101,14 +92,12 @@ const EditSubmissionPage = () => {
           try {
             // Fetch submission answers using the fixed endpoint with unambiguous column reference
             const answersResponse = await axios.get(
-              `${API_BASE_URL}/api/submission_answers?submission_id=${submissionId}`, 
-              authHeader
+              `${API_BASE_URL}/api/submission_answers?submission_id=${submissionId}`
             );
             
             // Fetch questions for the campaign
             const questionsResponse = await axios.get(
-              `${API_BASE_URL}/api/questions?campaign_id=${submissionData.campaign_id}`, 
-              authHeader
+              `${API_BASE_URL}/api/questions?campaign_id=${submissionData.campaign_id}`
             );
             
             setQuestions(questionsResponse.data);

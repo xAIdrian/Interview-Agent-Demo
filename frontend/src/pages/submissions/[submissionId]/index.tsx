@@ -16,18 +16,11 @@ const SubmissionDetailPage: React.FC = () => {
       try {
         setIsLoading(true);
         
-        // Get the auth token from localStorage
-        const token = localStorage.getItem('access_token');
-        
         // Ensure submission ID is a string
         const stringSubmissionId = String(submissionId);
         
-        // Fetch submission data with authorization header
-        const submissionResponse = await axios.get(`/api/submissions/${stringSubmissionId}`, {
-          headers: {
-            'Authorization': token ? `Bearer ${token}` : ''
-          }
-        });
+        // Fetch submission data without authorization header
+        const submissionResponse = await axios.get(`/api/submissions/${stringSubmissionId}`);
         
         // Ensure all IDs are strings
         const submissionData = submissionResponse.data;
@@ -37,12 +30,8 @@ const SubmissionDetailPage: React.FC = () => {
         
         setSubmission(submissionData);
         
-        // Fetch campaign data using campaign_id
-        const campaignResponse = await axios.get(`/api/campaigns/${String(submissionData.campaign_id)}`, {
-          headers: {
-            'Authorization': token ? `Bearer ${token}` : ''
-          }
-        });
+        // Fetch campaign data using campaign_id without authorization header
+        const campaignResponse = await axios.get(`/api/campaigns/${String(submissionData.campaign_id)}`);
         
         // Ensure campaign ID is a string
         const campaignData = campaignResponse.data;
@@ -50,12 +39,8 @@ const SubmissionDetailPage: React.FC = () => {
         
         setCampaign(campaignData);
         
-        // Fetch submission answers
-        const answersResponse = await axios.get(`/api/submission_answers?submission_id=${stringSubmissionId}`, {
-          headers: {
-            'Authorization': token ? `Bearer ${token}` : ''
-          }
-        });
+        // Fetch submission answers without authorization header
+        const answersResponse = await axios.get(`/api/submission_answers?submission_id=${stringSubmissionId}`);
         
         // Ensure all IDs in answers are strings
         const answersData = answersResponse.data.map((answer: any) => ({

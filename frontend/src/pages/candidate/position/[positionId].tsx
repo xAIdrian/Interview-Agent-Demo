@@ -25,14 +25,9 @@ const PositionDetailsPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // Check authentication on component mount
+  // Remove authentication check since we're not using tokens anymore
   useEffect(() => {
-    const token = localStorage.getItem('accessToken');
-    if (token) {
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    } else {
-      router.push('/login');
-    }
+    // No authentication check needed
   }, [router]);
 
   // Fetch position details
@@ -51,9 +46,7 @@ const PositionDetailsPage = () => {
         console.error('Error fetching position details:', err);
         
         if (axios.isAxiosError(err)) {
-          if (err.response?.status === 401) {
-            router.push('/login');
-          } else if (err.response?.status === 404) {
+          if (err.response?.status === 404) {
             setError('Position not found or not available');
           } else if (err.response?.data?.error) {
             setError(err.response.data.error);

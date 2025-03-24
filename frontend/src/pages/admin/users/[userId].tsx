@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import axios from 'axios';
 import Link from 'next/link';
-import { AdminLayout } from '../../../components/Layout/AdminLayout';
+import { PageTemplate } from '../../../components/PageTemplate';
 import { AuthLogger } from '../../../utils/logging';
 
 interface User {
@@ -66,7 +66,7 @@ const UserDetailPage = () => {
   };
 
   return (
-    <AdminLayout title={user?.name || 'User Details'}>
+    <PageTemplate title={user?.name || 'User Details'}>
       <div className="w-full bg-white shadow-md rounded-lg p-6">
         <h1 className="text-2xl font-bold mb-6">User Details</h1>
         
@@ -116,7 +116,7 @@ const UserDetailPage = () => {
           </div>
         )}
       </div>
-    </AdminLayout>
+    </PageTemplate>
   );
 };
 

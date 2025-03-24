@@ -26,7 +26,7 @@ const HomePage = () => {
       
       // Redirect based on user type
       if (userIsAdmin) {
-        router.push('/admin/dashboard');
+        router.push('/campaigns');
       } else {
         router.push('/candidate/positions');
       }

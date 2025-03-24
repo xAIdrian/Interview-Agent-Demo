@@ -26,7 +26,7 @@ export const AdminGuard = ({ children }: AdminGuardProps) => {
       // If user is not authenticated, redirect to login
       if (!isAuthenticated) {
         AuthLogger.warn('Unauthorized access attempt to admin area. Redirecting to login.');
-        router.push('/login?redirect=/admin/dashboard');
+        router.push('/login?redirect=/campaigns');
         return;
       }
       
