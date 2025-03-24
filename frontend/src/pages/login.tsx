@@ -14,7 +14,7 @@ const LoginPage = () => {
   const { login, error, clearError, isAuthenticated } = useAuth();
   
   // Get the redirect URL from query parameters
-  const redirectPath = router.query?.redirect as string || '/candidate/positions';
+  const redirectPath = router.query?.redirect as string || '/candidate';
 
   // If already authenticated, redirect
   useEffect(() => {

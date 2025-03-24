@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import axios from 'axios';
-import { AdminLayout } from '../../../components/Layout/AdminLayout';
+import { PageTemplate } from '../../../components/PageTemplate';
 import Link from 'next/link';
 import { AuthLogger } from '../../../utils/logging';
 
@@ -145,184 +145,186 @@ const SubmissionPage = () => {
   };
 
   return (
-    <AdminLayout title={`Submission ${submission?.id || ''}`}>
-      <div className="flex justify-between mb-4 items-center">
-        <h1 className="text-2xl font-bold">Submission Details</h1>
-        {submission && isAdmin && (
-          <Link 
-            href={`/submission/${submissionId}/edit`}
-            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700"
-          >
-            Edit Submission
-          </Link>
-        )}
-      </div>
-      
-      {error && (
-        <div className="mb-4 p-2 bg-red-100 text-red-700 rounded">
-          {error}
-        </div>
-      )}
-
-      {!isAdmin && (
-        <div className="mb-4 p-2 bg-yellow-100 text-yellow-700 rounded">
-          Note: Some features require admin privileges.
-        </div>
-      )}
-      
-      {isLoading ? (
-        <div className="flex justify-center items-center py-10">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-700"></div>
-        </div>
-      ) : submission ? (
-        <>
-          <div className="bg-white shadow overflow-hidden sm:rounded-lg mb-6">
-            <div className="px-4 py-5 sm:px-6">
-              <h2 className="text-lg leading-6 font-medium text-gray-900">Submission Information</h2>
-              {campaignId && (
-                <p className="mt-1 max-w-2xl text-sm text-gray-500">
-                  <Link href={`/campaigns/${campaignId}`} className="text-blue-600 hover:underline">
-                    View Campaign Details
-                  </Link>
-                  {isAdmin && (
-                    <> | <Link href={`/campaigns/${campaignId}/submissions`} className="text-blue-600 hover:underline">
-                      View All Submissions
-                    </Link>
-                    </>
-                  )}
-                </p>
-              )}
-            </div>
-            <div className="border-t border-gray-200">
-              <dl>
-                <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                  <dt className="text-sm font-medium text-gray-500">Campaign</dt>
-                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{submission.campaign_name}</dd>
-                </div>
-                <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                  <dt className="text-sm font-medium text-gray-500">Candidate</dt>
-                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{submission.email}</dd>
-                </div>
-                <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                  <dt className="text-sm font-medium text-gray-500">Created</dt>
-                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                    {new Date(submission.created_at).toLocaleString()}
-                  </dd>
-                </div>
-                <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                  <dt className="text-sm font-medium text-gray-500">Status</dt>
-                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                    <span className={`px-2 py-1 rounded ${submission.is_complete ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                      {submission.is_complete ? 'Completed' : 'In Progress'}
-                    </span>
-                  </dd>
-                </div>
-                <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                  <dt className="text-sm font-medium text-gray-500">Total Score</dt>
-                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                    {submission.total_points !== null ? submission.total_points : 'Not scored'}
-                  </dd>
-                </div>
-              </dl>
-            </div>
-          </div>
-
-          <h2 className="text-xl font-bold mb-4">Answers</h2>
-          
-          {submissionAnswers.length > 0 ? (
-            submissionAnswers.map((answer) => (
-              <div key={answer.id} className="bg-white shadow overflow-hidden sm:rounded-lg mb-4">
-                <div className="px-4 py-5 sm:px-6">
-                  <h3 className="text-lg leading-6 font-medium text-gray-900">{answer.question_title}</h3>
-                  {/* If we have question details, show the max points */}
-                  {questions.find(q => q.id === answer.question_id) && (
-                    <p className="mt-1 max-w-2xl text-sm text-gray-500">
-                      Max Points: {questions.find(q => q.id === answer.question_id)?.max_points}
-                    </p>
-                  )}
-                </div>
-                <div className="border-t border-gray-200">
-                  <dl>
-                    {/* Show question text if available */}
-                    {isAdmin && questions.find(q => q.id === answer.question_id)?.body && (
-                      <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                        <dt className="text-sm font-medium text-gray-500">Question Text</dt>
-                        <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 whitespace-pre-line">
-                          {questions.find(q => q.id === answer.question_id)?.body}
-                        </dd>
-                      </div>
-                    )}
-                    
-                    <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                      <dt className="text-sm font-medium text-gray-500">Video</dt>
-                      <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                        {answer.video_path ? (
-                          <a 
-                            href={`${API_BASE_URL}/watch_video/${getVideoFilename(answer.video_path)}`} 
-                            className="text-blue-600 hover:text-blue-900" 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                          >
-                            Watch Video
-                          </a>
-                        ) : (
-                          'No video uploaded'
-                        )}
-                      </dd>
-                    </div>
-                    <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                      <dt className="text-sm font-medium text-gray-500">Transcript</dt>
-                      <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 whitespace-pre-line">
-                        {answer.transcript || 'No transcript available'}
-                      </dd>
-                    </div>
-                    <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                      <dt className="text-sm font-medium text-gray-500">Score</dt>
-                      <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                        {answer.score !== null ? answer.score : 'Not scored'}
-                      </dd>
-                    </div>
-                    {answer.score_rationale && (
-                      <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                        <dt className="text-sm font-medium text-gray-500">Score Rationale</dt>
-                        <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 whitespace-pre-line">
-                          {answer.score_rationale}
-                        </dd>
-                      </div>
-                    )}
-                  </dl>
-                </div>
-              </div>
-            ))
-          ) : (
-            <div className="text-center py-4 bg-gray-50 rounded">
-              <p className="text-gray-500">No answers found for this submission.</p>
-            </div>
+    <PageTemplate title={`Submission ${submission?.id || ''}`}>
+      <div className="w-full bg-white shadow-md rounded-lg p-6">
+        <div className="flex justify-between mb-4 items-center">
+          <h1 className="text-2xl font-bold">Submission Details</h1>
+          {submission && isAdmin && (
+            <Link 
+              href={`/submission/${submissionId}/edit`}
+              className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700"
+            >
+              Edit Submission
+            </Link>
           )}
-        </>
-      ) : (
-        <div className="text-center py-8 text-gray-500">
-          Submission not found. Please check the URL or go back to the dashboard.
         </div>
-      )}
-      
-      <div className="mt-6 space-x-2">
-        {campaignId && (
-          <Link
-            href={`/campaigns/${campaignId}`}
-            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700 inline-block"
-          >
-            Back to Campaign
-          </Link>
+        
+        {error && (
+          <div className="mb-4 p-2 bg-red-100 text-red-700 rounded">
+            {error}
+          </div>
         )}
-        <button 
-          onClick={() => router.push('/dashboard')}
-          className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-700"
-        >
-          Back to Dashboard
-        </button>
+
+        {!isAdmin && (
+          <div className="mb-4 p-2 bg-yellow-100 text-yellow-700 rounded">
+            Note: Some features require admin privileges.
+          </div>
+        )}
+        
+        {isLoading ? (
+          <div className="flex justify-center items-center py-10">
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-700"></div>
+          </div>
+        ) : submission ? (
+          <>
+            <div className="bg-white shadow overflow-hidden sm:rounded-lg mb-6">
+              <div className="px-4 py-5 sm:px-6">
+                <h2 className="text-lg leading-6 font-medium text-gray-900">Submission Information</h2>
+                {campaignId && (
+                  <p className="mt-1 max-w-2xl text-sm text-gray-500">
+                    <Link href={`/campaigns/${campaignId}`} className="text-blue-600 hover:underline">
+                      View Campaign Details
+                    </Link>
+                    {isAdmin && (
+                      <> | <Link href={`/campaigns/${campaignId}/submissions`} className="text-blue-600 hover:underline">
+                        View All Submissions
+                      </Link>
+                      </>
+                    )}
+                  </p>
+                )}
+              </div>
+              <div className="border-t border-gray-200">
+                <dl>
+                  <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                    <dt className="text-sm font-medium text-gray-500">Campaign</dt>
+                    <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{submission.campaign_name}</dd>
+                  </div>
+                  <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                    <dt className="text-sm font-medium text-gray-500">Candidate</dt>
+                    <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{submission.email}</dd>
+                  </div>
+                  <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                    <dt className="text-sm font-medium text-gray-500">Created</dt>
+                    <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                      {new Date(submission.created_at).toLocaleString()}
+                    </dd>
+                  </div>
+                  <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                    <dt className="text-sm font-medium text-gray-500">Status</dt>
+                    <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                      <span className={`px-2 py-1 rounded ${submission.is_complete ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                        {submission.is_complete ? 'Completed' : 'In Progress'}
+                      </span>
+                    </dd>
+                  </div>
+                  <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                    <dt className="text-sm font-medium text-gray-500">Total Score</dt>
+                    <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                      {submission.total_points !== null ? submission.total_points : 'Not scored'}
+                    </dd>
+                  </div>
+                </dl>
+              </div>
+            </div>
+
+            <h2 className="text-xl font-bold mb-4">Answers</h2>
+            
+            {submissionAnswers.length > 0 ? (
+              submissionAnswers.map((answer) => (
+                <div key={answer.id} className="bg-white shadow overflow-hidden sm:rounded-lg mb-4">
+                  <div className="px-4 py-5 sm:px-6">
+                    <h3 className="text-lg leading-6 font-medium text-gray-900">{answer.question_title}</h3>
+                    {/* If we have question details, show the max points */}
+                    {questions.find(q => q.id === answer.question_id) && (
+                      <p className="mt-1 max-w-2xl text-sm text-gray-500">
+                        Max Points: {questions.find(q => q.id === answer.question_id)?.max_points}
+                      </p>
+                    )}
+                  </div>
+                  <div className="border-t border-gray-200">
+                    <dl>
+                      {/* Show question text if available */}
+                      {isAdmin && questions.find(q => q.id === answer.question_id)?.body && (
+                        <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                          <dt className="text-sm font-medium text-gray-500">Question Text</dt>
+                          <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 whitespace-pre-line">
+                            {questions.find(q => q.id === answer.question_id)?.body}
+                          </dd>
+                        </div>
+                      )}
+                      
+                      <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                        <dt className="text-sm font-medium text-gray-500">Video</dt>
+                        <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                          {answer.video_path ? (
+                            <a 
+                              href={`${API_BASE_URL}/watch_video/${getVideoFilename(answer.video_path)}`} 
+                              className="text-blue-600 hover:text-blue-900" 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                            >
+                              Watch Video
+                            </a>
+                          ) : (
+                            'No video uploaded'
+                          )}
+                        </dd>
+                      </div>
+                      <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                        <dt className="text-sm font-medium text-gray-500">Transcript</dt>
+                        <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 whitespace-pre-line">
+                          {answer.transcript || 'No transcript available'}
+                        </dd>
+                      </div>
+                      <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                        <dt className="text-sm font-medium text-gray-500">Score</dt>
+                        <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                          {answer.score !== null ? answer.score : 'Not scored'}
+                        </dd>
+                      </div>
+                      {answer.score_rationale && (
+                        <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                          <dt className="text-sm font-medium text-gray-500">Score Rationale</dt>
+                          <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 whitespace-pre-line">
+                            {answer.score_rationale}
+                          </dd>
+                        </div>
+                      )}
+                    </dl>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-4 bg-gray-50 rounded">
+                <p className="text-gray-500">No answers found for this submission.</p>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="text-center py-8 text-gray-500">
+            Submission not found. Please check the URL or go back to the dashboard.
+          </div>
+        )}
+        
+        <div className="mt-6 space-x-2">
+          {campaignId && (
+            <Link
+              href={`/campaigns/${campaignId}`}
+              className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700 inline-block"
+            >
+              Back to Campaign
+            </Link>
+          )}
+          <button 
+            onClick={() => router.push('/dashboard')}
+            className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-700"
+          >
+            Back to Dashboard
+          </button>
+        </div>
       </div>
-    </AdminLayout>
+    </PageTemplate>
   );
 };
 

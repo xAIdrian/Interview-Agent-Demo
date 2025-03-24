@@ -22,7 +22,7 @@ const RegisterPage = () => {
   // If already authenticated, redirect to positions page
   useEffect(() => {
     if (isAuthenticated) {
-      router.push('/candidate/positions');
+      router.push('/candidate');
     }
   }, [isAuthenticated, router]);
 

@@ -6,15 +6,7 @@ import { AuthProvider } from '../app/components/AuthProvider';
 import { NetworkErrorBoundary } from '../app/components/NetworkErrorBoundary';
 import dynamic from 'next/dynamic';
 
-// Import AuthDebugToggle only on client-side and only in development
-const AuthDebugToggle = dynamic(
-  () => process.env.NODE_ENV === 'development' 
-    ? import('../components/auth/AuthDebug').then(mod => mod.AuthDebugToggle) 
-    : Promise.resolve(() => null),
-  { ssr: false }
-);
-
-function MyApp({ Component, pageProps }: AppProps) {
+const App = ({ Component, pageProps }: AppProps) => {
   return (
     <NetworkErrorBoundary>
       <Head>
@@ -24,10 +16,9 @@ function MyApp({ Component, pageProps }: AppProps) {
       </Head>
       <AuthProvider>
         <Component {...pageProps} />
-        <AuthDebugToggle />
       </AuthProvider>
     </NetworkErrorBoundary>
   );
-}
+};
 
-export default MyApp;
+export default App;

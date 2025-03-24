@@ -28,7 +28,7 @@ const HomePage = () => {
       if (userIsAdmin) {
         router.push('/campaigns');
       } else {
-        router.push('/candidate/positions');
+        router.push('/candidate');
       }
     } else {
       setIsLoading(false);
