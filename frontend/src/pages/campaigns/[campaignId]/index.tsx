@@ -162,10 +162,10 @@ const CampaignDetailsPage = () => {
             </Link>
           )}
           <Link 
-            href="/dashboard"
+            href="/campaigns"
             className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-700"
           >
-            Back to Dashboard
+            Back to Campaigns
           </Link>
         </div>
       </div>
