@@ -268,12 +268,12 @@ def get_submission_by_id(id):
     submission_id = ensure_string_id(id)
     
     # Check if user has access to this submission
-    if not is_admin:
-        cursor.execute("SELECT user_id FROM submissions WHERE id = %s", (submission_id,))
-        submission = cursor.fetchone()
-        if not submission or submission[0] != user_id:
-            conn.close()
-            return jsonify({"error": "Access denied for user"}), 403
+    #if not is_admin:
+        #cursor.execute("SELECT user_id FROM submissions WHERE id = %s", (submission_id,))
+        #submission = cursor.fetchone()
+        #if not submission or submission[0] != user_id:
+            #conn.close()
+            #return jsonify({"error": "Access denied for user"}), 403
     
     # Get submission details
     cursor.execute("""
@@ -1531,3 +1531,13 @@ def complete_submission(id):
             conn.rollback()
             conn.close()
         return jsonify({"error": str(e)}), 500
+
+@api_bp.route('/submit_interview', methods=['POST'])
+def submit_interview():
+    try:
+        data = request.json
+        transcript = data.get('transcript')
+        print('Received transcript:', transcript)
+        return jsonify({'success': True}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
