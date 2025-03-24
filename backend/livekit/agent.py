@@ -93,7 +93,7 @@ async def entrypoint(ctx: JobContext):
 
     async def async_handle_text_stream(reader, participant_identity):
         info = reader.info
-        global submission_data
+        nonlocal submission_data  # Use nonlocal instead of global
 
         print(
             f"🚀 ~ async_handle_text_stream ~ info:",
@@ -143,6 +143,8 @@ async def entrypoint(ctx: JobContext):
             except json.JSONDecodeError as e:
                 print(f"Error parsing chunk as JSON: {e}")
                 # Continue processing other chunks even if one fails
+            except Exception as e:
+                logger.error(f"Unexpected error processing chunk: {e}")
 
     def handle_text_stream(reader, participant_identity):
         task = asyncio.create_task(
@@ -166,41 +168,61 @@ async def entrypoint(ctx: JobContext):
         logger.info(f"Extracted submission ID from participant identity: {submission_id}")
         
         # Fetch submission data if not received via text stream
-        if not submission_data:
+        if not submission_data and submission_id:
             try:
+                logger.info(f"Attempting to fetch submission data for ID: {submission_id}")
                 submission_url = f"http://localhost:5000/api/submissions/{submission_id}"
-                submission_response = requests.get(submission_url)
+                submission_response = requests.get(submission_url, timeout=5)  # Add timeout
                 if submission_response.ok:
                     submission_data = submission_response.json()
-                    logger.info(f"Fetched submission data for ID: {submission_id}")
+                    if not isinstance(submission_data, dict):
+                        logger.warning(f"Received non-dict submission data: {type(submission_data)}")
+                        submission_data = {}
+                    else:
+                        logger.info(f"Fetched submission data for ID: {submission_id}")
                     
                     # Extract campaign ID
-                    campaign_id = submission_data.get("campaign_id") or (
-                        submission_data.get("submission", {}).get("campaign_id")
-                    )
+                    campaign_id = None
+                    if submission_data:
+                        campaign_id = submission_data.get("campaign_id") or (
+                            submission_data.get("submission", {}).get("campaign_id")
+                        )
                     
                     if campaign_id:
                         # Fetch campaign details
                         campaign_url = f"http://localhost:5000/api/campaigns/{campaign_id}"
-                        campaign_response = requests.get(campaign_url)
+                        campaign_response = requests.get(campaign_url, timeout=5)
                         if campaign_response.ok:
                             campaign_data = campaign_response.json()
-                            submission_data["job_description"] = campaign_data.get("job_description", "")
-                            submission_data["campaign_context"] = campaign_data.get("campaign_context", "")
-                            
+                            if isinstance(campaign_data, dict):
+                                submission_data["job_description"] = campaign_data.get("job_description", "")
+                                submission_data["campaign_context"] = campaign_data.get("campaign_context", "")
+                            else:
+                                logger.warning(f"Received non-dict campaign data: {type(campaign_data)}")
+                        
                         # Fetch questions if not already loaded
                         if not _accumulated_questions:
                             questions_url = f"http://localhost:5000/api/questions?campaign_id={campaign_id}"
-                            questions_response = requests.get(questions_url)
+                            questions_response = requests.get(questions_url, timeout=5)
                             if questions_response.ok:
                                 questions = questions_response.json()
-                                question_titles = [q["title"] for q in questions]
-                                _accumulated_questions.extend(question_titles)
-                                logger.info(f"Fetched {len(question_titles)} questions")
+                                if isinstance(questions, list):
+                                    question_titles = [q.get("title", "") for q in questions if isinstance(q, dict)]
+                                    _accumulated_questions.extend(question_titles)
+                                    logger.info(f"Fetched {len(question_titles)} questions")
+                                else:
+                                    logger.warning(f"Received non-list questions data: {type(questions)}")
+            except requests.RequestException as e:
+                logger.error(f"Request error fetching submission data: {e}")
             except Exception as e:
                 logger.error(f"Error fetching submission data: {e}")
     except Exception as e:
         logger.error(f"Error processing participant identity: {e}")
+    
+    # Ensure submission_data is not None
+    if submission_data is None:
+        logger.warning("No submission data available - initializing empty dictionary")
+        submission_data = {}
     
     # Use default questions if none were loaded
     if not _accumulated_questions:
@@ -213,13 +235,32 @@ async def entrypoint(ctx: JobContext):
         logger.info("Using default questions as none were provided")
     
     # Start the multimodal agent
-    run_multimodal_agent(ctx, participant, _accumulated_questions, submission_data, interviewer_name)
+    try:
+        run_multimodal_agent(ctx, participant, _accumulated_questions, submission_data, interviewer_name)
+        logger.info("agent started successfully")
+    except Exception as e:
+        logger.error(f"Error starting multimodal agent: {e}")
+        # Start with minimal data in case of error
+        try:
+            fallback_data = {
+                "resume_text": "Not available",
+                "job_description": "Not available"
+            }
+            run_multimodal_agent(ctx, participant, _accumulated_questions, fallback_data, interviewer_name)
+            logger.info("agent started with fallback data")
+        except Exception as e2:
+            logger.error(f"Critical error starting agent even with fallback data: {e2}")
 
-    logger.info("agent started")
+    logger.info("agent initialization completed")
 
 
 def run_multimodal_agent(ctx: JobContext, participant: rtc.RemoteParticipant, questions, submission_data, interviewer_name):
     logger.info("starting multimodal agent")
+    
+    # Check if submission_data is None and provide default empty dict if needed
+    if submission_data is None:
+        logger.warning("No submission data available, using default values")
+        submission_data = {}
     
     # Extract necessary data with fallbacks
     resume_text = submission_data.get("resume_text", "Not provided")
