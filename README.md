@@ -26,43 +26,48 @@ This project is an AI-powered candidate scoring system that allows administrator
     pip install -r requirements.txt
     ```
 
-3. Configure the environment variables in a `.env` file:
+3. Configure environment variables:
+
+    Create a `.env` file with the following variables:
     ```env
-    DB_USER=your_db_user
-    DB_PASSWORD=your_db_password
-    DB_HOST=your_db_host
-    DB_PORT=your_db_port
-    DB_NAME=your_db_name
-    AWS_ACCESS_KEY_ID=your_aws_access_key
-    AWS_SECRET_ACCESS_KEY=***REMOVED***=***REMOVED***=your_aws_secret_access_key
-    AWS_SESSION_TOKEN=your_aws_session_token
     OPENAI_API_KEY=your_openai_api_key
+    DEEPGRAM_API_KEY=your_deepgram_api_key
+    LIVEKIT_URL=your_livekit_url
+    LIVEKIT_API_KEY=your_livekit_api_key
+    LIVEKIT_API_SECRET=your_livekit_api_secret
+    AWS_ACCESS_KEY_ID=your_aws_access_key
+    AWS_SECRET_ACCESS_KEY=***REMOVED***=***REMOVED***=your_aws_secret_key
+    AWS_SESSION_TOKEN=your_aws_session_token
     ```
 
-4. Initialize the database tables:
+    Configure database settings in `backend/config.py`:
+    ```python
+    DB_USER = "your_db_user"
+    DB_PASSWORD = "your_db_password" 
+    DB_HOST = "your_db_host"
+    DB_PORT = "your_db_port"
+    DB_NAME = "your_db_name"
+    ```
+
+4. Run the three required servers:
+
+    a. Frontend server:
     ```sh
-    python -c "from app.database import create_tables; create_tables()"
+    cd frontend
+    npm run dev
     ```
 
-## Running the Server
-
-### Development
-
-1. Run the Flask development server:
+    b. Backend server:
     ```sh
-    flask run
+    cd app
+    python app.py
     ```
 
-2. Access the application at `http://127.0.0.1:5000`.
-
-### Production
-
-1. Use a production-ready WSGI server like Gunicorn:
+    c. LiveKit agent server:
     ```sh
-    gunicorn -w 4 app:app
+    cd app/livekit
+    python agent.py start
     ```
-
-2. Configure a reverse proxy like Nginx to forward requests to the Gunicorn server.
 
 ## Usage
 
