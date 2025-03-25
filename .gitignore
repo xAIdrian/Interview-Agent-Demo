@@ -9,3 +9,41 @@ backend/venv
 
 backend/.env
 backend/.env.local
+backend/.env.develop
+
+.env
+
+
+# dependencies
+frontend/node_modules
+frontend/.pnp
+frontend/.pnp.*
+frontend/.yarn/*
+frontend/!.yarn/patches
+frontend/!.yarn/plugins
+frontend/!.yarn/releases
+frontend/!.yarn/versions
+frontend/coverage
+frontend/.next/
+frontend/out/
+frontend/build
+frontend/.DS_Store
+frontend/*.pem
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+frontend/.pnpm-debug.log*
+frontend/.env*
+frontend/.vercel
+frontend/*.tsbuildinfo
+frontend/next-env.d.ts
+node_modules/*
+
+# Environment files in all directories
+**/.env
+**/.env.local
+**/.env.development
+**/.env.develop
+**/.env.production
+**/.env.test
+**/.env.staging

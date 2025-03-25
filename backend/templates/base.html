@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>Gulpin: The AI Interview Platform for the Future of Hiring</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Luxon for Tabulator date processing -->
+    <script src="https://cdn.jsdelivr.net/npm/luxon@3.5.0/build/global/luxon.min.js"></script>
+    <script src="{{ url_for('static', filename='js/tabulator-setup.js') }}"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-900">
+    <header class="bg-blue-800 text-white p-4">
+        <h1 class="text-2xl font-bold">Gulpin: The AI Interview Platform for the Future of Hiring</h1>
+    </header>
+    
+    <div class="flex">
+        <!-- Sidebar Navigation -->
+        <nav class="bg-blue-700 text-white w-64 min-h-screen py-4 px-3 flex-shrink-0">
+            <div class="mb-8">
+                <p class="font-semibold text-lg mb-2">
+                    {% if session.get('user_id') %}
+                        Welcome, {{ session.get('name') or session.get('email') }}
+                    {% else %}
+                        Welcome!
+                    {% endif %}
+                </p>
+                {% if session.get('user_id') %}
+                    <a href="{{ url_for('profile') }}" class="block hover:bg-blue-900 p-2 rounded mb-2">Profile</a>
+                {% endif %}
+            </div>
+            <div class="space-y-2">
+                <a href="{{ url_for('index') }}" class="block hover:bg-blue-900 p-2 rounded">Home</a>
+                {% if session.get('user_id') %}
+                    {% if session.get('is_admin') %}
+                        <a href="{{ url_for('admin_users') }}" class="block hover:bg-blue-900 p-2 rounded">User Manager</a>
+                        <a href="{{ url_for('admin_create_user') }}" class="block hover:bg-blue-900 p-2 rounded">Create User</a>
+                        <a href="{{ url_for('admin_campaigns') }}" class="block hover:bg-blue-900 p-2 rounded">View Campaigns</a>
+                    {% endif %}
+                    <a href="{{ url_for('logout') }}" class="block hover:bg-blue-900 p-2 rounded">Logout</a>
+                {% else %}
+                    <a href="{{ url_for('login') }}" class="block hover:bg-blue-900 p-2 rounded">Login</a>
+                    <a href="{{ url_for('register') }}" class="block hover:bg-blue-900 p-2 rounded">Register</a>
+                {% endif %}
+            </div>
+        </nav>
+
+        <!-- Main Content Area -->
+        <div class="flex-1 p-4">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+              {% if messages %}
+                <ul class="mb-4">
+                {% for category, message in messages %}
+                  <li class="p-2 mb-2 rounded {% if category == 'error' %}bg-red-500 text-white{% else %}bg-green-500 text-white{% endif %}">{{ message }}</li>
+                {% endfor %}
+                </ul>
+              {% endif %}
+            {% endwith %}
+            
+            {% block content %}{% endblock %}
+        </div>
+    </div>
+
+    <footer class="bg-gray-800 text-white p-4 text-center">
+        <p>© 2025 Gulpin</p>
+    </footer>
+</body>
+</html>

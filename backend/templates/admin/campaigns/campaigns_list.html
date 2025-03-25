@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 class="text-2xl font-bold mb-4">Campaigns</h2>
+
+<div id="campaigns-table" class="mb-4"></div>
+
+<div class="flex space-x-4 mt-4">
+    <a href="{{ url_for('admin_create_campaign') }}" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700">Create Campaign from Scratch</a>
+    <a href="{{ url_for('admin_create_campaign_from_doc') }}" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-700">Create Campaign from Document</a>
+</div>
+
+<script src="https://unpkg.com/tabulator-tables@5.0.7/dist/js/tabulator.min.js"></script>
+<link href="https://unpkg.com/tabulator-tables@5.0.7/dist/css/tabulator.min.css" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/big-integer/1.6.48/BigInteger.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/luxon@3.5.0/build/global/luxon.min.js"></script>
+<script src="{{ url_for('static', filename='js/tabulator-setup.js') }}"></script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var table = new Tabulator("#campaigns-table", {
+            ajaxURL: "/api/campaigns",
+            layout: "fitColumns",
+            columns: [
+                //{ title: "ID", field: "id" },
+                { title: "Title", field: "title" },
+                { title: "Max User Submissions", field: "max_user_submissions" },
+                { title: "Max Points", field: "max_points" },
+                { title: "Is Public", field: "is_public", formatter: function(cell) {
+                    return cell.getValue() ? "Yes" : "No";
+                }},
+                { title: "Actions", formatter: "link", formatterParams: {
+                    label: "View",
+                    url: function(cell) {
+                        var rowData = cell.getRow().getData();
+                        console.log(rowData);  // Debugging: Log the row data
+                        var id = bigInt(rowData.id).toString();  // Convert id to string using big-integer
+                        return "/admin/campaigns/" + id;
+                    }
+                }}
+            ],
+            ajaxResponse: function(url, params, response) {
+                console.log(response);  // Debugging: Log the API response
+                return response;
+            }
+        });
+    });
+</script>
+{% endblock %}
