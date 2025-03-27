@@ -467,7 +467,7 @@ def create_campaign():
         
         # Insert the campaign using MariaDB's UUID_SHORT() function
         cursor.execute("""
-            INSERT INTO campaigns (id, title, max_user_submissions, max_points, is_public, campaign_context, job_description)
+            INSERT INTO campaigns (id, title, max_user_submissions, max_points, is_public, campaign_context, description)
             VALUES (UUID_SHORT(), %s, %s, %s, %s, %s, %s) RETURNING *
         """, (
             data.get('title'), 
@@ -612,7 +612,7 @@ def create_submission():
             count = cursor.fetchone()[0]
             if count >= campaign[2]:
                 conn.close()
-                return jsonify({"error": f"Maximum submissions ({campaign[2]}) reached for this campaign"}), 400
+                return jsonify({"error": f"Maximum submissions ({campaign[2]}) reached for this campaign - {count}"}), 400
         
         # Create submission with UUID
         cursor.execute(
@@ -819,7 +819,7 @@ def update_campaign_with_questions(id):
     # Update campaign properties
     cursor.execute("""
         UPDATE campaigns
-        SET title = %s, max_user_submissions = %s, is_public = %s, campaign_context = %s, job_description = %s
+        SET title = %s, max_user_submissions = %s, is_public = %s, campaign_context = %s, description = %s
         WHERE id = %s
     """, (data['title'], data['max_user_submissions'], data['is_public'], data['campaign_context'], 
           data['job_description'], id))

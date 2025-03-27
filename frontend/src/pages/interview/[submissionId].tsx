@@ -370,7 +370,7 @@ export default function Page() {
       clearInterval(intervalCheck);
       setNoActivityTime(0);
     };
-  }, [isInterviewActive, agentState, noActivityTime, roomRef.current]);
+  }, [isInterviewActive, agentState, noActivityTime]);
 
   // Set up watchdog timer for agent inactivity
   useEffect(() => {
@@ -415,22 +415,33 @@ export default function Page() {
             
             // Force reconnect if needed after 5 more seconds of inactivity
             setTimeout(() => {
-              if (Date.now() - lastActiveTimestamp > 25000) {
+              if (Date.now() - lastActiveTimestamp > 25000 && isInterviewActive) {
                 console.log("Still inactive, forcing audio reconnection");
                 // Toggle audio to force reconnection
-                if (roomRef.current) {
+                if (roomRef.current && roomRef.current.state === 'connected') {
                   const localParticipant = roomRef.current.localParticipant;
                   
                   // Toggle audio without checking audioTracks
                   navigator.mediaDevices.getUserMedia({ audio: true })
                     .then(stream => {
                       const track = stream.getAudioTracks()[0];
-                      if (track) {
-                        const pub = localParticipant.publishTrack(track);
-                        setTimeout(() => {
-                          localParticipant.unpublishTrack(track);
+                      if (track && roomRef.current && roomRef.current.state === 'connected') {
+                        try {
+                          const pub = localParticipant.publishTrack(track);
+                          setTimeout(() => {
+                            if (roomRef.current && roomRef.current.state === 'connected') {
+                              localParticipant.unpublishTrack(track);
+                            }
+                            stream.getTracks().forEach(t => t.stop());
+                          }, 1000);
+                        } catch (err) {
+                          // Make sure to clean up the stream on error
                           stream.getTracks().forEach(t => t.stop());
-                        }, 1000);
+                          console.error("Error during reconnection:", err);
+                        }
+                      } else {
+                        // Make sure to clean up if we can't reconnect
+                        stream.getTracks().forEach(t => t.stop());
                       }
                     })
                     .catch(err => console.error("Error toggling audio:", err));
@@ -624,15 +635,23 @@ export default function Page() {
           console.log("LiveKit room disconnected, attempting to recover");
           // Don't immediately reset connection details
           // Instead, set a timeout to allow for potential reconnection
-          setTimeout(() => {
-            // Only reset if still disconnected
-            if (isInterviewActive && roomRef.current?.state !== 'connected') {
-              console.log("Connection not recovered after timeout, resetting state");
-          updateConnectionDetails(undefined);
-              setIsInterviewActive(false);
-              alert("The connection to the interview was lost. Please try reconnecting.");
+          if (roomRef.current) {
+            // Clear any existing reconnection timeout
+            if ((roomRef.current as any)._reconnectTimeout) {
+              clearTimeout((roomRef.current as any)._reconnectTimeout);
             }
-          }, 5000);
+            
+            // Set a new reconnection timeout
+            (roomRef.current as any)._reconnectTimeout = setTimeout(() => {
+              // Only reset if still disconnected
+              if (isInterviewActive && roomRef.current?.state !== 'connected') {
+                console.log("Connection not recovered after timeout, resetting state");
+                updateConnectionDetails(undefined);
+                setIsInterviewActive(false);
+                alert("The connection to the interview was lost. Please try reconnecting.");
+              }
+            }, 5000);
+          }
         }}
         options={{
           adaptiveStream: false,
@@ -745,15 +764,26 @@ function SimpleVoiceAssistant(props: {
       navigator.mediaDevices.getUserMedia({ audio: true })
         .then(stream => {
           const track = stream.getAudioTracks()[0];
-          if (track) {
+          if (track && room.state === 'connected') {
             // Use the track directly instead of creating a new MediaStreamTrack
-            const pub = room.localParticipant.publishTrack(track);
-            // Unpublish after a moment
-            setTimeout(() => {
-              room.localParticipant.unpublishTrack(track);
-              // Release the media stream
+            try {
+              const pub = room.localParticipant.publishTrack(track);
+              // Unpublish after a moment
+              setTimeout(() => {
+                if (room.state === 'connected') {
+                  room.localParticipant.unpublishTrack(track);
+                }
+                // Release the media stream
+                stream.getTracks().forEach(track => track.stop());
+              }, 500);
+            } catch (err) {
+              // Cleanup on error
               stream.getTracks().forEach(track => track.stop());
-            }, 500);
+              console.error("Error publishing recovery track:", err);
+            }
+          } else {
+            // Cleanup if room is disconnected or no track
+            stream.getTracks().forEach(track => track.stop());
           }
         })
         .catch(err => console.error("Error accessing audio for recovery:", err));
@@ -764,11 +794,12 @@ function SimpleVoiceAssistant(props: {
     }
   }, [room]);
   
+  // Avoid infinite updates by not updating state in every render
   useEffect(() => {
     // Only trigger state change when the state actually changes
     if (prevStateRef.current !== state) {
       console.log(`Agent state changed: ${prevStateRef.current} -> ${state}`);
-    props.onStateChange(state);
+      props.onStateChange(state);
       prevStateRef.current = state;
       
       // If the agent is speaking, add a timeout to check if it stops speaking
@@ -795,7 +826,7 @@ function SimpleVoiceAssistant(props: {
         return () => clearTimeout(speakingTimeout);
       }
     }
-  }, [props, state, stuckCounter]);
+  }, [props, state, stuckCounter]); // Include stuckCounter in dependencies
 
   return (
     <div className="h-[200px] flex flex-col items-center justify-center">

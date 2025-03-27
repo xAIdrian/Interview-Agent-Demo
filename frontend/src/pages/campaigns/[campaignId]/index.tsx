@@ -45,10 +45,6 @@ const CampaignDetailsPage = () => {
     const token = localStorage.getItem('accessToken');
     const isAdminUser = localStorage.getItem('isAdmin') === 'true';
     setIsAdmin(isAdminUser);
-    
-    if (!token) {
-      router.push('/login');
-    }
   }, [router]);
 
   // Fetch campaign data
