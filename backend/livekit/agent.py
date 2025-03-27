@@ -68,6 +68,7 @@ async def entrypoint(ctx: JobContext):
     tasks = []
     _accumulated_questions = []
     submission_data = None
+    campaign_data = None  # Store campaign data
     
     # Keep-alive mechanism to prevent disconnection
     async def keep_alive_task():
@@ -110,7 +111,7 @@ async def entrypoint(ctx: JobContext):
 
     async def async_handle_text_stream(reader, participant_identity):
         info = reader.info
-        nonlocal submission_data  # Use nonlocal instead of global
+        nonlocal submission_data, campaign_data  # Use nonlocal for both variables
 
         print(
             f"🚀 ~ async_handle_text_stream ~ info:",
@@ -135,18 +136,37 @@ async def entrypoint(ctx: JobContext):
                             campaign_id = parsed_chunk["submission"]["campaign_id"]
                             logger.info(f"Extracted campaign ID: {campaign_id}")
                             
-                            # Fetch additional data if needed
-                            try:
-                                # Fetch questions
-                                questions_url = f"http://localhost:5000/api/questions?campaign_id={campaign_id}"
-                                questions_response = requests.get(questions_url)
-                                if questions_response.ok:
-                                    questions = questions_response.json()
-                                    question_titles = [q["title"] for q in questions]
-                                    _accumulated_questions.extend(question_titles)
-                                    logger.info(f"Fetched {len(question_titles)} questions")
-                            except Exception as e:
-                                logger.error(f"Error fetching additional data: {e}")
+                            # Fetch campaign data only once
+                            if not campaign_data:
+                                try:
+                                    campaign_url = f"http://localhost:5000/api/campaigns/{campaign_id}"
+                                    campaign_response = requests.get(campaign_url, timeout=5)
+                                    if campaign_response.ok:
+                                        campaign_data = campaign_response.json()
+                                        if isinstance(campaign_data, dict):
+                                            submission_data["job_description"] = campaign_data.get("job_description", "")
+                                            submission_data["campaign_context"] = campaign_data.get("campaign_context", "")
+                                            logger.info("Successfully fetched campaign data")
+                                        else:
+                                            logger.warning(f"Received non-dict campaign data: {type(campaign_data)}")
+                                except Exception as e:
+                                    logger.error(f"Error fetching campaign data: {e}")
+
+                            # Fetch questions if not already loaded
+                            if not _accumulated_questions:
+                                try:
+                                    questions_url = f"http://localhost:5000/api/questions?campaign_id={campaign_id}"
+                                    questions_response = requests.get(questions_url, timeout=5)
+                                    if questions_response.ok:
+                                        questions = questions_response.json()
+                                        if isinstance(questions, list):
+                                            question_titles = [q.get("title", "") for q in questions if isinstance(q, dict)]
+                                            _accumulated_questions.extend(question_titles)
+                                            logger.info(f"Fetched {len(question_titles)} questions")
+                                        else:
+                                            logger.warning(f"Received non-list questions data: {type(questions)}")
+                                except Exception as e:
+                                    logger.error(f"Error fetching questions: {e}")
 
                     # If this chunk contains interview questions, process them
                     if "questions" in parsed_chunk and isinstance(
@@ -189,7 +209,7 @@ async def entrypoint(ctx: JobContext):
             try:
                 logger.info(f"Attempting to fetch submission data for ID: {submission_id}")
                 submission_url = f"http://localhost:5000/api/submissions/{submission_id}"
-                submission_response = requests.get(submission_url, timeout=5)  # Add timeout
+                submission_response = requests.get(submission_url, timeout=5)
                 if submission_response.ok:
                     submission_data = submission_response.json()
                     if not isinstance(submission_data, dict):
@@ -198,15 +218,15 @@ async def entrypoint(ctx: JobContext):
                     else:
                         logger.info(f"Fetched submission data for ID: {submission_id}")
                     
-                    # Extract campaign ID
+                    # Extract campaign ID and fetch campaign data only once
                     campaign_id = None
                     if submission_data:
                         campaign_id = submission_data.get("campaign_id") or (
                             submission_data.get("submission", {}).get("campaign_id")
                         )
                     
-                    if campaign_id:
-                        # Fetch campaign details
+                    if campaign_id and not campaign_data:
+                        # Fetch campaign details only once
                         campaign_url = f"http://localhost:5000/api/campaigns/{campaign_id}"
                         campaign_response = requests.get(campaign_url, timeout=5)
                         if campaign_response.ok:
@@ -214,6 +234,7 @@ async def entrypoint(ctx: JobContext):
                             if isinstance(campaign_data, dict):
                                 submission_data["job_description"] = campaign_data.get("job_description", "")
                                 submission_data["campaign_context"] = campaign_data.get("campaign_context", "")
+                                logger.info("Successfully fetched campaign data")
                             else:
                                 logger.warning(f"Received non-dict campaign data: {type(campaign_data)}")
                         

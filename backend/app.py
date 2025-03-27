@@ -27,7 +27,9 @@ from utils.file_handling import SafeTemporaryFile, safe_delete
 from flask_cors import CORS
 from datetime import timedelta
 import secrets
+import dotenv
 
+dotenv.load_dotenv()
 
 app = Flask(__name__)
 
