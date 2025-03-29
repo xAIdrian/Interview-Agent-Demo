@@ -23,7 +23,7 @@ api_bp = Blueprint('api', __name__)
 CORS(api_bp, 
     origins=["http://localhost:3000", "http://127.0.0.1:3000"],
     supports_credentials=True,
-    allow_headers=["Content-Type", "X-Requested-With", "Authorization", "Origin", "Accept"],
+    allow_headers=["Content-Type", "X-Requested-With", "Authorization", "Origin", "Accept", "x-retry-count"],
     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     max_age=3600
 )

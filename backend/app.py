@@ -40,7 +40,7 @@ def add_cors_headers(response):
     # Only add headers if they don't exist already
     if 'Access-Control-Allow-Origin' not in response.headers:
         response.headers.add('Access-Control-Allow-Origin', 'http://localhost:3000')
-        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,Accept')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,Accept,x-retry-count')
         response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
         response.headers.add('Access-Control-Allow-Credentials', 'true')
     return response
