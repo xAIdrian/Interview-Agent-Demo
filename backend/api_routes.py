@@ -1,5 +1,5 @@
 from database import get_db_connection, build_filter_query, ensure_string_id, map_row_to_dict
-from flask import Blueprint, request, jsonify, session, redirect, url_for, render_template
+from flask import Blueprint, request, jsonify, session, redirect, url_for, render_template, current_app as app
 from flask_cors import CORS, cross_origin
 from functools import wraps
 import boto3
@@ -14,15 +14,19 @@ from document_processor import generate_campaign_context, generate_interview_que
 import json
 import re
 import bcrypt
+from livekit.token_server import LiveKitTokenServer
 
 # Create a Blueprint for the API routes
 api_bp = Blueprint('api', __name__)
 
+# Apply CORS specifically to the API blueprint
 CORS(api_bp, 
     origins=["http://localhost:3000", "http://127.0.0.1:3000"],
     supports_credentials=True,
-    allow_headers=["Content-Type", "X-Requested-With", "x-retry-count"],
-    methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
+    allow_headers=["Content-Type", "X-Requested-With", "Authorization", "Origin", "Accept"],
+    methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    max_age=3600
+)
 
 # Configure your S3 bucket name (already created)
 S3_BUCKET = Config.S3_BUCKET_NAME
@@ -1657,3 +1661,38 @@ def submit_interview():
         return jsonify({'success': True}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+# Add LiveKit token endpoint
+@api_bp.route("/livekit/token", methods=["GET", "OPTIONS"])
+def get_livekit_token():
+    """Generate and return a LiveKit token for joining a room"""
+    if request.method == "OPTIONS":
+        # Handle preflight request
+        response = jsonify({"status": "ok"})
+        # Let the global CORS middleware handle the headers
+        return response, 200
+        
+    # Get parameters from the request
+    name = request.args.get("name", "anonymous")
+    room = request.args.get("room")
+    
+    try:
+        # Generate room name if not provided
+        if not room:
+            # Use synchronous call since this is not an async function
+            import uuid
+            room = f"interview-{str(uuid.uuid4())[:8]}"
+            
+        # Generate token
+        token = LiveKitTokenServer.generate_token(name, room)
+        
+        # Create response without explicit CORS headers (let global middleware handle it)
+        response = jsonify({
+            "token": token,
+            "room": room
+        })
+        return response, 200
+    except Exception as e:
+        app.logger.error(f"Error generating LiveKit token: {str(e)}")
+        error_response = jsonify({"error": str(e)})
+        return error_response, 500
