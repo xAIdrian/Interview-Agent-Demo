@@ -423,7 +423,7 @@ Your first message should be a friendly introduction as {interviewer_name}, welc
         for attempt in range(max_retries):
             try:
                 logger.info(f"Generating initial reply (attempt {attempt+1}/{max_retries})")
-    agent.generate_reply()
+                agent.generate_reply()
                 
                 # Wait a bit to see if the state changes to speaking
                 await asyncio.sleep(5)

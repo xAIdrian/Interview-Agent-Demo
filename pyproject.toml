@@ -1,0 +1,38 @@
+[project]
+name = "gulpin-ai-candidate-scoring"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "None"}
+]
+readme = "README.md"
+requires-python = ">=3.13,<4.0"
+dependencies = [
+    "flask (==2.2.2)",
+    "pypdf2 (>=3.0.1,<4.0.0)",
+    "werkzeug (==2.2.2)",
+    "boto3 (>=1.18.69)",
+    "botocore (>=1.21.69)",
+    "flask-cors (>=5.0.1,<6.0.0)",
+    "flask-jwt-extended (>=4.4.4)",
+    "fpdf (==1.7.2)",
+    "livekit (==0.22.0)",
+    "livekit-agents (==0.12.18)",
+    "livekit-plugins-deepgram (==0.7.2)",
+    "livekit-plugins-openai (==0.12.1)",
+    "mariadb (==1.1.12)",
+    "numpy (>=2.2.4,<3.0.0)",
+    "openai (>=1.68.2)",
+    "pymupdf (>=1.25.4,<2.0.0)",
+    "python-docx (>=1.1.2,<2.0.0)",
+    "python-dotenv (>=1.1.0,<2.0.0)",
+    "requests (>=2.32.3,<3.0.0)",
+    "whisper (==1.0.0)",
+    "bcrypt (>=4.3.0,<5.0.0)",
+    "livekit-api (>=0.8.2,<0.9.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"

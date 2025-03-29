@@ -1,0 +1,31 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+flask = "==2.2.2"
+pypdf2 = "*"
+werkzeug = "==2.2.2"
+boto3 = ">=1.18.69"
+botocore = ">=1.21.69"
+flask-cors = "*"
+flask-jwt-extended = ">=4.4.4"
+fpdf = "==1.7.2"
+livekit = "*"
+livekit-agents = "*"
+livekit-plugins-deepgram = "*"
+livekit-plugins-openai = "*"
+mariadb = "==1.0.7"
+numpy = "*"
+openai = "==0.27.0"
+pymupdf = "*"
+python-docx = "*"
+python-dotenv = "*"
+requests = "*"
+whisper = "==1.0.0"
+
+[dev-packages]
+
+[requires]
+python_version = "3.13"

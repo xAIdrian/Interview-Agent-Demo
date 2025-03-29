@@ -31,12 +31,19 @@ import secrets
 
 app = Flask(__name__)
 
-# Configure CORS properly
-CORS(app, 
-    origins=["http://localhost:3000", "http://127.0.0.1:3000"],
-    supports_credentials=True,
-    allow_headers=["Content-Type", "X-Requested-With", "x-retry-count"],
-    methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
+# Configure CORS properly - disable the automatic CORS and let us handle it manually
+app.config['CORS_ENABLED'] = False
+
+# A simple function to add CORS headers to all responses
+@app.after_request
+def add_cors_headers(response):
+    # Only add headers if they don't exist already
+    if 'Access-Control-Allow-Origin' not in response.headers:
+        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:3000')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,Accept')
+        response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+        response.headers.add('Access-Control-Allow-Credentials', 'true')
+    return response
 
 app.config.from_object(Config)
 app.register_blueprint(api_bp, url_prefix='/api')
@@ -55,14 +62,20 @@ def make_session_permanent():
     session.permanent = True
 
 # Add a root-level health endpoint
-@app.route('/health', methods=['GET', 'HEAD'])
+@app.route('/health', methods=['GET', 'HEAD', 'OPTIONS'])
 def health_check():
     """
     Simple health check endpoint to verify the API is running.
     This doesn't check database connectivity to allow CORS preflight to succeed.
     """
+    # Handle preflight OPTIONS request
+    if request.method == 'OPTIONS':
+        response = jsonify({"status": "ok"})
+        return response
+        
     try:
-        return jsonify({"status": "ok", "message": "API is operational"}), 200
+        response = jsonify({"status": "ok", "message": "API is operational"})
+        return response, 200
     except Exception as e:
         app.logger.error(f"Health check failed: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -1160,6 +1173,16 @@ def test_session():
             "session_contents": dict(session),
             "test_value": session.get('test_value', 'Not set')
         })
+
+# Handle OPTIONS requests globally
+@app.route('/', defaults={'path': ''}, methods=['OPTIONS'])
+@app.route('/<path:path>', methods=['OPTIONS'])
+def handle_options(path):
+    response = app.response_class(
+        response=[],
+        status=200
+    )
+    return response
 
 if __name__ == "__main__":
     app.run(debug=True)
