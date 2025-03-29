@@ -9,8 +9,8 @@ from livekit.agents import (
 from livekit.agents.multimodal import MultimodalAgent
 from livekit.plugins import openai
 from dotenv import load_dotenv
-from .interview_api import AssistantFnc
-from .prompts import WELCOME_MESSAGE, AGENT_INSTRUCTIONS, LOOKUP_EMAIL_MESSAGE
+from interview_api import AssistantFnc
+from prompts import WELCOME_MESSAGE, AGENT_INSTRUCTIONS, LOOKUP_EMAIL_MESSAGE
 import os
 import logging
 
