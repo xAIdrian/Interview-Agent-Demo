@@ -45,7 +45,7 @@ assistant = MultimodalAgent(model=model, fnc_ctx=assistant_fnc)
 
 Contains the business logic for:
 - Candidate profile management
-- Database operations
+- Database operations for candidates and interview questions
 - Interview question flow
 - Position-specific question sets
 
@@ -53,6 +53,39 @@ The `AssistantFnc` class provides functions that can be called by the AI:
 - `lookup_candidate`: Find candidate by email
 - `create_candidate`: Create a new candidate profile
 - `get_next_question`: Get the next question in the interview sequence
+- `add_interview_question`: Add a new question to the database
+
+### SQLite Database
+
+The system uses SQLite to store:
+
+1. **Candidate Information**:
+   - Email (primary key)
+   - Name
+   - Position
+   - Experience level
+
+2. **Interview Questions**:
+   - Position-specific questions (software engineer, data scientist, product manager)
+   - Stage-specific questions (technical or behavioral)
+   - Automatically populated with default questions on first run
+
+Database schema:
+```sql
+CREATE TABLE candidates (
+    email TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    position TEXT NOT NULL,
+    experience INTEGER NOT NULL
+);
+
+CREATE TABLE questions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    position TEXT NOT NULL,
+    stage TEXT NOT NULL,
+    question TEXT NOT NULL
+);
+```
 
 ### Token Server (`token_server.py`)
 

@@ -38,6 +38,73 @@ class DatabaseDriver:
         )
         ''')
         
+        # Create questions table if it doesn't exist
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS questions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            position TEXT NOT NULL,
+            stage TEXT NOT NULL,
+            question TEXT NOT NULL
+        )
+        ''')
+        
+        # Insert default questions if the table is empty
+        cursor.execute('SELECT COUNT(*) FROM questions')
+        if cursor.fetchone()[0] == 0:
+            # Default questions for software engineer
+            software_engineer_technical = [
+                "Can you explain the difference between an array and a linked list?",
+                "What is the time complexity of binary search?",
+                "Explain the concept of recursion and provide a simple example."
+            ]
+            software_engineer_behavioral = [
+                "Tell me about a time when you had to work under pressure to meet a deadline.",
+                "Describe a situation where you had to resolve a conflict within your team.",
+                "How do you handle feedback on your work?"
+            ]
+            
+            # Default questions for data scientist
+            data_scientist_technical = [
+                "Explain the difference between supervised and unsupervised learning.",
+                "How would you handle missing data in a dataset?",
+                "What evaluation metrics would you use for a classification problem?"
+            ]
+            data_scientist_behavioral = [
+                "Tell me about a data-driven project you're particularly proud of.",
+                "How do you communicate technical results to non-technical stakeholders?",
+                "How do you ensure your analysis is unbiased?"
+            ]
+            
+            # Default questions for product manager
+            product_manager_technical = [
+                "How do you prioritize features for a product?",
+                "Explain how you would conduct user research for a new product.",
+                "How do you measure the success of a product?"
+            ]
+            product_manager_behavioral = [
+                "Tell me about a time when you had to make a difficult product decision.",
+                "How do you handle stakeholder disagreements?",
+                "Describe a situation where you had to pivot a product strategy."
+            ]
+            
+            # Insert default questions
+            questions_to_insert = []
+            for position, stage, questions in [
+                ("software engineer", "technical_questions", software_engineer_technical),
+                ("software engineer", "behavioral_questions", software_engineer_behavioral),
+                ("data scientist", "technical_questions", data_scientist_technical),
+                ("data scientist", "behavioral_questions", data_scientist_behavioral),
+                ("product manager", "technical_questions", product_manager_technical),
+                ("product manager", "behavioral_questions", product_manager_behavioral)
+            ]:
+                for question in questions:
+                    questions_to_insert.append((position, stage, question))
+            
+            cursor.executemany(
+                'INSERT INTO questions (position, stage, question) VALUES (?, ?, ?)',
+                questions_to_insert
+            )
+        
         conn.commit()
         conn.close()
         
@@ -92,6 +159,19 @@ class DatabaseDriver:
             )
         finally:
             conn.close()
+            
+    def get_questions_for_position_and_stage(self, position: str, stage: str) -> List[str]:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        
+        cursor.execute('SELECT question FROM questions WHERE position = ? AND stage = ?', (position.lower(), stage))
+        results = cursor.fetchall()
+        
+        conn.close()
+        
+        if results:
+            return [result[0] for result in results]
+        return []
 
 class CandidateDetails(enum.Enum):
     Email = "email"
@@ -120,46 +200,9 @@ class AssistantFnc(llm.FunctionContext):
         self._question_index = 0
         self._db = DatabaseDriver()
         
-        # Define interview questions by position
-        self._questions = {
-            "software engineer": {
-                InterviewStage.TechnicalQuestions: [
-                    "Can you explain the difference between an array and a linked list?",
-                    "What is the time complexity of binary search?",
-                    "Explain the concept of recursion and provide a simple example."
-                ],
-                InterviewStage.BehavioralQuestions: [
-                    "Tell me about a time when you had to work under pressure to meet a deadline.",
-                    "Describe a situation where you had to resolve a conflict within your team.",
-                    "How do you handle feedback on your work?"
-                ]
-            },
-            "data scientist": {
-                InterviewStage.TechnicalQuestions: [
-                    "Explain the difference between supervised and unsupervised learning.",
-                    "How would you handle missing data in a dataset?",
-                    "What evaluation metrics would you use for a classification problem?"
-                ],
-                InterviewStage.BehavioralQuestions: [
-                    "Tell me about a data-driven project you're particularly proud of.",
-                    "How do you communicate technical results to non-technical stakeholders?",
-                    "How do you ensure your analysis is unbiased?"
-                ]
-            },
-            "product manager": {
-                InterviewStage.TechnicalQuestions: [
-                    "How do you prioritize features for a product?",
-                    "Explain how you would conduct user research for a new product.",
-                    "How do you measure the success of a product?"
-                ],
-                InterviewStage.BehavioralQuestions: [
-                    "Tell me about a time when you had to make a difficult product decision.",
-                    "How do you handle stakeholder disagreements?",
-                    "Describe a situation where you had to pivot a product strategy."
-                ]
-            }
-        }
-    
+        # We'll now load questions dynamically from the database
+        # Rather than having them hardcoded
+        
     def get_candidate_str(self):
         candidate_str = ""
         for key, value in self._candidate_details.items():
@@ -218,22 +261,34 @@ class AssistantFnc(llm.FunctionContext):
         
         position = self._candidate_details[CandidateDetails.Position].lower()
         
-        # Default to software engineer questions if position not found
-        if position not in self._questions:
+        # Default to software engineer if position not found
+        if position not in ["software engineer", "data scientist", "product manager"]:
             position = "software engineer"
             
         if self._current_stage == InterviewStage.Introduction:
             self._current_stage = InterviewStage.TechnicalQuestions
             self._question_index = 0
-            return self._questions[position][self._current_stage][self._question_index]
+            
+            # Get questions for this position and stage from database
+            questions = self._db.get_questions_for_position_and_stage(position, self._current_stage.value)
+            if questions and self._question_index < len(questions):
+                return questions[self._question_index]
+            return "No technical questions available for this position."
         
-        questions = self._questions[position][self._current_stage]
+        current_stage_questions = self._db.get_questions_for_position_and_stage(position, self._current_stage.value)
         
-        if self._question_index < len(questions) - 1:
+        if self._question_index < len(current_stage_questions) - 1:
             self._question_index += 1
+            return current_stage_questions[self._question_index]
         elif self._current_stage == InterviewStage.TechnicalQuestions:
             self._current_stage = InterviewStage.BehavioralQuestions
             self._question_index = 0
+            
+            # Get questions for the new stage
+            new_questions = self._db.get_questions_for_position_and_stage(position, self._current_stage.value)
+            if new_questions and self._question_index < len(new_questions):
+                return new_questions[self._question_index]
+            return "No behavioral questions available for this position."
         elif self._current_stage == InterviewStage.BehavioralQuestions:
             self._current_stage = InterviewStage.Closing
             return "That concludes all our questions. Do you have any questions for us?"
@@ -241,7 +296,34 @@ class AssistantFnc(llm.FunctionContext):
         if self._current_stage == InterviewStage.Closing:
             return "The interview has concluded. Thank you for your time."
             
-        return self._questions[position][self._current_stage][self._question_index]
+        return "No more questions available."
+    
+    @llm.ai_callable(description="add a new interview question")
+    def add_interview_question(
+        self,
+        position: Annotated[str, llm.TypeInfo(description="The position this question is for (e.g., software engineer, data scientist, product manager)")],
+        stage: Annotated[str, llm.TypeInfo(description="The interview stage (technical_questions or behavioral_questions)")],
+        question: Annotated[str, llm.TypeInfo(description="The question text")]
+    ):
+        logger.info("Adding new question for %s at stage %s: %s", position, stage, question)
+        
+        if stage not in ["technical_questions", "behavioral_questions"]:
+            return "Invalid stage. Must be 'technical_questions' or 'behavioral_questions'."
+        
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        
+        try:
+            cursor.execute(
+                'INSERT INTO questions (position, stage, question) VALUES (?, ?, ?)',
+                (position.lower(), stage, question)
+            )
+            conn.commit()
+            return f"Question added successfully for {position} in the {stage} stage."
+        except Exception as e:
+            return f"Failed to add question: {str(e)}"
+        finally:
+            conn.close()
     
     def has_candidate(self):
         return self._candidate_details[CandidateDetails.Email] != "" 
