@@ -31,15 +31,33 @@ logger.setLevel(logging.INFO)
 
 # List of female names to use for the AI interviewer
 FEMALE_INTERVIEWER_NAMES = [
-    "Emma", "Olivia", "Ava", "Isabella", "Sophia", 
-    "Charlotte", "Amelia", "Mia", "Harper", "Evelyn",
-    "Abigail", "Emily", "Elizabeth", "Sofia", "Ella", 
-    "Madison", "Scarlett", "Victoria", "Aria", "Grace"
+    "Emma",
+    "Olivia",
+    "Ava",
+    "Isabella",
+    "Sophia",
+    "Charlotte",
+    "Amelia",
+    "Mia",
+    "Harper",
+    "Evelyn",
+    "Abigail",
+    "Emily",
+    "Elizabeth",
+    "Sofia",
+    "Ella",
+    "Madison",
+    "Scarlett",
+    "Victoria",
+    "Aria",
+    "Grace",
 ]
+
 
 def generate_interviewer_name():
     """Generate a random female name for the AI interviewer"""
     return random.choice(FEMALE_INTERVIEWER_NAMES)
+
 
 async def _forward_transcription(
     stt_stream: stt.SpeechStream,
@@ -63,12 +81,12 @@ async def entrypoint(ctx: JobContext):
     # Generate a random interviewer name
     interviewer_name = generate_interviewer_name()
     logger.info(f"Using interviewer name: {interviewer_name}")
-    
+
     stt = STT()
     tasks = []
     _accumulated_questions = []
     submission_data = None
-    
+
     # Keep-alive mechanism to prevent disconnection
     async def keep_alive_task():
         """Send periodic pings to keep the connection alive"""
@@ -81,7 +99,7 @@ async def entrypoint(ctx: JobContext):
                 break
             except Exception as e:
                 logger.error(f"Error in keep-alive task: {e}")
-    
+
     # Start keep-alive task
     keep_alive = asyncio.create_task(keep_alive_task())
     tasks.append(keep_alive)
@@ -128,23 +146,30 @@ async def entrypoint(ctx: JobContext):
                     # Store submission data
                     if "submission_id" in parsed_chunk:
                         submission_data = parsed_chunk
-                        logger.info(f"Received submission data with ID: {parsed_chunk['submission_id']}")
-                        
+                        logger.info(
+                            f"Received submission data with ID: {parsed_chunk['submission_id']}"
+                        )
+
                         # Extract campaign ID if present
-                        if "submission" in parsed_chunk and "campaign_id" in parsed_chunk["submission"]:
+                        if (
+                            "submission" in parsed_chunk
+                            and "campaign_id" in parsed_chunk["submission"]
+                        ):
                             campaign_id = parsed_chunk["submission"]["campaign_id"]
                             logger.info(f"Extracted campaign ID: {campaign_id}")
-                            
+
                             # Fetch additional data if needed
                             try:
                                 # Fetch questions
-                                questions_url = f"http://localhost:5000/api/questions?campaign_id={campaign_id}"
+                                questions_url = f"http://127.0.0.1:5000/api/questions?campaign_id={campaign_id}"
                                 questions_response = requests.get(questions_url)
                                 if questions_response.ok:
                                     questions = questions_response.json()
                                     question_titles = [q["title"] for q in questions]
                                     _accumulated_questions.extend(question_titles)
-                                    logger.info(f"Fetched {len(question_titles)} questions")
+                                    logger.info(
+                                        f"Fetched {len(question_titles)} questions"
+                                    )
                             except Exception as e:
                                 logger.error(f"Error fetching additional data: {e}")
 
@@ -177,94 +202,122 @@ async def entrypoint(ctx: JobContext):
     await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
 
     participant = await ctx.wait_for_participant()
-    
+
     # Extract submission ID from participant identity if possible
     submission_id = None
     try:
-        submission_id = participant.identity.split('_')[0]
-        logger.info(f"Extracted submission ID from participant identity: {submission_id}")
-        
+        submission_id = participant.identity.split("_")[0]
+        logger.info(
+            f"Extracted submission ID from participant identity: {submission_id}"
+        )
+
         # Fetch submission data if not received via text stream
         if not submission_data and submission_id:
             try:
-                logger.info(f"Attempting to fetch submission data for ID: {submission_id}")
-                submission_url = f"http://localhost:5000/api/submissions/{submission_id}"
-                submission_response = requests.get(submission_url, timeout=5)  # Add timeout
+                logger.info(
+                    f"Attempting to fetch submission data for ID: {submission_id}"
+                )
+                submission_url = (
+                    f"http://127.0.0.1:5000/api/submissions/{submission_id}"
+                )
+                submission_response = requests.get(
+                    submission_url, timeout=5
+                )  # Add timeout
                 if submission_response.ok:
                     submission_data = submission_response.json()
                     if not isinstance(submission_data, dict):
-                        logger.warning(f"Received non-dict submission data: {type(submission_data)}")
+                        logger.warning(
+                            f"Received non-dict submission data: {type(submission_data)}"
+                        )
                         submission_data = {}
                     else:
                         logger.info(f"Fetched submission data for ID: {submission_id}")
-                    
+
                     # Extract campaign ID
                     campaign_id = None
                     if submission_data:
                         campaign_id = submission_data.get("campaign_id") or (
                             submission_data.get("submission", {}).get("campaign_id")
                         )
-                    
+
                     if campaign_id:
                         # Fetch campaign details
-                        campaign_url = f"http://localhost:5000/api/campaigns/{campaign_id}"
+                        campaign_url = (
+                            f"http://127.0.0.1:5000/api/campaigns/{campaign_id}"
+                        )
                         campaign_response = requests.get(campaign_url, timeout=5)
                         if campaign_response.ok:
                             campaign_data = campaign_response.json()
                             if isinstance(campaign_data, dict):
-                                submission_data["job_description"] = campaign_data.get("job_description", "")
-                                submission_data["campaign_context"] = campaign_data.get("campaign_context", "")
+                                submission_data["job_description"] = campaign_data.get(
+                                    "job_description", ""
+                                )
+                                submission_data["campaign_context"] = campaign_data.get(
+                                    "campaign_context", ""
+                                )
                             else:
-                                logger.warning(f"Received non-dict campaign data: {type(campaign_data)}")
-                        
+                                logger.warning(
+                                    f"Received non-dict campaign data: {type(campaign_data)}"
+                                )
+
                         # Fetch questions if not already loaded
                         if not _accumulated_questions:
-                            questions_url = f"http://localhost:5000/api/questions?campaign_id={campaign_id}"
+                            questions_url = f"http://127.0.0.1:5000/api/questions?campaign_id={campaign_id}"
                             questions_response = requests.get(questions_url, timeout=5)
                             if questions_response.ok:
                                 questions = questions_response.json()
                                 if isinstance(questions, list):
-                                    question_titles = [q.get("title", "") for q in questions if isinstance(q, dict)]
+                                    question_titles = [
+                                        q.get("title", "")
+                                        for q in questions
+                                        if isinstance(q, dict)
+                                    ]
                                     _accumulated_questions.extend(question_titles)
-                                    logger.info(f"Fetched {len(question_titles)} questions")
+                                    logger.info(
+                                        f"Fetched {len(question_titles)} questions"
+                                    )
                                 else:
-                                    logger.warning(f"Received non-list questions data: {type(questions)}")
+                                    logger.warning(
+                                        f"Received non-list questions data: {type(questions)}"
+                                    )
             except requests.RequestException as e:
                 logger.error(f"Request error fetching submission data: {e}")
             except Exception as e:
                 logger.error(f"Error fetching submission data: {e}")
     except Exception as e:
         logger.error(f"Error processing participant identity: {e}")
-    
+
     # Ensure submission_data is not None
     if submission_data is None:
         logger.warning("No submission data available - initializing empty dictionary")
         submission_data = {}
-    
+
     # Use default questions if none were loaded
     if not _accumulated_questions:
         _accumulated_questions = [
             "Tell me about yourself",
             "What are your strengths and weaknesses?",
             "Why are you interested in this position?",
-            "Describe a challenge you've faced and how you overcame it"
+            "Describe a challenge you've faced and how you overcame it",
         ]
         logger.info("Using default questions as none were provided")
-    
+
     # Add monitoring for agent state to help with debugging
     last_activity_time = time.time()
     agent_instance = None
-    
+
     async def monitor_agent_activity():
         """Monitor agent activity and re-prompt if necessary"""
         nonlocal last_activity_time, agent_instance
-        
+
         while True:
             try:
                 current_time = time.time()
                 # If more than 45 seconds have passed without activity
                 if agent_instance and current_time - last_activity_time > 45:
-                    logger.warning("Agent appears to be inactive, attempting to re-prompt...")
+                    logger.warning(
+                        "Agent appears to be inactive, attempting to re-prompt..."
+                    )
                     try:
                         # Reset the last activity time
                         last_activity_time = current_time
@@ -273,21 +326,23 @@ async def entrypoint(ctx: JobContext):
                         logger.info("Successfully re-prompted the agent")
                     except Exception as e:
                         logger.error(f"Failed to re-prompt agent: {e}")
-                
+
                 await asyncio.sleep(15)  # Check every 15 seconds
             except asyncio.CancelledError:
                 logger.info("Agent monitoring task cancelled")
                 break
             except Exception as e:
                 logger.error(f"Error in agent monitoring: {e}")
-    
+
     # Start the agent monitoring task
     monitor_task = asyncio.create_task(monitor_agent_activity())
     tasks.append(monitor_task)
 
     # Start the multimodal agent
     try:
-        agent_instance = run_multimodal_agent(ctx, participant, _accumulated_questions, submission_data, interviewer_name)
+        agent_instance = run_multimodal_agent(
+            ctx, participant, _accumulated_questions, submission_data, interviewer_name
+        )
         # Update last activity time when the agent starts
         last_activity_time = time.time()
         logger.info("agent started successfully")
@@ -297,9 +352,15 @@ async def entrypoint(ctx: JobContext):
         try:
             fallback_data = {
                 "resume_text": "Not available",
-                "job_description": "Not available"
+                "job_description": "Not available",
             }
-            agent_instance = run_multimodal_agent(ctx, participant, _accumulated_questions, fallback_data, interviewer_name)
+            agent_instance = run_multimodal_agent(
+                ctx,
+                participant,
+                _accumulated_questions,
+                fallback_data,
+                interviewer_name,
+            )
             last_activity_time = time.time()
             logger.info("agent started with fallback data")
         except Exception as e2:
@@ -315,37 +376,43 @@ async def entrypoint(ctx: JobContext):
         for task in tasks:
             if not task.done():
                 task.cancel()
-        
+
         logger.info("All tasks completed or cancelled")
-    
+
     logger.info("agent initialization completed")
 
 
-def run_multimodal_agent(ctx: JobContext, participant: rtc.RemoteParticipant, questions, submission_data, interviewer_name):
+def run_multimodal_agent(
+    ctx: JobContext,
+    participant: rtc.RemoteParticipant,
+    questions,
+    submission_data,
+    interviewer_name,
+):
     logger.info("starting multimodal agent")
-    
+
     # Check if submission_data is None and provide default empty dict if needed
     if submission_data is None:
         logger.warning("No submission data available, using default values")
         submission_data = {}
-    
+
     # Extract necessary data with fallbacks
     resume_text = submission_data.get("resume_text", "Not provided")
     job_description = submission_data.get("job_description", "Not provided")
     campaign_context = submission_data.get("campaign_context", "")
-    
+
     # Format the question list
     formatted_questions = "\n".join([f"- {q}" for q in questions])
-    
+
     # Build the full prompt with additional instruction to keep conversation going
     full_prompt = agent_prompt_template.format(
         interviewer_name=interviewer_name,
         questions=formatted_questions,
         job_description=job_description,
         resume_text=resume_text,
-        campaign_context=campaign_context
+        campaign_context=campaign_context,
     )
-    
+
     # Add explicit instructions to continue the conversation
     full_prompt += """
 IMPORTANT: Always continue the conversation. If the candidate doesn't respond within 10 seconds, gently prompt them again.
@@ -354,8 +421,10 @@ Never end the interview abruptly. Keep the conversation flowing naturally and wa
 
 Your first message should be a friendly introduction as {interviewer_name}, welcoming the candidate and explaining that you'll be conducting the interview today.
 """
-    
-    logger.info(f"Using prompt template with interviewer {interviewer_name} and {len(questions)} questions")
+
+    logger.info(
+        f"Using prompt template with interviewer {interviewer_name} and {len(questions)} questions"
+    )
 
     # Create an event handler to track when the agent speaks or listens
     def on_agent_state_change(state):
@@ -363,7 +432,7 @@ Your first message should be a friendly introduction as {interviewer_name}, welc
         # Update activity timestamp whenever the agent changes state
         nonlocal last_activity_time
         last_activity_time = time.time()
-    
+
     # Create a message handler to ensure audio conversion happens
     def on_message_generated(message):
         logger.info(f"Agent generated message: {message}")
@@ -379,7 +448,7 @@ Your first message should be a friendly introduction as {interviewer_name}, welc
                     asyncio.create_task(agent._speak_text(str(message)))
         except Exception as e:
             logger.error(f"Error during message handling: {e}")
-    
+
     last_activity_time = time.time()
 
     model = openai.realtime.RealtimeModel(
@@ -404,17 +473,17 @@ Your first message should be a friendly introduction as {interviewer_name}, welc
         model=model,
         chat_ctx=chat_ctx,
     )
-    
+
     # Try to attach state change handler if the method exists
     if hasattr(agent, "on_state_change"):
         agent.on_state_change = on_agent_state_change
-        
+
     # Try to attach message handler if the method exists on the agent
     if hasattr(agent, "on_message_generated"):
         agent.on_message_generated = on_message_generated
     elif hasattr(agent, "set_on_message_generated"):
         agent.set_on_message_generated(on_message_generated)
-    
+
     agent.start(ctx.room, participant)
 
     # Define a retry function for initial generation
@@ -422,12 +491,14 @@ Your first message should be a friendly introduction as {interviewer_name}, welc
         max_retries = 3
         for attempt in range(max_retries):
             try:
-                logger.info(f"Generating initial reply (attempt {attempt+1}/{max_retries})")
+                logger.info(
+                    f"Generating initial reply (attempt {attempt+1}/{max_retries})"
+                )
                 agent.generate_reply()
-                
+
                 # Wait a bit to see if the state changes to speaking
                 await asyncio.sleep(5)
-                
+
                 # If no state change, try a different approach on next attempt
                 if attempt < max_retries - 1:
                     logger.info("Trying alternative prompt approach")
@@ -435,15 +506,17 @@ Your first message should be a friendly introduction as {interviewer_name}, welc
                     if hasattr(agent, "send_text") and callable(agent.send_text):
                         intro_text = f"Hello, I'm {interviewer_name}. Welcome to your interview today! I'll be asking you some questions about your experience and qualifications."
                         await agent.send_text(intro_text)
-                
+
                 return
             except Exception as e:
-                logger.error(f"Error generating initial reply (attempt {attempt+1}): {e}")
+                logger.error(
+                    f"Error generating initial reply (attempt {attempt+1}): {e}"
+                )
                 await asyncio.sleep(2)
-    
+
     # Run the async function in a task
     asyncio.create_task(generate_with_retry())
-    
+
     # Return the agent instance so we can reference it later if needed
     return agent
 

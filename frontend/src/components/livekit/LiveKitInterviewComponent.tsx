@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import {
   LiveKitRoom,
   RoomAudioRenderer,
@@ -12,10 +12,10 @@ import '@livekit/components-styles';
 import { Track } from 'livekit-client';
 
 interface LiveKitInterviewComponentProps {
+  onDisconnect: () => void;
   token: string;
   room: string;
   userName: string;
-  onDisconnect: () => void;
 }
 
 interface MessageProps {
@@ -43,9 +43,9 @@ const SimpleVoiceAssistant: React.FC = () => {
     participant: localParticipant.localParticipant,
   });
 
-  const [messages, setMessages] = useState<Array<{ id?: string; type: 'agent' | 'user'; text: string }>>([]);
+  const [messages, setMessages] = React.useState<Array<{ id?: string; type: 'agent' | 'user'; text: string }>>([]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     const allMessages = [
       ...(agentTranscriptions?.map((t) => ({ ...t, type: 'agent' as const })) ?? []),
       ...(userTranscriptions?.map((t) => ({ ...t, type: 'user' as const })) ?? []),
@@ -88,14 +88,9 @@ const SimpleVoiceAssistant: React.FC = () => {
   );
 };
 
-const LiveKitInterviewComponent: React.FC<LiveKitInterviewComponentProps> = ({ 
-  token, 
-  room, 
-  userName,
-  onDisconnect 
-}) => {
-  const livekitUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL?.trim() || 'wss://your-livekit-server.com';
-  
+const LiveKitInterviewComponent: React.FC<LiveKitInterviewComponentProps> = ({ onDisconnect, token, room, userName }) => {
+  const livekitUrl = 'wss://default-test-oyjqa9xh.livekit.cloud';
+
   return (
     <div className="livekit-interview">
       <div className="bg-white rounded-lg overflow-hidden shadow-lg">

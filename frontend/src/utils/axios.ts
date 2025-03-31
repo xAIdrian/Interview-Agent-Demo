@@ -2,7 +2,7 @@ import axios, { AxiosHeaders } from 'axios';
 import { AuthLogger } from './logging';
 
 // Define API base URL for consistent usage
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5000';
 
 // Set default base URL for all requests
 axios.defaults.baseURL = API_BASE_URL;

@@ -9,12 +9,14 @@ const LiveKitInterviewPage = () => {
   const [userName, setUserName] = useState<string>('');
   
   const onFormSubmit = (name: string, token: string, roomName: string) => {
+    console.log('Parent component received interview data:', { name, token, roomName });
     setUserName(name);
     setToken(token);
     setRoom(roomName);
   };
   
   const onDisconnect = () => {
+    console.log('Interview disconnected, resetting state');
     setToken(null);
     setRoom(null);
   };
