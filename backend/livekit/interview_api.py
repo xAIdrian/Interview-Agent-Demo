@@ -332,9 +332,6 @@ class AssistantFnc(llm.FunctionContext):
         self._question_index = 0
         self._db = DatabaseDriver()
 
-        # We'll now load questions dynamically from the database
-        # Rather than having them hardcoded
-
     def get_candidate_str(self):
         candidate_str = ""
         for key, value in self._candidate_details.items():
@@ -342,69 +339,25 @@ class AssistantFnc(llm.FunctionContext):
 
         return candidate_str
 
-    @llm.ai_callable(description="lookup a candidate by their email")
-    def lookup_candidate(
-        self,
-        email: Annotated[
-            str, llm.TypeInfo(description="The email of the candidate to lookup")
-        ],
-    ):
-        logger.info("lookup candidate - email: %s", email)
-
-        result = self._db.get_candidate_by_email(email)
-        if result is None:
-            return "Candidate not found"
-
+    def set_candidate_data(self, candidate_data):
+        """Set the candidate data directly from the database result."""
         self._candidate_details = {
-            CandidateDetails.Email: result.email,
-            CandidateDetails.Name: result.name,
-            CandidateDetails.Position: result.position,
-            CandidateDetails.Experience: result.experience,
+            CandidateDetails.Email: candidate_data.email,
+            CandidateDetails.Name: candidate_data.name,
+            CandidateDetails.Position: candidate_data.position,
+            CandidateDetails.Experience: candidate_data.experience,
         }
-
-        return f"Candidate found: {self.get_candidate_str()}"
+        return f"Candidate data set: {self.get_candidate_str()}"
 
     @llm.ai_callable(description="get the details of the current candidate")
     def get_candidate_details(self):
         logger.info("get candidate details")
         return f"The candidate details are: {self.get_candidate_str()}"
 
-    @llm.ai_callable(description="create a new candidate profile")
-    def create_candidate(
-        self,
-        email: Annotated[str, llm.TypeInfo(description="The email of the candidate")],
-        name: Annotated[str, llm.TypeInfo(description="The name of the candidate")],
-        position: Annotated[
-            str, llm.TypeInfo(description="The position the candidate is applying for")
-        ],
-        experience: Annotated[
-            int, llm.TypeInfo(description="The years of experience of the candidate")
-        ],
-    ):
-        logger.info(
-            "create candidate - email: %s, name: %s, position: %s, experience: %s",
-            email,
-            name,
-            position,
-            experience,
-        )
-        result = self._db.create_candidate(email, name, position, experience)
-        if result is None:
-            return "Failed to create candidate profile"
-
-        self._candidate_details = {
-            CandidateDetails.Email: result.email,
-            CandidateDetails.Name: result.name,
-            CandidateDetails.Position: result.position,
-            CandidateDetails.Experience: result.experience,
-        }
-
-        return "Candidate profile created successfully!"
-
     @llm.ai_callable(description="get the next interview question")
     def get_next_question(self):
         if not self.has_candidate():
-            return "Please register the candidate first"
+            return "Please set candidate data first"
 
         position = self._candidate_details[CandidateDetails.Position].lower()
 
@@ -450,45 +403,6 @@ class AssistantFnc(llm.FunctionContext):
             return "The interview has concluded. Thank you for your time."
 
         return "No more questions available."
-
-    @llm.ai_callable(description="add a new interview question")
-    def add_interview_question(
-        self,
-        position: Annotated[
-            str,
-            llm.TypeInfo(
-                description="The position this question is for (e.g., software engineer, data scientist, product manager)"
-            ),
-        ],
-        stage: Annotated[
-            str,
-            llm.TypeInfo(
-                description="The interview stage (technical_questions or behavioral_questions)"
-            ),
-        ],
-        question: Annotated[str, llm.TypeInfo(description="The question text")],
-    ):
-        logger.info(
-            "Adding new question for %s at stage %s: %s", position, stage, question
-        )
-
-        if stage not in ["technical_questions", "behavioral_questions"]:
-            return "Invalid stage. Must be 'technical_questions' or 'behavioral_questions'."
-
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-
-        try:
-            cursor.execute(
-                "INSERT INTO questions (position, stage, question) VALUES (?, ?, ?)",
-                (position.lower(), stage, question),
-            )
-            conn.commit()
-            return f"Question added successfully for {position} in the {stage} stage."
-        except Exception as e:
-            return f"Failed to add question: {str(e)}"
-        finally:
-            conn.close()
 
     def has_candidate(self):
         return self._candidate_details[CandidateDetails.Email] != ""

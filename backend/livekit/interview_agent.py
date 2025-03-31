@@ -4,7 +4,7 @@ from livekit.agents.multimodal import MultimodalAgent
 from livekit.plugins import openai
 from dotenv import load_dotenv
 from interview_api import AssistantFnc, DatabaseDriver
-from prompts import WELCOME_MESSAGE, AGENT_INSTRUCTIONS, LOOKUP_EMAIL_MESSAGE
+from prompts import WELCOME_MESSAGE, demo_agent_prompt_template
 import os
 import logging
 
@@ -37,7 +37,6 @@ async def entrypoint(ctx: JobContext):
 
         print(f"\n✅ Candidate data:")
         print(f"  Name: {candidate_data.name}")
-        print(f"  Email: {candidate_data.email}")
         print(f"  Position: {candidate_data.position}")
         print(f"  Experience: {candidate_data.experience}")
 
@@ -62,37 +61,14 @@ async def entrypoint(ctx: JobContext):
         for i, q in enumerate(behavioral_questions, 1):
             questions_prompt += f"{i}. {q}\n"
 
-        # Create custom instructions with the questions
-        custom_instructions = f"""
-{AGENT_INSTRUCTIONS}
-
-You are conducting an interview for a {candidate_data.position} position.
-The candidate's name is {candidate_data.name} and they have {candidate_data.experience} years of experience.
-
-Here are the specific questions you should ask in order:
-
-{questions_prompt}
-
-Follow these guidelines:
-1. Ask questions in the exact order provided
-2. After each answer, move to the next question
-3. Keep track of which question you're on
-4. Maintain a professional and friendly tone
-5. Listen carefully to the candidate's responses
-6. If a response is unclear, ask for clarification
-7. After all questions are asked, thank the candidate and conclude the interview
-"""
-
         # Initialize the assistant with candidate data
         assistant_fnc = AssistantFnc()
-        assistant_fnc.lookup_candidate(
-            candidate_data.email
-        )  # Still need email for the assistant
+        assistant_fnc.set_candidate_data(candidate_data)
         print("\n✅ Assistant initialized with candidate data")
 
         # Initialize the model and agent with custom instructions
         model = openai.realtime.RealtimeModel(
-            instructions=custom_instructions,
+            instructions=demo_agent_prompt_template,
             voice="shimmer",
             temperature=0.8,
             modalities=["audio", "text"],
@@ -102,11 +78,16 @@ Follow these guidelines:
         print("✅ Multimodal agent started")
 
         session = model.sessions[0]
-        session.conversation.item.create(
-            llm.ChatMessage(role="assistant", content=WELCOME_MESSAGE)
-        )
+        # session.conversation.item.create(
+        #     llm.ChatMessage(role="assistant", content=WELCOME_MESSAGE)
+        # )
         session.response.create()
         print("✅ Initial session created")
+
+        # Generate initial reply to start the conversation
+        print("\n🎤 Agent starting conversation...")
+        assistant.generate_reply()
+        print("✅ Initial reply generated")
 
         @session.on("user_speech_committed")
         def on_user_speech_committed(msg: llm.ChatMessage):
@@ -114,18 +95,7 @@ Follow these guidelines:
                 msg.content = "\n".join(
                     "[image]" if isinstance(x, llm.ChatImage) else x for x in msg
                 )
-
-            if assistant_fnc.has_candidate():
-                handle_interview(msg)
-            else:
-                find_candidate(msg)
-
-        def find_candidate(msg: llm.ChatMessage):
-            print("\n🔍 Looking up candidate...")
-            session.conversation.item.create(
-                llm.ChatMessage(role="system", content=LOOKUP_EMAIL_MESSAGE(msg))
-            )
-            session.response.create()
+            handle_interview(msg)
 
         def handle_interview(msg: llm.ChatMessage):
             print("\n🗣️ Processing interview response...")
