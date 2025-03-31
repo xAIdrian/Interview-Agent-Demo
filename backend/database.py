@@ -4,7 +4,7 @@ from config import Config
 # Remove psycopg2 import as we're not using it
 # import psycopg2
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.orm import sessionmaker, declarative_base, Session
 from sqlalchemy.pool import QueuePool
 import os
 import logging
@@ -273,31 +273,37 @@ def map_row_to_dict(row, columns, string_id_columns=None):
     return result
 
 
-# Create SQLAlchemy engine with connection pooling
-def create_db_engine(db_url):
-    try:
-        engine = create_engine(db_url, poolclass=QueuePool, **DB_CONFIG)
-        logger.info("Database engine created successfully")
-        return engine
-    except Exception as e:
-        logger.error(f"Failed to create database engine: {e}")
-        raise
+def create_db_engine(database_url: str) -> create_engine:
+    """Create a SQLAlchemy engine with connection pooling."""
+    return create_engine(
+        database_url,
+        poolclass=QueuePool,
+        pool_size=5,  # Number of permanent connections to keep
+        max_overflow=10,  # Number of additional connections to allow
+        pool_timeout=30,  # Seconds to wait before giving up on getting a connection
+        pool_recycle=1800,  # Recycle connections after 30 minutes
+        pool_pre_ping=True,  # Enable connection health checks
+        echo=False,  # Set to True for SQL query logging
+    )
 
 
-# Create session factory
-def create_session_factory(engine):
-    return sessionmaker(autocommit=False, autoflush=False, bind=engine)
+def get_db_session(engine) -> sessionmaker:
+    """Create a session factory for database operations."""
+    return sessionmaker(
+        bind=engine, autocommit=False, autoflush=False, expire_on_commit=False
+    )
 
 
 # Create declarative base
 Base = declarative_base()
 
 
-# Function to get database session
-def get_db_session():
-    Session = create_session_factory(engine)
-    session = Session()
+def get_db() -> Session:
+    """Get a database session."""
+    from interview_server import engine, SessionLocal
+
+    db = SessionLocal()
     try:
-        yield session
+        yield db
     finally:
-        session.close()
+        db.close()
