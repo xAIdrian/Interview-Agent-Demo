@@ -19,7 +19,7 @@ export function NetworkErrorBoundary({ children }: NetworkErrorBoundaryProps) {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000);
       
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000' || 'http://127.0.0.1:5000';
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5000' || 'http://127.0.0.1:5000';
       const response = await fetch(`${API_BASE_URL}/health`, {
         method: 'HEAD',
         cache: 'no-cache',
