@@ -45,34 +45,6 @@ export const getApiUrl = (endpoint: string): string => {
   return endpoint;
 };
 
-// Helper to check if the backend is reachable
-export const checkBackendConnection = async (): Promise<boolean> => {
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
-    
-    const response = await fetch(`${API_BASE_URL}/health`, { 
-      method: 'HEAD',
-      cache: 'no-cache',
-      credentials: 'include',
-      signal: controller.signal
-    });
-    
-    clearTimeout(timeoutId);
-    
-    // Check if we got a successful response
-    if (response.ok) {
-      return true;
-    } else {
-      console.error(`Backend health check returned status: ${response.status}`);
-      return false;
-    }
-  } catch (error) {
-    console.error('Backend connection check failed:', error);
-    return false;
-  }
-};
-
 // Request interceptor to handle API URL transformation
 axios.interceptors.request.use(
   config => {

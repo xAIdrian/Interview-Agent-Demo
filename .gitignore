@@ -48,3 +48,8 @@ node_modules/*
 **/.env.test
 **/.env.staging
 NoorIA.pem
+
+# Python cache files
+backend/**/__pycache__/
+backend/**/*.py[cod]
+backend/**/*$py.class

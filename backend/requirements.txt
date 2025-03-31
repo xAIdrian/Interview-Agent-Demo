@@ -18,3 +18,5 @@ python-docx
 python-dotenv
 requests
 whisper
+sqlalchemy
+bcrypt

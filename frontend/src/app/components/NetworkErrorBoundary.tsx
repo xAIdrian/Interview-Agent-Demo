@@ -13,57 +13,6 @@ export function NetworkErrorBoundary({ children }: NetworkErrorBoundaryProps) {
   const [retryCount, setRetryCount] = useState(0);
   const router = useRouter();
   
-  // Function to check API connectivity
-  const checkConnection = async (): Promise<boolean> => {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
-      
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5000' || 'http://127.0.0.1:5000';
-      const response = await fetch(`${API_BASE_URL}/health`, {
-        method: 'HEAD',
-        cache: 'no-cache',
-        credentials: 'include',
-        signal: controller.signal
-      });
-      
-      clearTimeout(timeoutId);
-      
-      // Check if the response is OK (status in the range 200-299)
-      if (response.ok) {
-        AuthLogger.info('API health check succeeded');
-        return true;
-      } else {
-        AuthLogger.warn(`API health check failed with status: ${response.status}`);
-        return false;
-      }
-    } catch (error) {
-      AuthLogger.error('API connection check failed:', error);
-      return false;
-    }
-  };
-  
-  // Periodically check for network connectivity when in error state
-  useEffect(() => {
-    let intervalId: NodeJS.Timeout;
-    
-    if (hasNetworkError) {
-      intervalId = setInterval(async () => {
-        const isConnected = await checkConnection();
-        if (isConnected) {
-          setHasNetworkError(false);
-          AuthLogger.info('Network connectivity restored');
-        }
-      }, 5000); // Check every 5 seconds
-    }
-    
-    return () => {
-      if (intervalId) {
-        clearInterval(intervalId);
-      }
-    };
-  }, [hasNetworkError]);
-  
   // Listen for global network errors
   useEffect(() => {
     const handleNetworkChange = () => {
@@ -71,16 +20,8 @@ export function NetworkErrorBoundary({ children }: NetworkErrorBoundaryProps) {
         setHasNetworkError(true);
         AuthLogger.warn('Browser reports offline status');
       } else {
-        // Verify real connectivity to backend
-        checkConnection().then(isConnected => {
-          if (isConnected) {
-            setHasNetworkError(false);
-            AuthLogger.info('Network connectivity confirmed');
-          } else {
-            setHasNetworkError(true);
-            AuthLogger.warn('Network appears online but API is unreachable');
-          }
-        });
+        setHasNetworkError(false);
+        AuthLogger.info('Network connectivity confirmed');
       }
     };
     
@@ -117,8 +58,7 @@ export function NetworkErrorBoundary({ children }: NetworkErrorBoundaryProps) {
     setRetryCount(retryCount + 1);
     AuthLogger.info(`Retrying connection (attempt ${retryCount + 1})`);
     
-    const isConnected = await checkConnection();
-    if (isConnected) {
+    if (navigator.onLine) {
       setHasNetworkError(false);
       AuthLogger.info('Connection restored after retry');
       // Refresh the page to reload data

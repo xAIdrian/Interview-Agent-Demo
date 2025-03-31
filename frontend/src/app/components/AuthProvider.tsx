@@ -68,20 +68,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     //checkAuth();
   }, []);
 
-  // Function to check if API is available
-  const checkApiStatus = async () => {
-    try {
-      const response = await fetch(`${axios.defaults.baseURL}/health`, {
-        method: 'HEAD',
-        mode: 'cors',
-        credentials: 'include',
-      });
-      return response.ok;
-    } catch {
-      return false;
-    }
-  };
-
   // Login function
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
@@ -89,37 +75,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       clearError();
       
       AuthLogger.info('Attempting login...');
-      
-      // Check if the backend is reachable
-      let networkWorks = true;
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3000);
-        
-        const response = await fetch(`${axios.defaults.baseURL}/health`, {
-          method: 'HEAD',
-          cache: 'no-cache',
-          credentials: 'include',
-          signal: controller.signal
-        });
-        
-        clearTimeout(timeoutId);
-        
-        // Check if the response indicates the server is healthy
-        if (!response.ok) {
-          networkWorks = false;
-          AuthLogger.warn(`Backend health check failed with status: ${response.status}`);
-          setError('Cannot connect to server. Please check your internet connection and try again.');
-          setLoading(false);
-          return false;
-        }
-      } catch (networkError) {
-        networkWorks = false;
-        AuthLogger.warn('Network connectivity issue detected:', networkError);
-        setError('Cannot connect to server. Please check your internet connection and try again.');
-        setLoading(false);
-        return false;
-      }
       
       // We now use '/login' directly since axios config handles the URL transformation
       const response = await axios.post(`/login`, { email, password });

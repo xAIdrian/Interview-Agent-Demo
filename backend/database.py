@@ -1,7 +1,25 @@
 import mariadb
 from config import Config
+
 # Remove psycopg2 import as we're not using it
 # import psycopg2
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.pool import QueuePool
+import os
+import logging
+
+logger = logging.getLogger(__name__)
+
+# Database configuration
+DB_CONFIG = {
+    "pool_size": 20,
+    "max_overflow": 10,
+    "pool_timeout": 30,
+    "pool_recycle": 1800,  # Recycle connections after 30 minutes
+    "pool_pre_ping": True,  # Enable connection health checks
+}
+
 
 def build_filter_query(table_name, filters):
     query = f"SELECT * FROM {table_name} WHERE "
@@ -15,6 +33,7 @@ def build_filter_query(table_name, filters):
     query += " AND ".join(conditions)
     return query, params
 
+
 def get_db_connection():
     """Create a connection to the MariaDB database."""
     try:
@@ -23,7 +42,7 @@ def get_db_connection():
             user=Config.DB_USER,
             password=Config.DB_PASSWORD,
             database=Config.DB_NAME,
-            port=Config.DB_PORT
+            port=Config.DB_PORT,
         )
         conn.autocommit = False
         return conn
@@ -31,10 +50,12 @@ def get_db_connection():
         print(f"Error connecting to MariaDB: {e}")
         raise
 
+
 def create_users_table():
     conn = get_db_connection()
     with conn.cursor() as cursor:
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS users (
                 id BIGINT UNSIGNED PRIMARY KEY,
                 email VARCHAR(255) NOT NULL UNIQUE,
@@ -45,14 +66,17 @@ def create_users_table():
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 INDEX (email)
             )
-        """)
+        """
+        )
     conn.commit()
     conn.close()
+
 
 def create_campaigns_table():
     conn = get_db_connection()
     with conn.cursor() as cursor:
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS campaigns (
                 id BIGINT UNSIGNED PRIMARY KEY,
                 title VARCHAR(255) NOT NULL,
@@ -67,14 +91,17 @@ def create_campaigns_table():
                 FOREIGN KEY (created_by) REFERENCES users(id),
                 INDEX (is_public)
             )
-        """)
+        """
+        )
     conn.commit()
     conn.close()
+
 
 def create_questions_table():
     conn = get_db_connection()
     with conn.cursor() as cursor:
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS questions (
                 id BIGINT UNSIGNED PRIMARY KEY,
                 campaign_id BIGINT UNSIGNED NOT NULL,
@@ -88,14 +115,17 @@ def create_questions_table():
                 FOREIGN KEY (campaign_id) REFERENCES campaigns(id),
                 INDEX (campaign_id)
             )
-        """)
+        """
+        )
     conn.commit()
     conn.close()
+
 
 def create_submissions_table():
     conn = get_db_connection()
     with conn.cursor() as cursor:
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS submissions (
                 id BIGINT UNSIGNED PRIMARY KEY,
                 campaign_id BIGINT UNSIGNED NOT NULL,
@@ -112,14 +142,17 @@ def create_submissions_table():
                 INDEX (user_id, campaign_id),
                 INDEX (is_complete)
             )
-        """)
+        """
+        )
     conn.commit()
     conn.close()
+
 
 def create_submission_answers_table():
     conn = get_db_connection()
     with conn.cursor() as cursor:
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS submission_answers (
                 id BIGINT UNSIGNED PRIMARY KEY,
                 submission_id BIGINT UNSIGNED NOT NULL,
@@ -136,9 +169,11 @@ def create_submission_answers_table():
                 INDEX (question_id),
                 UNIQUE KEY (submission_id, question_id)
             )
-        """)
+        """
+        )
     conn.commit()
     conn.close()
+
 
 def create_tables():
     create_users_table()
@@ -147,45 +182,55 @@ def create_tables():
     create_submissions_table()
     create_submission_answers_table()
 
+
 def migrate_submissions_table_add_resume_columns():
     """Add resume_path and resume_text columns to the submissions table if they don't exist"""
     conn = get_db_connection()
     with conn.cursor() as cursor:
         # Check if columns exist
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT COUNT(*) 
             FROM INFORMATION_SCHEMA.COLUMNS 
             WHERE TABLE_NAME = 'submissions' 
             AND COLUMN_NAME = 'resume_path'
-        """)
+        """
+        )
         resume_path_exists = cursor.fetchone()[0] > 0
-        
-        cursor.execute("""
+
+        cursor.execute(
+            """
             SELECT COUNT(*) 
             FROM INFORMATION_SCHEMA.COLUMNS 
             WHERE TABLE_NAME = 'submissions' 
             AND COLUMN_NAME = 'resume_text'
-        """)
+        """
+        )
         resume_text_exists = cursor.fetchone()[0] > 0
-        
+
         # Add columns if they don't exist
         if not resume_path_exists:
-            cursor.execute("""
+            cursor.execute(
+                """
                 ALTER TABLE submissions
                 ADD COLUMN resume_path VARCHAR(255) DEFAULT NULL
-            """)
+            """
+            )
             print("Added resume_path column to submissions table")
-            
+
         if not resume_text_exists:
-            cursor.execute("""
+            cursor.execute(
+                """
                 ALTER TABLE submissions
                 ADD COLUMN resume_text LONGTEXT DEFAULT NULL
-            """)
+            """
+            )
             print("Added resume_text column to submissions table")
-    
+
     conn.commit()
     conn.close()
     print("Migrations completed successfully")
+
 
 def ensure_string_id(id_value):
     """Convert any ID to a string to ensure consistent handling."""
@@ -193,22 +238,29 @@ def ensure_string_id(id_value):
         return None
     return str(id_value)
 
+
 def map_row_to_dict(row, columns, string_id_columns=None):
     """
     Map a database row to a dictionary, ensuring ID columns are strings.
-    
+
     Args:
         row: Database row (tuple)
         columns: List of column names
         string_id_columns: List of column names that should be converted to strings
                           (default: ['id', 'user_id', 'campaign_id', 'submission_id', 'question_id'])
-    
+
     Returns:
         Dictionary with column names as keys and values from the row
     """
     if string_id_columns is None:
-        string_id_columns = ['id', 'user_id', 'campaign_id', 'submission_id', 'question_id']
-    
+        string_id_columns = [
+            "id",
+            "user_id",
+            "campaign_id",
+            "submission_id",
+            "question_id",
+        ]
+
     result = {}
     for i, column in enumerate(columns):
         if i < len(row):
@@ -217,5 +269,35 @@ def map_row_to_dict(row, columns, string_id_columns=None):
                 result[column] = ensure_string_id(row[i])
             else:
                 result[column] = row[i]
-    
+
     return result
+
+
+# Create SQLAlchemy engine with connection pooling
+def create_db_engine(db_url):
+    try:
+        engine = create_engine(db_url, poolclass=QueuePool, **DB_CONFIG)
+        logger.info("Database engine created successfully")
+        return engine
+    except Exception as e:
+        logger.error(f"Failed to create database engine: {e}")
+        raise
+
+
+# Create session factory
+def create_session_factory(engine):
+    return sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+
+# Create declarative base
+Base = declarative_base()
+
+
+# Function to get database session
+def get_db_session():
+    Session = create_session_factory(engine)
+    session = Session()
+    try:
+        yield session
+    finally:
+        session.close()
