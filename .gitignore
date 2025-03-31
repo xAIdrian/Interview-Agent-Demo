@@ -47,3 +47,4 @@ node_modules/*
 **/.env.production
 **/.env.test
 **/.env.staging
+NoorIA.pem
