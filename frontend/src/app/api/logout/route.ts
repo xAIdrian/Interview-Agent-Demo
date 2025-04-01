@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import axios from 'axios';
-
-const FLASK_API_URL = process.env.NEXT_PUBLIC_FLASK_API_URL || 'http://127.0.0.1:5000';
+import axios from '../../../utils/axios';
 
 export async function POST(req: NextRequest) {
   try {
@@ -10,7 +8,7 @@ export async function POST(req: NextRequest) {
     
     if (accessToken) {
       // Call backend to invalidate token (if your backend supports this)
-      await axios.post(`${FLASK_API_URL}/logout`, {}, {
+      await axios.post('/logout', {}, {
         headers: {
           'Authorization': `Bearer ${accessToken}`
         }

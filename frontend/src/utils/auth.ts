@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { isAxiosError } from 'axios';
 import { AuthLogger } from './logging';
 
 export interface User {
@@ -8,18 +8,18 @@ export interface User {
   is_admin: boolean;
 }
 
-/**
- * Gets the user data from localStorage if available
- */
-export function getStoredUser(): User | null {
+// Helper function to get user from localStorage
+function getStoredUser(): User | null {
+  if (typeof window === 'undefined') return null;
+  
+  const storedUser = localStorage.getItem('user');
+  if (!storedUser) return null;
+  
   try {
-    const userJson = localStorage.getItem('user');
-    if (userJson) {
-      return JSON.parse(userJson);
-    }
-    return null;
+    return JSON.parse(storedUser);
   } catch (error) {
     console.error('Error parsing stored user:', error);
+    localStorage.removeItem('user');
     return null;
   }
 }
@@ -41,7 +41,7 @@ export async function getCurrentUser(): Promise<User | null> {
     }
     
     // If not found in localStorage, try fetching from API
-    const response = await axios.get('/profile');
+    const response = await axios.get('/api/profile');
     
     // Store the user data in localStorage for future use
     localStorage.setItem('user', JSON.stringify(response.data));
@@ -51,7 +51,7 @@ export async function getCurrentUser(): Promise<User | null> {
     AuthLogger.error('Error fetching current user:', error);
     
     // If there was an auth error, clear any stored user data
-    if (axios.isAxiosError(error) && error.response?.status === 401) {
+    if (isAxiosError(error) && error.response?.status === 401) {
       localStorage.removeItem('user');
     }
     

@@ -100,8 +100,8 @@ const LiveKitInterviewForm: React.FC<LiveKitInterviewFormProps> = ({ onSubmit })
 
     try {
       console.log('Starting interview for candidate:', { email, name });
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5000';
-      const response = await fetch(`${apiUrl}/api/livekit/token?name=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}`, {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5001';
+      const response = await fetch(`${apiUrl}/api/livekit/token?name=${encodeURIComponent(name)}`, {
         method: 'GET',
         headers: {
           'Accept': 'application/json',

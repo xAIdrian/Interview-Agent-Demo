@@ -1,17 +1,14 @@
 // pages/api/submit_answer.ts
-import { NextApiRequest, NextApiResponse } from 'next';
-import axios from 'axios';
+import { NextRequest, NextResponse } from 'next/server';
+import axios from '../../../utils/axios';
 
-export default async (req: NextApiRequest, res: NextApiResponse) => {
-  if (req.method === 'POST') {
-    try {
-      const response = await axios.post('http://127.0.0.1:5000/submit_answer', req.body);
-      res.status(response.status).json(response.data);
-    } catch (error) {
-      res.status(500).json({ error: 'Failed to submit answer' });
-    }
-  } else {
-    res.setHeader('Allow', ['POST']);
-    res.status(405).end(`Method ${req.method} Not Allowed`);
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const response = await axios.post('/api/submit_answer', body);
+    return NextResponse.json(response.data, { status: response.status });
+  } catch (error) {
+    console.error('Error submitting answer:', error);
+    return NextResponse.json({ error: 'Failed to submit answer' }, { status: 500 });
   }
-};
+}

@@ -4,6 +4,7 @@ from livekit.interview_api import DatabaseDriver
 import sqlite3
 import os
 import logging
+from livekit.token_server import LiveKitTokenServer
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -43,6 +44,39 @@ def health_check():
     if request.method == "OPTIONS":
         return jsonify({"status": "ok"})
     return jsonify({"status": "ok", "message": "Interview API is operational"})
+
+
+@app.route("/api/livekit/token", methods=["GET", "OPTIONS"])
+def get_livekit_token():
+    """Generate and return a LiveKit token for joining a room"""
+    if request.method == "OPTIONS":
+        # Handle preflight request
+        response = jsonify({"status": "ok"})
+        # Let the global CORS middleware handle the headers
+        return response, 200
+
+    # Get parameters from the request
+    name = request.args.get("name", "anonymous")
+    room = request.args.get("room")
+
+    try:
+        # Generate room name if not provided
+        if not room:
+            # Use synchronous call since this is not an async function
+            import uuid
+
+            room = f"interview-{str(uuid.uuid4())[:8]}"
+
+        # Generate token
+        token = LiveKitTokenServer.generate_token(name, room)
+
+        # Create response without explicit CORS headers (let global middleware handle it)
+        response = jsonify({"token": token, "room": room})
+        return response, 200
+    except Exception as e:
+        app.logger.error(f"Error generating LiveKit token: {str(e)}")
+        error_response = jsonify({"error": str(e)})
+        return error_response, 500
 
 
 @app.route("/api/candidates", methods=["GET"])
