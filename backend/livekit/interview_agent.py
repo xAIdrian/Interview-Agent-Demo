@@ -5,13 +5,14 @@ from livekit.plugins import openai
 from dotenv import load_dotenv
 from interview_api import AssistantFnc, DatabaseDriver
 from prompts import WELCOME_MESSAGE, demo_agent_prompt_template
-import os
 import logging
 
+# Load environment variables
+load_dotenv()
+
+# Configure logging
 logger = logging.getLogger("interview-agent")
 logger.setLevel(logging.INFO)
-
-load_dotenv()
 
 
 async def entrypoint(ctx: JobContext):
@@ -78,9 +79,6 @@ async def entrypoint(ctx: JobContext):
         print("✅ Multimodal agent started")
 
         session = model.sessions[0]
-        # session.conversation.item.create(
-        #     llm.ChatMessage(role="assistant", content=WELCOME_MESSAGE)
-        # )
         session.response.create()
         print("✅ Initial session created")
 
@@ -125,5 +123,9 @@ async def entrypoint(ctx: JobContext):
     print("=" * 50 + "\n")
 
 
-if __name__ == "__main__":
+def enter_app():
     cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint))
+
+
+if __name__ == "__main__":
+    enter_app()
