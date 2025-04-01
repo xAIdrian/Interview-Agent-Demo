@@ -18,6 +18,6 @@ python-docx
 python-dotenv
 requests
 whisper
-gunicorn==20.1.0
-celery==5.2.3
-sqlalchemy==1.4.41
+gunicorn
+sqlalchemy
+flask-limiter

@@ -6,6 +6,9 @@ import os
 import logging
 from livekit.token_server import LiveKitTokenServer
 import multiprocessing
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from datetime import timedelta
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -42,6 +45,14 @@ CORS(
     },
 )
 
+# Initialize rate limiter
+limiter = Limiter(
+    app=app,
+    key_func=get_remote_address,
+    default_limits=["2000 per day", "500 per hour"],
+    storage_uri="memory://",
+)
+
 # Initialize database driver
 db = DatabaseDriver()
 
@@ -55,6 +66,7 @@ def health_check():
 
 
 @app.route("/api/livekit/token", methods=["GET", "OPTIONS"])
+@limiter.limit("30 per minute")  # Limit token generation to 30 requests per minute
 def get_livekit_token():
     """Generate and return a LiveKit token for joining a room"""
     if request.method == "OPTIONS":
@@ -88,6 +100,7 @@ def get_livekit_token():
 
 
 @app.route("/api/candidates", methods=["GET"])
+@limiter.limit("100 per minute")  # Limit candidate listing to 100 requests per minute
 def get_candidates():
     """Get all available candidate profiles with their interview questions."""
     try:
@@ -139,6 +152,9 @@ def get_candidates():
 
 
 @app.route("/api/candidates/<email>", methods=["GET"])
+@limiter.limit(
+    "50 per minute"
+)  # Limit individual candidate lookups to 50 requests per minute
 def get_candidate(email):
     """Get a specific candidate's profile by email."""
     try:
@@ -160,6 +176,7 @@ def get_candidate(email):
 
 
 @app.route("/api/candidates/<email>/questions", methods=["GET"])
+@limiter.limit("50 per minute")  # Limit question fetching to 50 requests per minute
 def get_candidate_questions(email):
     """Get interview questions for a specific candidate based on their position."""
     try:
@@ -189,6 +206,7 @@ def get_candidate_questions(email):
 
 
 @app.route("/api/candidates", methods=["POST"])
+@limiter.limit("10 per hour")  # Limit candidate creation to 10 requests per hour
 def create_candidate():
     """Create a new candidate profile."""
     try:
@@ -227,6 +245,7 @@ def create_candidate():
 
 
 @app.route("/api/questions", methods=["POST"])
+@limiter.limit("20 per hour")  # Limit question creation to 20 requests per hour
 def add_question():
     """Add a new interview question."""
     try:
@@ -249,6 +268,7 @@ def add_question():
 
 
 @app.route("/api/candidates/<email>/interview", methods=["GET"])
+@limiter.limit("5 per hour")  # Limit interview data fetching to 5 requests per hour
 def get_candidate_interview_data(email):
     """Get all interview data for a candidate in a single request."""
     try:
