@@ -5,6 +5,7 @@ import sqlite3
 import os
 import logging
 from livekit.token_server import LiveKitTokenServer
+import multiprocessing
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -15,6 +16,13 @@ DB_PATH = os.path.join(os.path.dirname(__file__), "livekit/interview_db.sqlite")
 
 # Initialize Flask app
 app = Flask(__name__)
+
+# Gunicorn configuration
+workers = multiprocessing.cpu_count() * 2 + 1
+worker_class = "gevent"
+worker_connections = 1000
+timeout = 30
+keepalive = 2
 
 # Configure CORS
 CORS(
