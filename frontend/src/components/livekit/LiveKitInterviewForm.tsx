@@ -77,7 +77,7 @@ const LiveKitInterviewForm: React.FC<LiveKitInterviewFormProps> = ({ onSubmit })
   useEffect(() => {
     const fetchCandidates = async () => {
       try {
-        const response = await axios.get('http://localhost:5001/api/candidates');
+        const response = await axios.get('http://35.181.155.165/api/candidates');
         setCandidates(response.data);
       } catch (err) {
         setError('Failed to load candidates');
@@ -100,7 +100,7 @@ const LiveKitInterviewForm: React.FC<LiveKitInterviewFormProps> = ({ onSubmit })
 
     try {
       console.log('Starting interview for candidate:', { email, name });
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5001';
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://35.181.155.165';
       const response = await fetch(`${apiUrl}/api/livekit/token?name=${encodeURIComponent(name)}`, {
         method: 'GET',
         headers: {

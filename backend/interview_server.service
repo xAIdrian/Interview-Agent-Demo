@@ -1,0 +1,19 @@
+[Unit]
+Description=Interview Server Gunicorn Service
+After=network.target
+
+[Service]
+User=ec2-user
+Group=ec2-user
+WorkingDirectory=/home/ec2-user/livekit_server
+Environment="PATH=/home/ec2-user/livekit_server/venv/bin"
+Environment="PYTHONPATH=/home/ec2-user/livekit_server"
+EnvironmentFile=/home/ec2-user/livekit_server/.env
+ExecStart=/home/ec2-user/livekit_server/venv/bin/gunicorn --workers 4 --bind 0.0.0.0:5001 --timeout 120 interview_server:app
+StandardOutput=append:/home/ec2-user/livekit_server/logs/interview_server.out.log
+StandardError=append:/home/ec2-user/livekit_server/logs/interview_server.err.log
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

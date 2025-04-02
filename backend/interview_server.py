@@ -25,8 +25,12 @@ app = Flask(__name__)
 workers = multiprocessing.cpu_count() * 2 + 1
 worker_class = "gevent"
 worker_connections = 1000
-timeout = 30
+timeout = 120  # Increased for long-running interview operations
 keepalive = 2
+max_requests = 1000
+max_requests_jitter = 50
+graceful_timeout = 30
+preload_app = True
 
 # Configure CORS
 CORS(
@@ -56,6 +60,25 @@ limiter = Limiter(
 
 # Initialize database driver
 db = DatabaseDriver()
+
+# Configure logging for Gunicorn
+accesslog = "-"  # Log to stdout
+errorlog = "-"  # Log to stderr
+loglevel = "info"
+
+# Production configuration
+if not app.debug:
+    # Disable Flask debug mode in production
+    app.config["DEBUG"] = False
+    # Configure production logging
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(message)s",
+        handlers=[
+            logging.StreamHandler(),
+            logging.FileHandler("logs/interview_server.log"),
+        ],
+    )
 
 
 # Error handlers
@@ -385,5 +408,10 @@ def get_candidate_interview_data(email):
 
 
 if __name__ == "__main__":
-    logger.info("Starting Interview Server...")
+    # Development server
+    logger.info("Starting Interview Server in development mode...")
     app.run(debug=True, port=5001)
+else:
+    # Production server (Gunicorn)
+    logger.info("Starting Interview Server in production mode...")
+    # Gunicorn will use the 'app' variable
