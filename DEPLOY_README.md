@@ -59,3 +59,33 @@ REAL command to check for errors in gunicorn
 ```
 sudo journalctl -u interview_server.service -n 50 --no-pager
 ```
+
+Running Docker in our EC2
+``
+# 1. Install Docker on EC2
+sudo yum update -y
+sudo yum install docker -y
+
+# 2. Start Docker service
+sudo service docker start
+sudo systemctl enable docker
+
+# 3. Add ec2-user to docker group (so you don't need sudo for docker commands)
+sudo usermod -a -G docker ec2-user
+
+# 4. Log out and back in for group changes to take effect, or run:
+newgrp docker
+
+# 5. Verify Docker is working
+docker --version
+docker ps
+
+# 6. Pull your image from Docker Hub (replace with your image name)
+docker pull your-docker-username/your-image-name
+
+# 7. Run your container
+docker run -d \
+  -p 5001:5001 \
+  --name your-container-name \
+  your-docker-username/your-image-name
+```
