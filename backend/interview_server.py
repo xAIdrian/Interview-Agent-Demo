@@ -1,6 +1,6 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-from livekit.interview_api import DatabaseDriver
+from livekit.interview_api import DatabaseDriver, InterviewError
 import sqlite3
 import os
 import logging
@@ -9,6 +9,7 @@ import multiprocessing
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from datetime import timedelta
+from werkzeug.exceptions import HTTPException
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -57,6 +58,28 @@ limiter = Limiter(
 db = DatabaseDriver()
 
 
+# Error handlers
+@app.errorhandler(InterviewError)
+def handle_interview_error(error):
+    logger.error(f"Interview error: {str(error)}")
+    return (
+        jsonify({"error": str(error), "code": error.code, "details": error.details}),
+        error.status_code,
+    )
+
+
+@app.errorhandler(HTTPException)
+def handle_http_error(error):
+    logger.error(f"HTTP error: {str(error)}")
+    return jsonify({"error": error.description, "code": error.code}), error.code
+
+
+@app.errorhandler(Exception)
+def handle_generic_error(error):
+    logger.error(f"Unexpected error: {str(error)}")
+    return jsonify({"error": "An unexpected error occurred", "code": 500}), 500
+
+
 @app.route("/health", methods=["GET", "HEAD", "OPTIONS"])
 def health_check():
     """Simple health check endpoint."""
@@ -66,101 +89,110 @@ def health_check():
 
 
 @app.route("/api/livekit/token", methods=["GET", "OPTIONS"])
-@limiter.limit("30 per minute")  # Limit token generation to 30 requests per minute
+@limiter.limit("30 per minute")
 def get_livekit_token():
     """Generate and return a LiveKit token for joining a room"""
     if request.method == "OPTIONS":
-        # Handle preflight request
-        response = jsonify({"status": "ok"})
-        # Let the global CORS middleware handle the headers
-        return response, 200
-
-    # Get parameters from the request
-    name = request.args.get("name", "anonymous")
-    room = request.args.get("room")
+        return jsonify({"status": "ok"})
 
     try:
-        # Generate room name if not provided
+        name = request.args.get("name", "anonymous")
+        room = request.args.get("room")
+
         if not room:
-            # Use synchronous call since this is not an async function
             import uuid
 
             room = f"interview-{str(uuid.uuid4())[:8]}"
 
-        # Generate token
         token = LiveKitTokenServer.generate_token(name, room)
-
-        # Create response without explicit CORS headers (let global middleware handle it)
-        response = jsonify({"token": token, "room": room})
-        return response, 200
+        return jsonify({"token": token, "room": room}), 200
     except Exception as e:
-        app.logger.error(f"Error generating LiveKit token: {str(e)}")
-        error_response = jsonify({"error": str(e)})
-        return error_response, 500
+        logger.error(f"Error generating LiveKit token: {str(e)}")
+        raise InterviewError(
+            "Failed to generate interview token",
+            code="TOKEN_GENERATION_ERROR",
+            details=str(e),
+            status_code=500,
+        )
 
 
 @app.route("/api/candidates", methods=["GET"])
-@limiter.limit("100 per minute")  # Limit candidate listing to 100 requests per minute
+@limiter.limit("100 per minute")
 def get_candidates():
     """Get all available candidate profiles with their interview questions."""
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
 
-        # Get all candidates
         cursor.execute("SELECT email, name, position, experience FROM candidates")
         candidates = cursor.fetchall()
 
-        # For each candidate, get their questions
         candidates_with_questions = []
         for candidate in candidates:
             email, name, position, experience = candidate
 
-            # Get technical questions
-            cursor.execute(
-                "SELECT question FROM questions WHERE position = ? AND stage = ?",
-                (position.lower(), "technical_questions"),
-            )
-            technical_questions = [row[0] for row in cursor.fetchall()]
+            try:
+                cursor.execute(
+                    "SELECT question FROM questions WHERE position = ? AND stage = ?",
+                    (position.lower(), "technical_questions"),
+                )
+                technical_questions = [row[0] for row in cursor.fetchall()]
 
-            # Get behavioral questions
-            cursor.execute(
-                "SELECT question FROM questions WHERE position = ? AND stage = ?",
-                (position.lower(), "behavioral_questions"),
-            )
-            behavioral_questions = [row[0] for row in cursor.fetchall()]
+                cursor.execute(
+                    "SELECT question FROM questions WHERE position = ? AND stage = ?",
+                    (position.lower(), "behavioral_questions"),
+                )
+                behavioral_questions = [row[0] for row in cursor.fetchall()]
 
-            candidates_with_questions.append(
-                {
-                    "email": email,
-                    "name": name,
-                    "position": position,
-                    "experience": experience,
-                    "questions": {
-                        "technical_questions": technical_questions,
-                        "behavioral_questions": behavioral_questions,
-                    },
-                }
-            )
+                candidates_with_questions.append(
+                    {
+                        "email": email,
+                        "name": name,
+                        "position": position,
+                        "experience": experience,
+                        "questions": {
+                            "technical_questions": technical_questions,
+                            "behavioral_questions": behavioral_questions,
+                        },
+                    }
+                )
+            except sqlite3.Error as e:
+                logger.error(
+                    f"Error fetching questions for candidate {email}: {str(e)}"
+                )
+                # Continue with other candidates even if one fails
+                continue
 
         conn.close()
-
         return jsonify(candidates_with_questions)
+    except sqlite3.Error as e:
+        logger.error(f"Database error: {str(e)}")
+        raise InterviewError(
+            "Failed to fetch candidates",
+            code="DATABASE_ERROR",
+            details=str(e),
+            status_code=500,
+        )
     except Exception as e:
-        logger.error(f"Error fetching candidates: {str(e)}")
-        return jsonify({"error": str(e)}), 500
+        logger.error(f"Unexpected error: {str(e)}")
+        raise InterviewError(
+            "An unexpected error occurred",
+            code="UNEXPECTED_ERROR",
+            details=str(e),
+            status_code=500,
+        )
 
 
 @app.route("/api/candidates/<email>", methods=["GET"])
-@limiter.limit(
-    "50 per minute"
-)  # Limit individual candidate lookups to 50 requests per minute
+@limiter.limit("50 per minute")
 def get_candidate(email):
     """Get a specific candidate's profile by email."""
     try:
         candidate = db.get_candidate_by_email(email)
         if not candidate:
-            return jsonify({"error": "Candidate not found"}), 404
+            raise InterviewError(
+                "Candidate not found", code="CANDIDATE_NOT_FOUND", status_code=404
+            )
 
         return jsonify(
             {
@@ -170,26 +202,32 @@ def get_candidate(email):
                 "experience": candidate.experience,
             }
         )
+    except InterviewError:
+        raise
     except Exception as e:
         logger.error(f"Error fetching candidate {email}: {str(e)}")
-        return jsonify({"error": str(e)}), 500
+        raise InterviewError(
+            "Failed to fetch candidate details",
+            code="FETCH_ERROR",
+            details=str(e),
+            status_code=500,
+        )
 
 
 @app.route("/api/candidates/<email>/questions", methods=["GET"])
-@limiter.limit("50 per minute")  # Limit question fetching to 50 requests per minute
+@limiter.limit("50 per minute")
 def get_candidate_questions(email):
     """Get interview questions for a specific candidate based on their position."""
     try:
         candidate = db.get_candidate_by_email(email)
         if not candidate:
-            return jsonify({"error": "Candidate not found"}), 404
+            raise InterviewError(
+                "Candidate not found", code="CANDIDATE_NOT_FOUND", status_code=404
+            )
 
-        # Get technical questions
         technical_questions = db.get_questions_for_position_and_stage(
             candidate.position, "technical_questions"
         )
-
-        # Get behavioral questions
         behavioral_questions = db.get_questions_for_position_and_stage(
             candidate.position, "behavioral_questions"
         )
@@ -200,23 +238,37 @@ def get_candidate_questions(email):
                 "behavioral_questions": behavioral_questions,
             }
         )
+    except InterviewError:
+        raise
     except Exception as e:
         logger.error(f"Error fetching questions for candidate {email}: {str(e)}")
-        return jsonify({"error": str(e)}), 500
+        raise InterviewError(
+            "Failed to fetch interview questions",
+            code="QUESTIONS_FETCH_ERROR",
+            details=str(e),
+            status_code=500,
+        )
 
 
 @app.route("/api/candidates", methods=["POST"])
-@limiter.limit("10 per hour")  # Limit candidate creation to 10 requests per hour
+@limiter.limit("10 per hour")
 def create_candidate():
     """Create a new candidate profile."""
     try:
         data = request.get_json()
         if not data:
-            return jsonify({"error": "No data provided"}), 400
+            raise InterviewError(
+                "No data provided", code="MISSING_DATA", status_code=400
+            )
 
         required_fields = ["email", "name", "position", "experience"]
-        if not all(field in data for field in required_fields):
-            return jsonify({"error": "Missing required fields"}), 400
+        missing_fields = [field for field in required_fields if field not in data]
+        if missing_fields:
+            raise InterviewError(
+                f"Missing required fields: {', '.join(missing_fields)}",
+                code="MISSING_FIELDS",
+                status_code=400,
+            )
 
         candidate = db.create_candidate(
             email=data["email"],
@@ -239,50 +291,69 @@ def create_candidate():
             ),
             201,
         )
+    except InterviewError:
+        raise
     except Exception as e:
         logger.error(f"Error creating candidate: {str(e)}")
-        return jsonify({"error": str(e)}), 500
+        raise InterviewError(
+            "Failed to create candidate",
+            code="CREATION_ERROR",
+            details=str(e),
+            status_code=500,
+        )
 
 
 @app.route("/api/questions", methods=["POST"])
-@limiter.limit("20 per hour")  # Limit question creation to 20 requests per hour
+@limiter.limit("20 per hour")
 def add_question():
     """Add a new interview question."""
     try:
         data = request.get_json()
         if not data:
-            return jsonify({"error": "No data provided"}), 400
+            raise InterviewError(
+                "No data provided", code="MISSING_DATA", status_code=400
+            )
 
         required_fields = ["position", "stage", "question"]
-        if not all(field in data for field in required_fields):
-            return jsonify({"error": "Missing required fields"}), 400
+        missing_fields = [field for field in required_fields if field not in data]
+        if missing_fields:
+            raise InterviewError(
+                f"Missing required fields: {', '.join(missing_fields)}",
+                code="MISSING_FIELDS",
+                status_code=400,
+            )
 
         result = db.add_interview_question(
             position=data["position"], stage=data["stage"], question=data["question"]
         )
 
         return jsonify({"message": result}), 201
+    except InterviewError:
+        raise
     except Exception as e:
         logger.error(f"Error adding question: {str(e)}")
-        return jsonify({"error": str(e)}), 500
+        raise InterviewError(
+            "Failed to add question",
+            code="QUESTION_ADD_ERROR",
+            details=str(e),
+            status_code=500,
+        )
 
 
 @app.route("/api/candidates/<email>/interview", methods=["GET"])
-@limiter.limit("5 per hour")  # Limit interview data fetching to 5 requests per hour
+@limiter.limit("5 per hour")
 def get_candidate_interview_data(email):
     """Get all interview data for a candidate in a single request."""
     try:
-        # Get candidate profile
         candidate = db.get_candidate_by_email(email)
         if not candidate:
-            return jsonify({"error": "Candidate not found"}), 404
+            raise InterviewError(
+                "Candidate not found", code="CANDIDATE_NOT_FOUND", status_code=404
+            )
 
-        # Get technical questions
         technical_questions = db.get_questions_for_position_and_stage(
             candidate.position, "technical_questions"
         )
-
-        # Get behavioral questions
         behavioral_questions = db.get_questions_for_position_and_stage(
             candidate.position, "behavioral_questions"
         )
@@ -301,13 +372,18 @@ def get_candidate_interview_data(email):
                 },
             }
         )
+    except InterviewError:
+        raise
     except Exception as e:
         logger.error(f"Error fetching interview data for candidate {email}: {str(e)}")
-        return jsonify({"error": str(e)}), 500
+        raise InterviewError(
+            "Failed to fetch interview data",
+            code="INTERVIEW_DATA_ERROR",
+            details=str(e),
+            status_code=500,
+        )
 
 
 if __name__ == "__main__":
     logger.info("Starting Interview Server...")
-    app.run(
-        debug=True, port=5001
-    )  # Using port 5001 to avoid conflicts with other services
+    app.run(debug=True, port=5001)

@@ -6,11 +6,16 @@ from dotenv import load_dotenv
 from interview_api import AssistantFnc, DatabaseDriver
 from prompts import WELCOME_MESSAGE, demo_agent_prompt_template
 import logging
+import os
 
 # Load environment variables
 load_dotenv()
 
-# Configure logging
+# Configure production logging
+LOG_DIR = "/home/ec2-user/backend/logs"
+os.makedirs(LOG_DIR, exist_ok=True)
+
+# Configure logging with file handler
 logger = logging.getLogger("interview-agent")
 logger.setLevel(logging.INFO)
 

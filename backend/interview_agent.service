@@ -1,0 +1,17 @@
+[Unit]
+Description=Interview Agent LiveKit Service
+After=network.target
+
+[Service]
+Type=simple
+User=ec2-user
+Group=ec2-user
+WorkingDirectory=/home/ec2-user/backend
+Environment="PATH=/home/ec2-user/venv/bin"
+Environment="PYTHONPATH=/home/ec2-user/backend"
+ExecStart=/home/ec2-user/venv/bin/python livekit/interview_agent.py start
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
