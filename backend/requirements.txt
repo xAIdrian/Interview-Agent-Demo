@@ -10,7 +10,6 @@ livekit
 livekit-agents
 livekit-plugins-deepgram
 livekit-plugins-openai
-mariadb
 numpy
 openai
 pymupdf
@@ -21,3 +20,5 @@ whisper
 gunicorn
 sqlalchemy
 flask-limiter
+gunicorn
+gevent
