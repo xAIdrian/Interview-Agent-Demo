@@ -14,6 +14,7 @@ interface User {
   id: string;
   email: string;
   name: string;
+  is_admin: boolean;
 }
 
 interface Campaign {
@@ -50,6 +51,9 @@ interface Submission {
   user?: User;
   campaign?: Campaign;
   answers?: Answer[];
+  submission?: {
+    is_complete: boolean;
+  };
 }
 
 const SubmissionDetailsPage = () => {
@@ -144,7 +148,7 @@ const SubmissionDetailsPage = () => {
     const updatedAnswers = submission.answers.map(answer => {
       if (answer.id === answerId) {
         return {
-          transcript: answer.transcript,
+          ...answer,
           score,
           score_rationale: rationale
         };
@@ -323,8 +327,8 @@ const SubmissionDetailsPage = () => {
                 <p><span className="font-medium">Completed:</span> {formatDate(submission.completed_at)}</p>
                 <p>
                   <span className="font-medium">Status:</span> 
-                  <span className={`ml-2 px-2 py-1 rounded text-sm ${submission.submission.is_complete==1 ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                    {submission.submission.is_complete==1 ? 'Completed' : 'In Progress'}
+                  <span className={`ml-2 px-2 py-1 rounded text-sm ${submission.is_complete ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                    {submission.is_complete ? 'Completed' : 'In Progress'}
                   </span>
                 </p>
                 <p className="mt-2"><span className="font-medium">Total Score:</span> {submission.total_points ?? 'Not scored'}</p>

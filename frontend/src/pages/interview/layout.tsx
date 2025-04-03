@@ -1,5 +1,5 @@
 import "@livekit/components-styles";
-import "./globals.css";
+import "../../../styles/globals.css";
 import { Public_Sans } from "next/font/google";
 
 const publicSans400 = Public_Sans({

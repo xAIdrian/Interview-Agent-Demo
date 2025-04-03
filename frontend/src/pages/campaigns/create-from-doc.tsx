@@ -147,7 +147,7 @@ const CreateCampaignFromDocPage = () => {
         ...campaign,
         campaign_context: extractedData.context || '',
         job_description: extractedData.description || '',
-        questions: Array.isArray(extractedData.questions) ? extractedData.questions.map(q => ({
+        questions: Array.isArray(extractedData.questions) ? extractedData.questions.map((q: { title?: string; scoring_prompt?: string; max_points?: number }) => ({
           title: q.title || '',
           scoring_prompt: q.scoring_prompt || '',
           max_points: q.max_points || 10,

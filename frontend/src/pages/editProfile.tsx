@@ -12,7 +12,7 @@ const EditProfile = () => {
         confirm_password: '',
     });
 
-    const handleChange = (e) => {
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
         setFormData({
             ...formData,
@@ -20,7 +20,7 @@ const EditProfile = () => {
         });
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         // ...handle form submission...
     };
