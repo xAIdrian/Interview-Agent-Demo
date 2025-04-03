@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Define API base URL for consistent usage
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://35.181.155.165/';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://interview-server-1zvi.onrender.com/';
 
 // Create axios instance with default config
 const axiosInstance = axios.create({
