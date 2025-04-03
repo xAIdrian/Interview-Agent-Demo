@@ -10,6 +10,7 @@ interface User {
   email: string;
   name: string;
   role: string;
+  is_admin: boolean;
 }
 
 interface AuthContextType {
@@ -17,9 +18,11 @@ interface AuthContextType {
   loading: boolean;
   error: string | null;
   login: (email: string, password: string) => Promise<boolean>;
+  register: (name: string, email: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
   clearError: () => void;
   isAuthenticated: boolean;
+  isAdmin: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -115,6 +118,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // Register function
+  const register = async (name: string, email: string, password: string): Promise<boolean> => {
+    try {
+      setLoading(true);
+      clearError();
+      
+      const response = await axios.post('/register', { name, email, password });
+      
+      if (response.data.success) {
+        AuthLogger.info('Registration successful');
+        return true;
+      } else {
+        setError(response.data.message || 'Registration failed');
+        return false;
+      }
+    } catch (err) {
+      if (isAxiosError(err)) {
+        setError(err.response?.data?.message || 'Registration failed');
+      } else {
+        setError('An unexpected error occurred');
+      }
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Logout function
   const logout = async () => {
     try {
@@ -138,9 +168,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loading,
     error,
     login,
+    register,
     logout,
     clearError,
-    isAuthenticated: !!user
+    isAuthenticated: !!user,
+    isAdmin: user?.role === 'admin'
   };
 
   return (
