@@ -1,7 +1,21 @@
 from botocore.exceptions import ClientError
 from config import Config
-from database import get_db_connection, create_tables, migrate_submissions_table_add_resume_columns
-from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, send_file
+from database import (
+    get_db_connection,
+    create_tables,
+    migrate_submissions_table_add_resume_columns,
+)
+from flask import (
+    Flask,
+    render_template,
+    request,
+    redirect,
+    url_for,
+    flash,
+    session,
+    jsonify,
+    send_file,
+)
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
 import boto3
@@ -10,7 +24,8 @@ import random
 import string
 import tempfile
 import uuid
-#import whisper
+
+# import whisper
 import mariadb
 from fpdf import FPDF
 
@@ -31,67 +46,96 @@ import secrets
 
 app = Flask(__name__)
 
-# Configure CORS properly
-CORS(app, 
-    origins=["http://localhost:3000", "http://127.0.0.1:3000"],
-    supports_credentials=True,
-    allow_headers=["Content-Type", "X-Requested-With", "x-retry-count"],
-    methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
+# Configure CORS properly - disable the automatic CORS and let us handle it manually
+app.config["CORS_ENABLED"] = False
+
+
+# A simple function to add CORS headers to all responses
+@app.after_request
+def add_cors_headers(response):
+    # Only add headers if they don't exist already
+    if "Access-Control-Allow-Origin" not in response.headers:
+        response.headers.add("Access-Control-Allow-Origin", "http://localhost:3000")
+        response.headers.add(
+            "Access-Control-Allow-Headers",
+            "Content-Type,Authorization,Accept,x-retry-count",
+        )
+        response.headers.add(
+            "Access-Control-Allow-Methods", "GET,PUT,POST,DELETE,OPTIONS"
+        )
+        response.headers.add("Access-Control-Allow-Credentials", "true")
+    return response
+
 
 app.config.from_object(Config)
-app.register_blueprint(api_bp, url_prefix='/api')
+app.register_blueprint(api_bp, url_prefix="/api")
 
 # Configure the app for proper session handling
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', Config.SECRET_KEY)
-app.config['SESSION_TYPE'] = 'filesystem'
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)  # Extend to 30 days
-app.config['SESSION_COOKIE_SECURE'] = False  # Set to True in production with HTTPS
-app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # Use 'Strict' in production
+app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", Config.SECRET_KEY)
+app.config["SESSION_TYPE"] = "filesystem"
+app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=30)  # Extend to 30 days
+app.config["SESSION_COOKIE_SECURE"] = False  # Set to True in production with HTTPS
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"  # Use 'Strict' in production
+
 
 # Make sessions permanent by default
 @app.before_request
 def make_session_permanent():
     session.permanent = True
 
+
 # Add a root-level health endpoint
-@app.route('/health', methods=['GET', 'HEAD'])
+@app.route("/health", methods=["GET", "HEAD", "OPTIONS"])
 def health_check():
     """
     Simple health check endpoint to verify the API is running.
     This doesn't check database connectivity to allow CORS preflight to succeed.
     """
+    # Handle preflight OPTIONS request
+    if request.method == "OPTIONS":
+        response = jsonify({"status": "ok"})
+        return response
+
     try:
-        return jsonify({"status": "ok", "message": "API is operational"}), 200
+        response = jsonify({"status": "ok", "message": "API is operational"})
+        return response, 200
     except Exception as e:
         app.logger.error(f"Health check failed: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
+
 
 @app.before_first_request
 def create_tables_on_startup():
     try:
         create_tables()
         migrate_submissions_table_add_resume_columns()
-        
+
         # Execute the migration to update total_points to allow NULL
         conn = get_db_connection()
         try:
             with conn.cursor() as cursor:
                 # Modify the total_points column to allow NULL values
-                cursor.execute("""
+                cursor.execute(
+                    """
                     ALTER TABLE submissions
                     MODIFY COLUMN total_points INT DEFAULT NULL
-                """)
+                """
+                )
                 print("Successfully modified total_points column to allow NULL values")
-                
+
                 # Update existing submissions with total_points=0 to NULL
-                cursor.execute("""
+                cursor.execute(
+                    """
                     UPDATE submissions 
                     SET total_points = NULL 
                     WHERE total_points = 0 AND is_complete = FALSE
-                """)
-                print(f"Updated {cursor.rowcount} submissions with total_points=0 to NULL")
-                
+                """
+                )
+                print(
+                    f"Updated {cursor.rowcount} submissions with total_points=0 to NULL"
+                )
+
             conn.commit()
         except Exception as e:
             print(f"Error during migration: {e}")
@@ -103,6 +147,7 @@ def create_tables_on_startup():
         print(f"Error during startup database setup: {e}")
         # Don't crash the application - let it continue even with DB issues
         # The health check will still work, but database operations will fail
+
 
 @app.route("/register", methods=["GET", "POST"])
 def register():
@@ -117,7 +162,7 @@ def register():
             name = request.form.get("name", "")
             password = request.form.get("password")
 
-        hashed_password = generate_password_hash(password, method='pbkdf2:sha256')
+        hashed_password = generate_password_hash(password, method="pbkdf2:sha256")
 
         conn = get_db_connection()
         try:
@@ -125,9 +170,17 @@ def register():
                 sql = "INSERT INTO users (id, email, name, password_hash, is_admin) VALUES (UUID_SHORT(), ?, ?, ?, ?)"
                 cursor.execute(sql, (email, name, hashed_password, False))
             conn.commit()
-            
+
             if request.is_json:
-                return jsonify({"success": True, "message": "Registration successful! Please log in."}), 201
+                return (
+                    jsonify(
+                        {
+                            "success": True,
+                            "message": "Registration successful! Please log in.",
+                        }
+                    ),
+                    201,
+                )
             else:
                 flash("Registration successful! Please log in.", "success")
                 return redirect(url_for("login"))
@@ -155,7 +208,7 @@ def login():
         else:
             email = request.form.get("email")
             password = request.form.get("password")
-        
+
         conn = get_db_connection()
         with conn.cursor(dictionary=True) as cursor:
             sql = "SELECT id, email, name, password_hash, is_admin FROM users WHERE email = ?"
@@ -170,21 +223,26 @@ def login():
             session["email"] = user["email"]
             session["name"] = user["name"]
             session["is_admin"] = user["is_admin"]
-            
+
             # For JSON requests (API)
             if request.is_json:
                 user_data = {
                     "id": str(user["id"]),
                     "email": user["email"],
                     "name": user["name"],
-                    "is_admin": user["is_admin"]
+                    "is_admin": user["is_admin"],
                 }
-                return jsonify({
-                    "success": True,
-                    "message": "Login successful!",
-                    "user": user_data
-                }), 200
-            
+                return (
+                    jsonify(
+                        {
+                            "success": True,
+                            "message": "Login successful!",
+                            "user": user_data,
+                        }
+                    ),
+                    200,
+                )
+
             # For form submissions (Web UI)
             else:
                 flash("Login successful!", "success")
@@ -192,28 +250,30 @@ def login():
         else:
             # Authentication failed
             if request.is_json:
-                return jsonify({
-                    "success": False, 
-                    "message": "Invalid email or password"
-                }), 401
+                return (
+                    jsonify({"success": False, "message": "Invalid email or password"}),
+                    401,
+                )
             else:
                 flash("Invalid email or password", "danger")
                 return render_template("login.html")
-    
+
     return render_template("login.html")
+
 
 @app.route("/logout", methods=["GET", "POST"])
 def logout():
     # Clear session data
     session.clear()
-    
+
     # For API requests
     if request.is_json:
         return jsonify({"success": True, "message": "Logged out successfully"}), 200
-    
+
     # For web UI
     flash("You have been logged out.", "success")
     return redirect(url_for("login"))
+
 
 # Decorator for checking if a user is logged in
 def login_required(f):
@@ -222,14 +282,18 @@ def login_required(f):
         # Check if user is logged in via session
         if "user_id" not in session:
             # For API requests, return 401
-            if request.is_json or request.headers.get('Content-Type') == 'application/json':
+            if (
+                request.is_json
+                or request.headers.get("Content-Type") == "application/json"
+            ):
                 return jsonify({"error": "Authentication required"}), 401
             # For web UI, redirect to login
             return redirect(url_for("login"))
-        
+
         return f(*args, **kwargs)
 
     return decorated_function
+
 
 # Decorator to check admin status
 def admin_required(f):
@@ -238,11 +302,14 @@ def admin_required(f):
         # Check if user is an admin via session
         if not session.get("is_admin"):
             # For API requests, return 403
-            if request.is_json or request.headers.get('Content-Type') == 'application/json':
+            if (
+                request.is_json
+                or request.headers.get("Content-Type") == "application/json"
+            ):
                 return jsonify({"error": "Admin privileges required"}), 403
             # For web UI, redirect to home
             return redirect(url_for("index"))
-        
+
         return f(*args, **kwargs)
 
     return decorated_function
@@ -1148,18 +1215,30 @@ def admin_create_campaign_from_doc():
 
     return render_template("admin/campaigns/create_campaign_from_doc.html")
 
+
 # Add a route to test sessions
-@app.route('/api/test-session', methods=['GET', 'POST'])
+@app.route("/api/test-session", methods=["GET", "POST"])
 def test_session():
-    if request.method == 'POST':
-        session['test_value'] = 'This is a test value'
+    if request.method == "POST":
+        session["test_value"] = "This is a test value"
         return jsonify({"message": "Session value set", "session": dict(session)})
     else:
-        return jsonify({
-            "has_session": bool(session),
-            "session_contents": dict(session),
-            "test_value": session.get('test_value', 'Not set')
-        })
+        return jsonify(
+            {
+                "has_session": bool(session),
+                "session_contents": dict(session),
+                "test_value": session.get("test_value", "Not set"),
+            }
+        )
+
+
+# Handle OPTIONS requests globally
+@app.route("/", defaults={"path": ""}, methods=["OPTIONS"])
+@app.route("/<path:path>", methods=["OPTIONS"])
+def handle_options(path):
+    response = app.response_class(response=[], status=200)
+    return response
+
 
 if __name__ == "__main__":
     app.run(debug=True)
