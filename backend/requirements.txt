@@ -22,3 +22,6 @@ sqlalchemy
 flask-limiter
 gunicorn
 gevent
+pymysql
+mariadb
+bcrypt

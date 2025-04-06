@@ -5,13 +5,15 @@ import { PageTemplate } from '../components/PageTemplate';
 import { useAuth } from '../app/components/AuthProvider';
 import { Spinner } from '../components/ui/Spinner';
 import Head from 'next/head';
+import axios from 'axios';
 
 const LoginPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
   const router = useRouter();
-  const { login, error, clearError, isAuthenticated } = useAuth();
+  const { login, clearError, isAuthenticated } = useAuth();
   
   // Get the redirect URL from query parameters
   const redirectPath = router.query?.redirect as string || '/candidate';
@@ -28,11 +30,38 @@ const LoginPage = () => {
     setIsLoading(true);
     clearError();
     
-    const success = await login(email, password);
-    setIsLoading(false);
-    
-    if (success) {
-      router.push(redirectPath);
+    try {
+      const response = await axios.post('http://127.0.0.1:5000/login', {
+        email,
+        password
+      }, {
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.data.success) {
+        // Store user data in localStorage
+        localStorage.setItem('user', JSON.stringify(response.data.user));
+        // Redirect based on user role
+        router.push({
+          pathname: response.data.redirect_to,
+          query: {
+            loggedIn: 'true',
+            message: response.data.message
+          }
+        });
+      } else {
+        setError(response.data.message || 'Login failed');
+      }
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        setError(error.response?.data?.message || 'Login failed. Please try again.');
+      } else {
+        setError('An unexpected error occurred');
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
 
