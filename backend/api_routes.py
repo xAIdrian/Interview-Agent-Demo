@@ -44,7 +44,7 @@ api_bp = Blueprint("api", __name__)
 # Apply CORS specifically to the API blueprint
 CORS(
     api_bp,
-    origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    origins=["*"],
     supports_credentials=True,
     allow_headers=[
         "Content-Type",

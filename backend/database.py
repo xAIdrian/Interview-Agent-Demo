@@ -2,16 +2,19 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.pool import QueuePool
 from config import Config
+import sqlite3
+import os
 
-# Create SQLAlchemy engine with connection pooling
+# Create SQLAlchemy engine with connection pooling for SQLite
+db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "interview_agent.db")
 engine = create_engine(
-    f"mysql+pymysql://{Config.DB_USER}:{Config.DB_PASSWORD}@{Config.DB_HOST}:{Config.DB_PORT}/{Config.DB_NAME}",
+    f"sqlite:///{db_path}",
     poolclass=QueuePool,
-    pool_size=5,  # Number of permanent connections to keep
-    max_overflow=10,  # Number of additional connections to create when pool is full
-    pool_timeout=30,  # Seconds to wait before giving up on getting a connection from the pool
-    pool_recycle=1800,  # Recycle connections after 30 minutes
-    pool_pre_ping=True,  # Enable connection health checks
+    pool_size=5,
+    max_overflow=10,
+    pool_timeout=30,
+    pool_recycle=1800,
+    pool_pre_ping=True,
 )
 
 # Create session factory
@@ -24,6 +27,11 @@ Session = scoped_session(SessionFactory)
 def get_db_session():
     """Get a database session from the connection pool."""
     return Session()
+
+
+def get_db_connection():
+    """Get a direct database connection using sqlite3."""
+    return sqlite3.connect(db_path)
 
 
 def build_filter_query(table_name, filters):
@@ -46,14 +54,13 @@ def create_users_table():
             text(
                 """
             CREATE TABLE IF NOT EXISTS users (
-                id BIGINT UNSIGNED PRIMARY KEY,
+                id BIGINT PRIMARY KEY,
                 email VARCHAR(255) NOT NULL UNIQUE,
                 name VARCHAR(255) NOT NULL,
                 password_hash VARCHAR(255) NOT NULL,
                 is_admin BOOLEAN NOT NULL DEFAULT FALSE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                INDEX (email)
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """
             )
@@ -70,18 +77,17 @@ def create_campaigns_table():
             text(
                 """
             CREATE TABLE IF NOT EXISTS campaigns (
-                id BIGINT UNSIGNED PRIMARY KEY,
+                id BIGINT PRIMARY KEY,
                 title VARCHAR(255) NOT NULL,
                 max_user_submissions INT NOT NULL DEFAULT 1,
                 max_points INT NOT NULL,
                 is_public BOOLEAN NOT NULL DEFAULT FALSE,
                 campaign_context TEXT,
                 job_description TEXT,
-                created_by BIGINT UNSIGNED,
+                created_by BIGINT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                FOREIGN KEY (created_by) REFERENCES users(id),
-                INDEX (is_public)
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (created_by) REFERENCES users(id)
             )
         """
             )
@@ -98,17 +104,16 @@ def create_questions_table():
             text(
                 """
             CREATE TABLE IF NOT EXISTS questions (
-                id BIGINT UNSIGNED PRIMARY KEY,
-                campaign_id BIGINT UNSIGNED NOT NULL,
+                id BIGINT PRIMARY KEY,
+                campaign_id BIGINT NOT NULL,
                 title VARCHAR(255) NOT NULL,
                 body TEXT NOT NULL,
                 scoring_prompt TEXT NOT NULL,
                 max_points INT NOT NULL,
                 order_index INT NOT NULL DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                FOREIGN KEY (campaign_id) REFERENCES campaigns(id),
-                INDEX (campaign_id)
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (campaign_id) REFERENCES campaigns(id)
             )
         """
             )
@@ -125,20 +130,18 @@ def create_submissions_table():
             text(
                 """
             CREATE TABLE IF NOT EXISTS submissions (
-                id BIGINT UNSIGNED PRIMARY KEY,
-                campaign_id BIGINT UNSIGNED NOT NULL,
-                user_id BIGINT UNSIGNED NOT NULL,
+                id BIGINT PRIMARY KEY,
+                campaign_id BIGINT NOT NULL,
+                user_id BIGINT NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 completed_at TIMESTAMP DEFAULT NULL,
                 is_complete BOOLEAN NOT NULL DEFAULT FALSE,
                 total_points INT DEFAULT NULL,
                 resume_path VARCHAR(255) DEFAULT NULL,
-                resume_text LONGTEXT DEFAULT NULL,
+                resume_text TEXT DEFAULT NULL,
                 FOREIGN KEY (campaign_id) REFERENCES campaigns(id),
-                FOREIGN KEY (user_id) REFERENCES users(id),
-                INDEX (user_id, campaign_id),
-                INDEX (is_complete)
+                FOREIGN KEY (user_id) REFERENCES users(id)
             )
         """
             )
@@ -155,20 +158,18 @@ def create_submission_answers_table():
             text(
                 """
             CREATE TABLE IF NOT EXISTS submission_answers (
-                id BIGINT UNSIGNED PRIMARY KEY,
-                submission_id BIGINT UNSIGNED NOT NULL,
-                question_id BIGINT UNSIGNED NOT NULL,
+                id BIGINT PRIMARY KEY,
+                submission_id BIGINT NOT NULL,
+                question_id BIGINT NOT NULL,
                 video_path VARCHAR(255) DEFAULT NULL,
                 transcript TEXT NOT NULL,
                 score INT DEFAULT NULL,
                 score_rationale TEXT DEFAULT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (submission_id) REFERENCES submissions(id),
                 FOREIGN KEY (question_id) REFERENCES questions(id),
-                INDEX (submission_id),
-                INDEX (question_id),
-                UNIQUE KEY (submission_id, question_id)
+                UNIQUE (submission_id, question_id)
             )
         """
             )
@@ -232,7 +233,7 @@ def migrate_submissions_table_add_resume_columns():
                 text(
                     """
                 ALTER TABLE submissions
-                ADD COLUMN resume_text LONGTEXT DEFAULT NULL
+                ADD COLUMN resume_text TEXT DEFAULT NULL
             """
                 )
             )
