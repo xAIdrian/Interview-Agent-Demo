@@ -142,8 +142,21 @@ def handle_campaigns():
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM campaigns")
         campaigns = cursor.fetchall()
+        columns = [
+            "id",
+            "title",
+            "max_user_submissions",
+            "max_points",
+            "is_public",
+            "campaign_context",
+            "job_description",
+            "created_by",
+            "created_at",
+            "updated_at",
+        ]
+        result = [map_row_to_dict(campaign, columns) for campaign in campaigns]
         conn.close()
-        return jsonify([dict(campaign) for campaign in campaigns])
+        return jsonify(result)
 
     if request.method == "POST":
         data = request.get_json()
@@ -2001,3 +2014,129 @@ def get_livekit_token():
         app.logger.error(f"Error generating LiveKit token: {str(e)}")
         error_response = jsonify({"error": str(e)})
         return error_response, 500
+
+
+@api_bp.route("/test-campaigns", methods=["POST", "OPTIONS"])
+def test_create_campaign():
+    if request.method == "OPTIONS":
+        response = jsonify({})
+        response.headers.add("Access-Control-Allow-Origin", "*")
+        response.headers.add("Access-Control-Allow-Headers", "Content-Type")
+        response.headers.add("Access-Control-Allow-Methods", "POST, OPTIONS")
+        return response, 200
+
+    try:
+        data = request.get_json()
+        print("Received data:", data)  # For debugging
+
+        # Calculate total max points from questions
+        total_max_points = sum(
+            question.get("max_points", 0) for question in data.get("questions", [])
+        )
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        try:
+            # Generate BIGINT ID for campaign (using uuid int value)
+            campaign_id = str(
+                uuid.uuid4().int & (1 << 64) - 1
+            )  # Ensures it fits in BIGINT
+
+            # Insert campaign
+            cursor.execute(
+                """
+                INSERT INTO campaigns (
+                    id, title, max_user_submissions, max_points, 
+                    is_public, campaign_context, job_description
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    campaign_id,
+                    data.get("title"),
+                    data.get("max_user_submissions", 1),
+                    total_max_points,
+                    data.get("is_public", False),
+                    data.get("campaign_context", ""),
+                    data.get("job_description", ""),
+                ),
+            )
+
+            # Insert questions
+            questions_created = []
+            for question in data.get("questions", []):
+                # Generate BIGINT ID for question
+                question_id = str(uuid.uuid4().int & (1 << 64) - 1)
+
+                cursor.execute(
+                    """
+                    INSERT INTO questions (
+                        id, campaign_id, title, body, 
+                        scoring_prompt, max_points, order_index
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        question_id,
+                        campaign_id,
+                        question.get("title", ""),
+                        question.get("body", question.get("title", "")),
+                        question.get("scoring_prompt", ""),
+                        question.get("max_points", 0),
+                        0,  # default order_index
+                    ),
+                )
+                questions_created.append(
+                    {
+                        "id": question_id,
+                        "campaign_id": campaign_id,
+                        "title": question.get("title", ""),
+                        "body": question.get("body", question.get("title", "")),
+                        "scoring_prompt": question.get("scoring_prompt", ""),
+                        "max_points": question.get("max_points", 0),
+                    }
+                )
+
+            # Commit the transaction
+            conn.commit()
+
+            # Verify the campaign was created by fetching it
+            cursor.execute("SELECT * FROM campaigns WHERE id = ?", (campaign_id,))
+            created_campaign = cursor.fetchone()
+
+            if not created_campaign:
+                raise Exception("Campaign was not saved to database")
+
+            # Prepare response
+            response = jsonify(
+                {
+                    "success": True,
+                    "message": "Campaign created successfully",
+                    "data": {
+                        "id": campaign_id,
+                        "title": data.get("title"),
+                        "campaign_context": data.get("campaign_context", ""),
+                        "job_description": data.get("job_description", ""),
+                        "max_user_submissions": data.get("max_user_submissions", 1),
+                        "max_points": total_max_points,
+                        "is_public": data.get("is_public", False),
+                        "questions": questions_created,
+                    },
+                }
+            )
+            response.headers.add("Access-Control-Allow-Origin", "*")
+            return response, 201
+
+        except Exception as e:
+            conn.rollback()
+            print("Database error:", str(e))  # For debugging
+            raise e
+        finally:
+            conn.close()
+
+    except Exception as e:
+        print("Error creating campaign:", str(e))  # For debugging
+        response = jsonify(
+            {"success": False, "message": f"Failed to create campaign: {str(e)}"}
+        )
+        response.headers.add("Access-Control-Allow-Origin", "*")
+        return response, 400
