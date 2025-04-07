@@ -228,9 +228,13 @@ const CreateCampaignPage = () => {
         body: q.title // Set body to title when submitting
       }));
 
-      const response = await axios.post('/api/campaigns', {
+      const response = await axios.post('/api/test-campaigns', {
         ...campaign,
         questions: questionsData
+      }, {
+        headers: {
+          'Content-Type': 'application/json'
+        }
       });
 
       if (response.data.success) {
@@ -238,9 +242,9 @@ const CreateCampaignPage = () => {
       } else {
         setError(response.data.message || 'Failed to create campaign');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating campaign:', error);
-      setError('Failed to create campaign. Please try again.');
+      setError(error.response?.data?.message || 'Failed to create campaign. Please try again.');
     } finally {
       setIsSubmitting(false);
     }

@@ -55,7 +55,7 @@ CORS(
             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"],
             "allow_headers": ["*"],
             "expose_headers": ["*"],
-            "supports_credentials": True,
+            "supports_credentials": False,
             "max_age": 3600,
         }
     },

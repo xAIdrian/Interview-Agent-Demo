@@ -3,6 +3,8 @@ import axios from 'axios';
 import { useRouter } from 'next/router';
 import { PrimaryButton } from '../../components/Button';
 import { PageTemplate } from '../../components/PageTemplate';
+import { Spinner } from '../../components/ui/Spinner';
+import { Modal } from '../../components/ui/Modal';
 
 // Define interfaces similar to create.tsx
 interface Question {
@@ -369,7 +371,7 @@ const CreateCampaignFromDocPage = () => {
     
     try {
       const response = await axios.post(
-        'http://127.0.0.1:5000/api/campaigns',
+        'http://127.0.0.1:5000/api/test-campaigns',
         formData
       );
       
@@ -454,11 +456,31 @@ const CreateCampaignFromDocPage = () => {
                 disabled={isProcessing || !file}
                 className="w-auto"
               >
-                {isProcessing ? 'Processing...' : 'Extract Campaign Information'}
+                {isProcessing ? (
+                  <div className="flex items-center space-x-2">
+                    <Spinner size="small" />
+                    <span>Processing...</span>
+                  </div>
+                ) : (
+                  'Extract Campaign Information'
+                )}
               </PrimaryButton>
             </div>
           </form>
         </div>
+        
+        {/* Loading Modal */}
+        <Modal 
+          isOpen={isProcessing}
+          title="Processing Document"
+        >
+          <div className="flex flex-col items-center space-y-4">
+            <Spinner size="large" />
+            <p className="text-gray-600 text-center">
+              Please wait while we process your document and extract campaign information...
+            </p>
+          </div>
+        </Modal>
         
         {/* Only show the campaign form if there are questions (indicating successful document processing) */}
         {campaign.questions.length > 0 && (
