@@ -106,12 +106,24 @@ const CampaignsPage = () => {
       formatter: function(cell: any) {
         // Ensure ID is a string
         const id = String(cell.getValue());
-        return `<a href="/campaigns/${id}" class="text-blue-500 hover:text-blue-700">View</a>`;
+        const isAdmin = localStorage.getItem('isAdmin') === 'true';
+        
+        if (isAdmin) {
+          return `<a href="/campaigns/${id}" class="text-blue-500 hover:text-blue-700">View</a>`;
+        } else {
+          return `<a href="/interview/${id}" class="text-green-500 hover:text-green-700">Apply</a>`;
+        }
       },
       cellClick: function(e: any, cell: any) {
         // Ensure ID is a string
         const id = String(cell.getValue());
-        window.location.href = `/campaigns/${id}`;
+        const isAdmin = localStorage.getItem('isAdmin') === 'true';
+        
+        if (isAdmin) {
+          window.location.href = `/campaigns/${id}`;
+        } else {
+          window.location.href = `/interview/${id}`;
+        }
       }
     }
   ];

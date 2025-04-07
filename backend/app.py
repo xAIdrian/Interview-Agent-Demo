@@ -42,6 +42,7 @@ from utils.file_handling import SafeTemporaryFile, safe_delete
 from flask_cors import CORS
 from datetime import timedelta
 import secrets
+from interview_routes import interview_bp
 
 
 app = Flask(__name__)
@@ -63,6 +64,7 @@ CORS(
 
 app.config.from_object(Config)
 app.register_blueprint(api_bp, url_prefix="/api")
+app.register_blueprint(interview_bp, url_prefix="/interview")
 
 # Configure the app for proper session handling
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", Config.SECRET_KEY)

@@ -150,6 +150,14 @@ const CampaignDetailsPage = () => {
               View Submissions ({submissionCount})
             </Link>
           )}
+          {!isAdmin && (
+            <Link 
+              href={`/interview/${campaignId}`}
+              className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-700"
+            >
+              Apply Now
+            </Link>
+          )}
           <Link 
             href="/campaigns"
             className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-700"
