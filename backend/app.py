@@ -55,7 +55,7 @@ CORS(
             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"],
             "allow_headers": ["*"],
             "expose_headers": ["*"],
-            "supports_credentials": False,
+            "supports_credentials": True,  # Enable credentials support
             "max_age": 3600,
         }
     },
@@ -71,6 +71,7 @@ app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=30)  # Extend to 30 da
 app.config["SESSION_COOKIE_SECURE"] = False  # Set to True in production with HTTPS
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"  # Use 'Strict' in production
+app.config["SESSION_COOKIE_DOMAIN"] = None  # Allow cross-origin cookies
 
 
 # Make sessions permanent by default
