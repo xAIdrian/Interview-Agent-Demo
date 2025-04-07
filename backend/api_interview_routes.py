@@ -10,6 +10,7 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from datetime import timedelta
 from werkzeug.exceptions import HTTPException
+from flask import Blueprint
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -17,9 +18,6 @@ logger = logging.getLogger(__name__)
 
 # Define database path
 DB_PATH = os.path.join(os.path.dirname(__file__), "livekit/interview_db.sqlite")
-
-# Initialize Flask app
-app = Flask(__name__)
 
 # Gunicorn configuration
 workers = multiprocessing.cpu_count() * 2 + 1
@@ -32,30 +30,19 @@ max_requests_jitter = 50
 graceful_timeout = 30
 preload_app = True
 
+interview_bp = Blueprint("interview", __name__)
+
 # Configure CORS
 CORS(
-    app,
+    interview_bp,
     resources={
         r"/api/*": {
-            "origins": ["http://localhost:3000", "http://127.0.0.1:3000"],
+            "origins": ["*"],
             "supports_credentials": True,
-            "allow_headers": [
-                "Content-Type",
-                "Authorization",
-                "Accept",
-                "x-retry-count",
-            ],
+            "allow_headers": ["*"],
             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         }
     },
-)
-
-# Initialize rate limiter
-limiter = Limiter(
-    app=app,
-    key_func=get_remote_address,
-    default_limits=["2000 per day", "500 per hour"],
-    storage_uri="memory://",
 )
 
 # Initialize database driver
@@ -66,23 +53,9 @@ accesslog = "-"  # Log to stdout
 errorlog = "-"  # Log to stderr
 loglevel = "info"
 
-# Production configuration
-if not app.debug:
-    # Disable Flask debug mode in production
-    app.config["DEBUG"] = False
-    # Configure production logging
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s [%(levelname)s] %(message)s",
-        handlers=[
-            logging.StreamHandler(),
-            logging.FileHandler("logs/interview_server.log"),
-        ],
-    )
-
 
 # Error handlers
-@app.errorhandler(InterviewError)
+@interview_bp.errorhandler(InterviewError)
 def handle_interview_error(error):
     logger.error(f"Interview error: {str(error)}")
     return (
@@ -91,19 +64,19 @@ def handle_interview_error(error):
     )
 
 
-@app.errorhandler(HTTPException)
+@interview_bp.errorhandler(HTTPException)
 def handle_http_error(error):
     logger.error(f"HTTP error: {str(error)}")
     return jsonify({"error": error.description, "code": error.code}), error.code
 
 
-@app.errorhandler(Exception)
+@interview_bp.errorhandler(Exception)
 def handle_generic_error(error):
     logger.error(f"Unexpected error: {str(error)}")
     return jsonify({"error": "An unexpected error occurred", "code": 500}), 500
 
 
-@app.route("/health", methods=["GET", "HEAD", "OPTIONS"])
+@interview_bp.route("/health", methods=["GET", "HEAD", "OPTIONS"])
 def health_check():
     """Simple health check endpoint."""
     if request.method == "OPTIONS":
@@ -111,8 +84,7 @@ def health_check():
     return jsonify({"status": "ok", "message": "Interview API is operational"})
 
 
-@app.route("/api/livekit/token", methods=["GET", "OPTIONS"])
-@limiter.limit("30 per minute")
+@interview_bp.route("/api/livekit/token", methods=["GET", "OPTIONS"])
 def get_livekit_token():
     """Generate and return a LiveKit token for joining a room"""
     if request.method == "OPTIONS":
@@ -139,8 +111,7 @@ def get_livekit_token():
         )
 
 
-@app.route("/api/candidates", methods=["GET"])
-@limiter.limit("100 per minute")
+@interview_bp.route("/candidates", methods=["GET"])
 def get_candidates():
     """Get all available candidate profiles with their interview questions."""
     try:
@@ -206,8 +177,7 @@ def get_candidates():
         )
 
 
-@app.route("/api/candidates/<email>", methods=["GET"])
-@limiter.limit("50 per minute")
+@interview_bp.route("/candidates/<email>", methods=["GET"])
 def get_candidate(email):
     """Get a specific candidate's profile by email."""
     try:
@@ -237,8 +207,25 @@ def get_candidate(email):
         )
 
 
-@app.route("/api/candidates/<email>/questions", methods=["GET"])
-@limiter.limit("50 per minute")
+@interview_bp.route("/campaigns/<campaignId>", methods=["GET"])
+def get_campaign(campaignId):
+    try:
+        # Get campaign details from database
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM campaigns WHERE id = ?", (campaignId,))
+        campaign = cursor.fetchone()
+        conn.close()
+
+        if campaign:
+            return jsonify(campaign)
+        else:
+            return jsonify({"error": "Campaign not found"}), 404
+    except Exception as e:
+        return jsonify({"error": f"Error fetching campaign: {str(e)}"}), 500
+
+
+@interview_bp.route("/api/candidates/<email>/questions", methods=["GET"])
 def get_candidate_questions(email):
     """Get interview questions for a specific candidate based on their position."""
     try:
@@ -273,8 +260,7 @@ def get_candidate_questions(email):
         )
 
 
-@app.route("/api/candidates", methods=["POST"])
-@limiter.limit("10 per hour")
+@interview_bp.route("/api/candidates", methods=["POST"])
 def create_candidate():
     """Create a new candidate profile."""
     try:
@@ -326,8 +312,7 @@ def create_candidate():
         )
 
 
-@app.route("/api/questions", methods=["POST"])
-@limiter.limit("20 per hour")
+@interview_bp.route("/api/questions", methods=["POST"])
 def add_question():
     """Add a new interview question."""
     try:
@@ -363,8 +348,7 @@ def add_question():
         )
 
 
-@app.route("/api/candidates/<email>/interview", methods=["GET"])
-@limiter.limit("5 per hour")
+@interview_bp.route("/api/candidates/<email>/interview", methods=["GET"])
 def get_candidate_interview_data(email):
     """Get all interview data for a candidate in a single request."""
     try:
@@ -410,7 +394,6 @@ def get_candidate_interview_data(email):
 if __name__ == "__main__":
     # Development server
     logger.info("Starting Interview Server in development mode...")
-    app.run(debug=True, port=5001)
 else:
     # Production server (Gunicorn)
     logger.info("Starting Interview Server in production mode...")

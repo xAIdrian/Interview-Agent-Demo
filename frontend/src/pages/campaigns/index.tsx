@@ -111,7 +111,7 @@ const CampaignsPage = () => {
         if (isAdmin) {
           return `<a href="/campaigns/${id}" class="text-blue-500 hover:text-blue-700">View</a>`;
         } else {
-          return `<a href="/interview/${id}" class="text-green-500 hover:text-green-700">Apply</a>`;
+          return `<a href="/live-interview/${id}" class="text-green-500 hover:text-green-700">Apply</a>`;
         }
       },
       cellClick: function(e: any, cell: any) {

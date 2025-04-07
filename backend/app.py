@@ -42,7 +42,7 @@ from utils.file_handling import SafeTemporaryFile, safe_delete
 from flask_cors import CORS
 from datetime import timedelta
 import secrets
-from interview_routes import interview_bp
+from api_interview_routes import interview_bp
 
 
 app = Flask(__name__)
