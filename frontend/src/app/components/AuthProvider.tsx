@@ -70,7 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       AuthLogger.info('Attempting login...');
       
-      const response = await axios.post('/api/login', { email, password });
+      const response = await axios.post('/login', { email, password });
       
       if (response.data.user) {
         setUser(response.data.user);

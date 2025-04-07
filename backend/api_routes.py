@@ -213,34 +213,51 @@ def handle_campaigns():
 def get_campaign(id):
     conn = get_db_connection()
     cursor = conn.cursor()
-    # Ensure ID is a string
-    campaign_id = str(id)
 
-    if session.get("is_admin"):
-        cursor.execute("SELECT * FROM campaigns WHERE id = ?", (campaign_id,))
-    else:
-        cursor.execute(
-            "SELECT * FROM campaigns WHERE id = ? AND is_public = TRUE", (campaign_id,)
-        )
+    try:
+        # Ensure ID is a string
+        campaign_id = str(id)
+        print(f"Looking for campaign with ID: {campaign_id}")  # Debug log
 
-    campaign = cursor.fetchone()
-    conn.close()
+        # Get admin status from session
+        is_admin = session.get("is_admin", False)
+        print(f"User admin status: {is_admin}")  # Debug log
 
-    if campaign:
-        columns = [
-            "id",
-            "title",
-            "max_user_submissions",
-            "max_points",
-            "is_public",
-            "campaign_context",
-            "job_description",
-        ]
-        # Use the helper function to create the response with string IDs
-        result = map_row_to_dict(campaign, columns)
-        return jsonify(result)
-    else:
-        return jsonify({"error": "Campaign not found or not accessible"}), 404
+        # Try to find the campaign with the given ID
+        if is_admin:
+            print("User is admin, searching all campaigns")  # Debug log
+            cursor.execute("SELECT * FROM campaigns WHERE id = ?", (campaign_id,))
+        else:
+            print("User is not admin, searching public campaigns")  # Debug log
+            cursor.execute(
+                "SELECT * FROM campaigns WHERE id = ? AND is_public = TRUE",
+                (campaign_id,),
+            )
+
+        campaign = cursor.fetchone()
+        print(f"Found campaign: {campaign}")  # Debug log
+
+        if campaign:
+            columns = [
+                "id",
+                "title",
+                "max_user_submissions",
+                "max_points",
+                "is_public",
+                "campaign_context",
+                "job_description",
+            ]
+            result = map_row_to_dict(campaign, columns)
+            return jsonify(result)
+        else:
+            print("Campaign not found or not accessible")  # Debug log
+            return jsonify({"error": "Campaign not found or not accessible"}), 404
+
+    except Exception as e:
+        print(f"Error retrieving campaign: {str(e)}")  # Debug log
+        return jsonify({"error": f"Error retrieving campaign: {str(e)}"}), 500
+    finally:
+        conn.close()
 
 
 @api_bp.route("/questions", methods=["GET"])
@@ -1438,10 +1455,11 @@ def login():
     session["user_id"] = str(user["id"])
     session["email"] = user["email"]
     session["name"] = user["name"]
-    session["is_admin"] = user["is_admin"]
+    session["is_admin"] = bool(user["is_admin"])  # Ensure boolean value
 
     print(f"Login successful for: {email}")
     print(f"Session after login: {session}")
+    print(f"Admin status: {session.get('is_admin')}")  # Debug log
 
     # Return user data
     return jsonify(
@@ -2038,10 +2056,10 @@ def test_create_campaign():
         cursor = conn.cursor()
 
         try:
-            # Generate BIGINT ID for campaign (using uuid int value)
+            # Generate a simpler UUID that SQLite can handle
             campaign_id = str(
-                uuid.uuid4().int & (1 << 64) - 1
-            )  # Ensures it fits in BIGINT
+                uuid.uuid4().hex[:8]
+            )  # Use first 8 characters of hex UUID
 
             # Insert campaign
             cursor.execute(
@@ -2065,8 +2083,10 @@ def test_create_campaign():
             # Insert questions
             questions_created = []
             for question in data.get("questions", []):
-                # Generate BIGINT ID for question
-                question_id = str(uuid.uuid4().int & (1 << 64) - 1)
+                # Generate a simpler UUID for questions
+                question_id = str(
+                    uuid.uuid4().hex[:8]
+                )  # Use first 8 characters of hex UUID
 
                 cursor.execute(
                     """
