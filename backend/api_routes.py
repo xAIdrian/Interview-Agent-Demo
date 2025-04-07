@@ -219,20 +219,11 @@ def get_campaign(id):
         campaign_id = str(id)
         print(f"Looking for campaign with ID: {campaign_id}")  # Debug log
 
-        # Get admin status from session
-        is_admin = session.get("is_admin", False)
-        print(f"User admin status: {is_admin}")  # Debug log
-
         # Try to find the campaign with the given ID
-        if is_admin:
-            print("User is admin, searching all campaigns")  # Debug log
-            cursor.execute("SELECT * FROM campaigns WHERE id = ?", (campaign_id,))
-        else:
-            print("User is not admin, searching public campaigns")  # Debug log
-            cursor.execute(
-                "SELECT * FROM campaigns WHERE id = ? AND is_public = TRUE",
-                (campaign_id,),
-            )
+        cursor.execute(
+            "SELECT * FROM campaigns WHERE id = ? OR CAST(id AS TEXT) = ?",
+            (campaign_id, campaign_id),
+        )
 
         campaign = cursor.fetchone()
         print(f"Found campaign: {campaign}")  # Debug log
@@ -250,8 +241,8 @@ def get_campaign(id):
             result = map_row_to_dict(campaign, columns)
             return jsonify(result)
         else:
-            print("Campaign not found or not accessible")  # Debug log
-            return jsonify({"error": "Campaign not found or not accessible"}), 404
+            print("Campaign not found")  # Debug log
+            return jsonify({"error": "Campaign not found"}), 404
 
     except Exception as e:
         print(f"Error retrieving campaign: {str(e)}")  # Debug log
