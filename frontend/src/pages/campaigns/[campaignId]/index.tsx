@@ -42,14 +42,9 @@ const CampaignDetailsPage = () => {
 
   // Setup auth on component mount
   useEffect(() => {
-    const token = localStorage.getItem('accessToken');
     const isAdminUser = localStorage.getItem('isAdmin') === 'true';
     setIsAdmin(isAdminUser);
-    
-    if (!token) {
-      router.push('/login');
-    }
-  }, [router]);
+  }, []);
 
   // Fetch campaign data
   useEffect(() => {
@@ -62,9 +57,6 @@ const CampaignDetailsPage = () => {
       try {
         setIsLoading(true);
         setError('');
-        
-        // Get the auth token from localStorage
-        const token = localStorage.getItem('access_token');
         
         // Fetch campaign details
         const campaignResponse = await axios.get(
@@ -99,12 +91,9 @@ const CampaignDetailsPage = () => {
       } catch (err) {
         console.error('Error fetching campaign data:', err);
         if (axios.isAxiosError(err)) {
-          if (err.response?.status === 401) {
-            router.push('/login');
-            AuthLogger.error('Authentication error fetching campaign', err.response?.status, err.response?.data);
-          } else if (err.response?.status === 403) {
-            setError('Admin access required to view campaign details');
-            AuthLogger.error('Permission error fetching campaign', err.response?.status, err.response?.data);
+          if (err.response?.status === 404) {
+            setError('Campaign not found');
+            AuthLogger.error('Campaign not found', err.response?.status);
           } else if (err.response?.data?.error) {
             setError(err.response.data.error);
             AuthLogger.error('API error fetching campaign', err.response?.status, err.response?.data);
@@ -122,7 +111,7 @@ const CampaignDetailsPage = () => {
     };
 
     fetchCampaignData();
-  }, [campaignId, router]);
+  }, [campaignId]);
 
   const handleStartInterview = async () => {
     try {
