@@ -189,60 +189,31 @@ def create_tables():
 
 def migrate_submissions_table_add_resume_columns():
     """Add resume_path and resume_text columns to the submissions table if they don't exist"""
-    session = get_db_session()
+    conn = get_db_connection()
+    cursor = conn.cursor()
     try:
-        # Check if columns exist
-        result = session.execute(
-            text(
-                """
-            SELECT COUNT(*) 
-            FROM INFORMATION_SCHEMA.COLUMNS 
-            WHERE TABLE_NAME = 'submissions' 
-            AND COLUMN_NAME = 'resume_path'
-        """
-            )
-        )
-        resume_path_exists = result.scalar() > 0
+        # Check if columns exist using SQLite's PRAGMA
+        cursor.execute("PRAGMA table_info(submissions)")
+        columns = [row[1] for row in cursor.fetchall()]  # Column names are in index 1
 
-        result = session.execute(
-            text(
-                """
-            SELECT COUNT(*) 
-            FROM INFORMATION_SCHEMA.COLUMNS 
-            WHERE TABLE_NAME = 'submissions' 
-            AND COLUMN_NAME = 'resume_text'
-        """
-            )
-        )
-        resume_text_exists = result.scalar() > 0
-
-        # Add columns if they don't exist
-        if not resume_path_exists:
-            session.execute(
-                text(
-                    """
-                ALTER TABLE submissions
-                ADD COLUMN resume_path VARCHAR(255) DEFAULT NULL
-            """
-                )
+        # Add resume_path if it doesn't exist
+        if "resume_path" not in columns:
+            cursor.execute(
+                "ALTER TABLE submissions ADD COLUMN resume_path VARCHAR(255) DEFAULT NULL"
             )
             print("Added resume_path column to submissions table")
 
-        if not resume_text_exists:
-            session.execute(
-                text(
-                    """
-                ALTER TABLE submissions
-                ADD COLUMN resume_text TEXT DEFAULT NULL
-            """
-                )
+        # Add resume_text if it doesn't exist
+        if "resume_text" not in columns:
+            cursor.execute(
+                "ALTER TABLE submissions ADD COLUMN resume_text TEXT DEFAULT NULL"
             )
             print("Added resume_text column to submissions table")
 
-        session.commit()
+        conn.commit()
         print("Migrations completed successfully")
     finally:
-        session.close()
+        conn.close()
 
 
 def ensure_string_id(id_value):

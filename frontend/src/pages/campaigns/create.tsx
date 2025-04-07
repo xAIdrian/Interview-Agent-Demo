@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
 import { useRouter } from 'next/router';
 import { PrimaryButton } from '../../components/Button';
 import { PageTemplate } from '../../components/PageTemplate';
-import { INTERNAL_API_TOKEN } from '../../utils/internalApiToken';
+import axios from '../../utils/axios';
+import { useAuth } from '../../app/components/AuthProvider';
+import { Spinner } from '../../components/ui/Spinner';
 
 // Define interface for Question object
 interface Question {
@@ -26,6 +27,7 @@ interface Campaign {
 
 const CreateCampaignPage = () => {
   const router = useRouter();
+  const { isAuthenticated } = useAuth();
   const [isClient, setIsClient] = useState(false);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -152,20 +154,12 @@ const CreateCampaignPage = () => {
     setError('');
     
     try {
-      const response = await axios.post(
-        'http://127.0.0.1:5000/api/optimize_prompt',
-        {
-          campaign_name: campaignTitle,
-          campaign_context,
-          question: questionTitle,
-          prompt: scoring_prompt
-        },
-        {
-          headers: {
-            'Authorization': `Bearer ${INTERNAL_API_TOKEN}`
-          }
-        }
-      );
+      const response = await axios.post('/api/optimize_prompt', {
+        campaign_name: campaignTitle,
+        campaign_context,
+        question: questionTitle,
+        prompt: scoring_prompt
+      });
       
       // Store optimized prompt
       setOptimizedPrompts({
@@ -221,71 +215,28 @@ const CreateCampaignPage = () => {
     });
   };
   
-  // Submit the form
+  // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
     setIsSubmitting(true);
-    
-    // Validate form
-    if (!campaign.title.trim()) {
-      setError('Campaign title is required');
-      setIsSubmitting(false);
-      return;
-    }
-    
-    if (campaign.questions.length === 0) {
-      setError('At least one question is required');
-      setIsSubmitting(false);
-      return;
-    }
-    
-    for (const question of campaign.questions) {
-      if (!question.title.trim()) {
-        setError('All questions must have a title');
-        setIsSubmitting(false);
-        return;
-      }
-      
-      if (!question.scoring_prompt.trim()) {
-        setError('All questions must have a scoring prompt');
-        setIsSubmitting(false);
-        return;
-      }
-      
-      if (question.max_points <= 0) {
-        setError('All questions must have max points greater than 0');
-        setIsSubmitting(false);
-        return;
-      }
-    }
-    
-    // Prepare data for API
-    const formData = {
-      ...campaign,
-      questions: campaign.questions.map(q => ({
-        ...q,
-        body: q.title // Use question title as body
-      }))
-    };
-    
+    setError('');
+
     try {
-      const response = await axios.post(
-        'http://127.0.0.1:5000/api/campaigns',
-        formData,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${INTERNAL_API_TOKEN}`
-          }
-        }
-      );
-      
-      if (response.status === 201) {
-        // Redirect to campaigns list
+      // Prepare questions data
+      const questionsData = campaign.questions.map(q => ({
+        ...q,
+        body: q.title // Set body to title when submitting
+      }));
+
+      const response = await axios.post('/api/campaigns', {
+        ...campaign,
+        questions: questionsData
+      });
+
+      if (response.data.success) {
         router.push('/campaigns');
       } else {
-        setError('Failed to create campaign');
+        setError(response.data.message || 'Failed to create campaign');
       }
     } catch (error) {
       console.error('Error creating campaign:', error);

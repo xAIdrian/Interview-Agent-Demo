@@ -34,7 +34,7 @@ const AdminIndexPage = () => {
             </Link>
 
             {/* Campaigns Management Card */}
-            <Link href="/admin/campaigns" className="block">
+            <Link href="/campaigns" className="block">
               <div className="bg-white overflow-hidden shadow rounded-lg hover:shadow-lg transition-shadow duration-200">
                 <div className="px-4 py-5 sm:p-6">
                   <h3 className="text-lg font-medium text-gray-900">Campaigns</h3>
@@ -46,7 +46,7 @@ const AdminIndexPage = () => {
             </Link>
 
             {/* Submissions Management Card */}
-            <Link href="/admin/submissions" className="block">
+            <Link href="/submissions" className="block">
               <div className="bg-white overflow-hidden shadow rounded-lg hover:shadow-lg transition-shadow duration-200">
                 <div className="px-4 py-5 sm:p-6">
                   <h3 className="text-lg font-medium text-gray-900">Submissions</h3>

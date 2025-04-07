@@ -46,26 +46,20 @@ import secrets
 
 app = Flask(__name__)
 
-# Configure CORS properly - disable the automatic CORS and let us handle it manually
-app.config["CORS_ENABLED"] = False
-
-
-# A simple function to add CORS headers to all responses
-@app.after_request
-def add_cors_headers(response):
-    # Only add headers if they don't exist already
-    if "Access-Control-Allow-Origin" not in response.headers:
-        response.headers.add("Access-Control-Allow-Origin", "http://localhost:3000")
-        response.headers.add(
-            "Access-Control-Allow-Headers",
-            "Content-Type,Authorization,Accept,x-retry-count",
-        )
-        response.headers.add(
-            "Access-Control-Allow-Methods", "GET,PUT,POST,DELETE,OPTIONS"
-        )
-        response.headers.add("Access-Control-Allow-Credentials", "true")
-    return response
-
+# Configure CORS to allow all origins, methods, and headers
+CORS(
+    app,
+    resources={
+        r"/*": {
+            "origins": "*",
+            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"],
+            "allow_headers": ["*"],
+            "expose_headers": ["*"],
+            "supports_credentials": True,
+            "max_age": 3600,
+        }
+    },
+)
 
 app.config.from_object(Config)
 app.register_blueprint(api_bp, url_prefix="/api")
@@ -90,19 +84,8 @@ def make_session_permanent():
 def health_check():
     """
     Simple health check endpoint to verify the API is running.
-    This doesn't check database connectivity to allow CORS preflight to succeed.
     """
-    # Handle preflight OPTIONS request
-    if request.method == "OPTIONS":
-        response = jsonify({"status": "ok"})
-        return response
-
-    try:
-        response = jsonify({"status": "ok", "message": "API is operational"})
-        return response, 200
-    except Exception as e:
-        app.logger.error(f"Health check failed: {str(e)}")
-        return jsonify({"status": "error", "message": str(e)}), 500
+    return jsonify({"status": "ok", "message": "API is operational"}), 200
 
 
 @app.before_first_request

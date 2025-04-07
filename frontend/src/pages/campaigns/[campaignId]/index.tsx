@@ -132,7 +132,7 @@ const CampaignDetailsPage = () => {
       const token = localStorage.getItem('access_token');
       
       // Create a submission for this campaign
-      const response = await axios.post('/api/submissions', {
+      const response = await axios.post(`${API_BASE_URL}/api/submissions`, {
         campaign_id: String(campaignId)
       });
       
