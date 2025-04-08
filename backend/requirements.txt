@@ -25,3 +25,5 @@ gevent
 pymysql
 mariadb
 bcrypt
+pandas
+openai[datalib]
