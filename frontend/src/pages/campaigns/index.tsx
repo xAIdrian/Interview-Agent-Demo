@@ -3,6 +3,14 @@ import axios from 'axios';
 import Link from 'next/link';
 import Head from 'next/head';
 import { PageTemplate } from '../../components/PageTemplate';
+import { 
+  DocumentPlusIcon, 
+  DocumentTextIcon, 
+  EyeIcon, 
+  UserPlusIcon,
+  CheckCircleIcon,
+  XCircleIcon
+} from '@heroicons/react/24/outline';
 // Import Tabulator config
 import configureTabulatorDependencies from '../../utils/tabulator-config';
 // Import Tabulator styles
@@ -79,7 +87,6 @@ const CampaignsPage = () => {
 
   const columns: ColumnDefinition[] = [
     { title: "Title", field: "title", widthGrow: 3 },
-    // Add job description column with shortened display
     { 
       title: "Job Description", 
       field: "job_description", 
@@ -96,7 +103,12 @@ const CampaignsPage = () => {
       field: "is_public", 
       hozAlign: "center" as "center", 
       widthGrow: 1,
-      formatter: (cell: any) => cell.getValue() ? "Yes" : "No" 
+      formatter: (cell: any) => {
+        const isPublic = cell.getValue();
+        return isPublic ? 
+          '<div class="flex items-center justify-center text-green-600"><CheckCircleIcon class="h-5 w-5" /></div>' : 
+          '<div class="flex items-center justify-center text-red-600"><XCircleIcon class="h-5 w-5" /></div>';
+      }
     },
     { 
       title: "Actions", 
@@ -104,14 +116,23 @@ const CampaignsPage = () => {
       hozAlign: "center" as "center",
       widthGrow: 1,
       formatter: function(cell: any) {
-        // Ensure ID is a string
         const id = String(cell.getValue());
         const isAdmin = localStorage.getItem('isAdmin') === 'true';
         
         if (isAdmin) {
-          return `<a href="/campaigns/${id}" class="text-blue-500 hover:text-blue-700">View</a>`;
+          return `<div class="flex items-center justify-center">
+            <a href="/campaigns/${id}" class="text-blue-500 hover:text-blue-700 flex items-center">
+              <EyeIcon class="h-5 w-5 mr-1" />
+              View
+            </a>
+          </div>`;
         } else {
-          return `<a href="/live-interview/${id}" class="text-green-500 hover:text-green-700">Apply</a>`;
+          return `<div class="flex items-center justify-center">
+            <a href="/live-interview/${id}" class="text-green-500 hover:text-green-700 flex items-center">
+              <UserPlusIcon class="h-5 w-5 mr-1" />
+              Apply
+            </a>
+          </div>`;
         }
       },
       cellClick: function(e: any, cell: any) {
@@ -152,7 +173,25 @@ const CampaignsPage = () => {
       </Head>
       <PageTemplate title="Campaigns" maxWidth="lg">
         <div className="w-full bg-white shadow-md rounded-lg p-6">
-          <h2 className="text-2xl font-bold mb-6">Campaigns</h2>
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-bold">Campaigns</h2>
+            <div className="flex space-x-4">
+              <Link 
+                href="/campaigns/create" 
+                className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700 flex items-center"
+              >
+                <DocumentPlusIcon className="h-5 w-5 mr-2" />
+                Create Campaign
+              </Link>
+              <Link 
+                href="/campaigns/create-from-doc" 
+                className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-700 flex items-center"
+              >
+                <DocumentTextIcon className="h-5 w-5 mr-2" />
+                Import from Doc
+              </Link>
+            </div>
+          </div>
 
           {error && (
             <div className="mb-4 p-2 bg-red-100 text-red-700 rounded">
@@ -182,19 +221,7 @@ const CampaignsPage = () => {
               )}
             </>
           )}
-
-          <div className="flex space-x-4 mt-6">
-            <Link href="/campaigns/create" 
-              className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700">
-              Create Campaign from Scratch
-            </Link>
-            <Link href="/campaigns/create-from-doc" 
-              className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-700">
-              Create Campaign from Document
-            </Link>
-          </div>
         </div>
-        {/* Remove the inline styles since they're now in the external CSS file */}
       </PageTemplate>
     </>
   );

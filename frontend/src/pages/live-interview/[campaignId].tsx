@@ -4,6 +4,8 @@ import { useRouter } from 'next/router';
 import axios from 'axios';
 import LiveKitInterviewComponent from '@/components/livekit/LiveKitInterviewComponent';
 import { useLiveKitInterview } from '@/components/livekit/LiveKitInterviewForm';
+import Link from 'next/link';
+import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 
 interface Campaign {
   id: string;
@@ -101,12 +103,28 @@ const LiveKitInterviewPage = () => {
       </Head>
       
       <div className="container mx-auto px-4 py-8">
+        {/* Header Section */}
+        <div className="mb-8">
+          <div className="flex items-center gap-4 mb-6">
+            <Link 
+              href="/campaigns" 
+              className="flex items-center text-gray-600 hover:text-gray-900 transition-colors"
+            >
+              <ArrowLeftIcon className="h-5 w-5 mr-2" />
+              Back to Campaigns
+            </Link>
+          </div>
+          <h1 className="text-3xl font-bold text-gray-900">
+            {campaign?.title || 'AI Interview'}
+          </h1>
+        </div>
+
         {campaign && (
           <div className="mb-8">
             <h1 className="text-3xl font-bold mb-4">{campaign.title}</h1>
             
             <div className="bg-white shadow rounded-lg p-6 mb-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid  gap-6">
                 <div>
                   <h2 className="text-xl font-semibold mb-2">Job Description</h2>
                   <p className="text-gray-700 mb-4">{campaign.job_description}</p>
