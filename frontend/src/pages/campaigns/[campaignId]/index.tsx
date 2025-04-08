@@ -97,15 +97,15 @@ const CampaignDetailsPage = () => {
       setIsLoading(true);
       
       // Create a submission for this campaign
-      const response = await axios.post(`/api/submissions`, {
-        campaign_id: String(campaignId)
-      });
+      // const response = await axios.post(`/api/submissions`, {
+      //   campaign_id: String(campaignId)
+      // });
       
-      // Ensure the submission ID is a string
-      const newSubmissionId = String(response.data.id);
+      // // Ensure the submission ID is a string
+      // const newSubmissionId = String(response.data.id);
       
       // Navigate to the interview page with the submission ID
-      router.push(`/interview/${newSubmissionId}`);
+      router.push(`/live-interview/${campaignId}`);
     } catch (error) {
       console.error('Error creating submission:', error);
       setErrorMessage('Failed to start interview. Please try again.');
