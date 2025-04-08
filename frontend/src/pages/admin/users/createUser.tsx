@@ -30,7 +30,7 @@ const CreateUserPage = () => {
     setError('');
     
     try {
-      const response = await axios.post('https://interview-agent-demo.onrender.com/api/users/create', 
+      const response = await axios.post('https://main-service-48k0.onrender.com/api/users/create', 
         { 
           email, 
           name, 

@@ -154,7 +154,7 @@ const LiveKitInterviewComponent: React.FC<LiveKitInterviewComponentProps> = ({
   const handleDisconnect = async () => {
     // try {
     //   // Submit the transcript before disconnecting
-    //   await axios.put(`https://interview-agent-demo.onrender.comnt-demo.onrender.comnt-demo.onrender.comnt-demo.onrender.comnt-demo.onrender.comnt-demo.onrender.com/api/submissions/${submissionId}`, {
+    //   await axios.put(`https://main-service-48k0.onrender.comnt-demo.onrender.comnt-demo.onrender.comnt-demo.onrender.comnt-demo.onrender.comnt-demo.onrender.com/api/submissions/${submissionId}`, {
     //     transcript
     //   });
     // } catch (error) {
