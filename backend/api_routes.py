@@ -762,6 +762,11 @@ def create_submission():
     if not data or "campaign_id" not in data:
         return jsonify({"error": "campaign_id is required"}), 400
 
+    # Get user ID from session
+    user_id = session.get("user_id")
+    if not user_id:
+        return jsonify({"error": "Authentication required"}), 401
+
     # Ensure campaign_id is a string
     campaign_id = str(data["campaign_id"])
 
@@ -779,13 +784,10 @@ def create_submission():
         # Generate UUID using Python's uuid module
         submission_id = str(uuid.uuid4())
 
-        # Use a default public user ID for submissions
-        public_user_id = "00000000-0000-0000-0000-000000000000"
-
-        # Create submission with UUID and public user ID
+        # Create submission with UUID and authenticated user ID
         cursor.execute(
             "INSERT INTO submissions (id, campaign_id, user_id) VALUES (?, ?, ?) RETURNING *",
-            (submission_id, campaign_id, public_user_id),
+            (submission_id, campaign_id, user_id),
         )
         submission = cursor.fetchone()
         conn.commit()
@@ -819,21 +821,39 @@ def create_submission_answer():
     data = request.json
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute(
-        """
-        INSERT INTO submission_answers (id, submission_id, question_id, video_path, transcript)
-        VALUES (UUID_SHORT(), ?, ?, ?, ?)
-    """,
-        (
-            data["submission_id"],
-            data["question_id"],
-            data["video_path"],
-            data["transcript"],
-        ),
-    )
-    conn.commit()
-    conn.close()
-    return jsonify({"message": "Submission answer created successfully"}), 201
+
+    try:
+        # Generate UUID in Python
+        submission_answer_id = str(uuid.uuid4())
+
+        cursor.execute(
+            """
+            INSERT INTO submission_answers (id, submission_id, question_id, video_path, transcript)
+            VALUES (?, ?, ?, ?, ?)
+        """,
+            (
+                submission_answer_id,
+                data["submission_id"],
+                data["question_id"],
+                data["video_path"],
+                data["transcript"],
+            ),
+        )
+        conn.commit()
+        return (
+            jsonify(
+                {
+                    "message": "Submission answer created successfully",
+                    "id": submission_answer_id,
+                }
+            ),
+            201,
+        )
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
 
 
 @api_bp.route("/campaigns/create-from-doc", methods=["POST"])
@@ -1127,44 +1147,75 @@ def update_submission_answer(id):
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # Update the submission answer
-    cursor.execute(
-        """
-        UPDATE submission_answers
-        SET transcript = ?, score = ?, score_rationale = ?
-        WHERE id = ?
-    """,
-        (data.get("transcript"), data.get("score"), data.get("score_rationale"), id),
-    )
+    try:
+        # First check if the submission answer exists
+        cursor.execute("SELECT id FROM submission_answers WHERE id = ?", (id,))
+        if not cursor.fetchone():
+            conn.close()
+            return jsonify({"error": "Submission answer not found"}), 404
 
-    # Get the submission_id for the updated answer
-    cursor.execute("SELECT submission_id FROM submission_answers WHERE id = ?", (id,))
-    submission_id = cursor.fetchone()[0]
+        # Convert transcript to JSON string if it's a list
+        transcript = data.get("transcript")
+        if isinstance(transcript, list):
+            transcript = json.dumps(transcript)
 
-    # Recalculate the total score for the submission
-    cursor.execute(
-        """
-        SELECT SUM(score)
-        FROM submission_answers
-        WHERE submission_id = ?
-    """,
-        (submission_id,),
-    )
-    total_score = cursor.fetchone()[0] or 0  # Use 0 if the sum is None
+        # Validate and convert score to integer or None
+        score = data.get("score")
+        if score is not None:
+            try:
+                score = int(score)
+            except (ValueError, TypeError):
+                return jsonify({"error": "Score must be an integer"}), 400
 
-    # Update the submission with the new total score
-    cursor.execute(
-        """
-        UPDATE submissions
-        SET total_points = ?
-        WHERE id = ?
-    """,
-        (total_score, submission_id),
-    )
+        # Update the submission answer
+        cursor.execute(
+            """
+            UPDATE submission_answers
+            SET transcript = ?, score = ?, score_rationale = ?
+            WHERE id = ?
+        """,
+            (transcript, score, data.get("score_rationale"), id),
+        )
 
-    conn.commit()
-    conn.close()
-    return jsonify({"message": "Submission answer updated successfully"}), 200
+        # Get the submission_id for the updated answer
+        cursor.execute(
+            "SELECT submission_id FROM submission_answers WHERE id = ?", (id,)
+        )
+        result = cursor.fetchone()
+        if not result:
+            conn.rollback()
+            return jsonify({"error": "Submission answer not found"}), 404
+
+        submission_id = result[0]
+
+        # Recalculate the total score for the submission
+        cursor.execute(
+            """
+            SELECT SUM(score)
+            FROM submission_answers
+            WHERE submission_id = ? AND score IS NOT NULL
+        """,
+            (submission_id,),
+        )
+        total_score = cursor.fetchone()[0] or 0  # Use 0 if the sum is None
+
+        # Update the submission with the new total score
+        cursor.execute(
+            """
+            UPDATE submissions
+            SET total_points = ?
+            WHERE id = ?
+        """,
+            (total_score, submission_id),
+        )
+
+        conn.commit()
+        return jsonify({"message": "Submission answer updated successfully"}), 200
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
 
 
 # DELETE routes
