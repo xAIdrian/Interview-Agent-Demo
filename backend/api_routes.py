@@ -41,16 +41,6 @@ from livekit.token_server import LiveKitTokenServer
 # Create a Blueprint for the API routes
 api_bp = Blueprint("api", __name__)
 
-# Apply CORS specifically to the API blueprint
-CORS(
-    api_bp,
-    origins=["*"],
-    supports_credentials=True,
-    allow_headers=["*"],
-    methods=["*"],
-    max_age=3600,
-)
-
 # Configure your S3 bucket name (already created)
 S3_BUCKET = Config.S3_BUCKET_NAME
 
@@ -292,30 +282,20 @@ def get_question(id):
 
 
 @api_bp.route("/submissions", methods=["GET"])
-# @admin_required
 def get_submissions():
     conn = get_db_connection()
     cursor = conn.cursor()
-
-    # Get user identity from session
-    user_id = session.get("user_id")
-    is_admin = session.get("is_admin", False)
 
     # Build query with filters
     args = request.args.to_dict()
     base_query = "SELECT * FROM submissions"
 
-    # If not admin, limit to own submissions
-    if not is_admin and "user_id" not in args:
-        if "campaign_id" in args:
-            base_query += " WHERE campaign_id = ? AND user_id = ?"
-            cursor.execute(base_query, (args["campaign_id"], user_id))
-        else:
-            base_query += " WHERE user_id = ?"
-            cursor.execute(base_query, (user_id,))
-    else:
+    # Apply filters if any
+    if args:
         filter_query, filter_values = build_filter_query(args)
         cursor.execute(f"{base_query} {filter_query}", filter_values)
+    else:
+        cursor.execute(base_query)
 
     submissions = cursor.fetchall()
     columns = [
@@ -782,11 +762,6 @@ def create_submission():
     if not data or "campaign_id" not in data:
         return jsonify({"error": "campaign_id is required"}), 400
 
-    # Get user identity from session directly
-    user_id = session.get("user_id")
-    if not user_id:
-        return jsonify({"error": "Authentication required"}), 401
-
     # Ensure campaign_id is a string
     campaign_id = str(data["campaign_id"])
 
@@ -801,34 +776,16 @@ def create_submission():
             conn.close()
             return jsonify({"error": "Campaign not found"}), 404
 
-        # Verify campaign is accessible to the user (public or admin)
-        is_admin = session.get("is_admin", False)
-        if not is_admin and not campaign[4]:  # campaign[4] is is_public field
-            conn.close()
-            return jsonify({"error": "You do not have access to this campaign"}), 403
+        # Generate UUID using Python's uuid module
+        submission_id = str(uuid.uuid4())
 
-        # Check max submissions per user if set
-        if campaign[2] > 0:  # max_user_submissions
-            cursor.execute(
-                "SELECT COUNT(*) FROM submissions WHERE campaign_id = ? AND user_id = ? AND is_complete = 1",
-                (campaign_id, user_id),
-            )
-            count = cursor.fetchone()[0]
-            if count >= campaign[2]:
-                conn.close()
-                return (
-                    jsonify(
-                        {
-                            "error": f"Maximum submissions ({campaign[2]}) reached for this campaign"
-                        }
-                    ),
-                    400,
-                )
+        # Use a default public user ID for submissions
+        public_user_id = "00000000-0000-0000-0000-000000000000"
 
-        # Create submission with UUID
+        # Create submission with UUID and public user ID
         cursor.execute(
-            "INSERT INTO submissions (id, campaign_id, user_id) VALUES (UUID_SHORT(), ?, ?) RETURNING *",
-            (campaign_id, user_id),
+            "INSERT INTO submissions (id, campaign_id, user_id) VALUES (?, ?, ?) RETURNING *",
+            (submission_id, campaign_id, public_user_id),
         )
         submission = cursor.fetchone()
         conn.commit()
