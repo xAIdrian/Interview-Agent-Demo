@@ -75,10 +75,6 @@ const CreateUserPage = () => {
   return (
     <PageTemplate title="Create New User">
       <div className="bg-white shadow-md rounded-lg p-6">
-        <div className="flex items-center mb-6">
-          <UserPlusIcon className="h-8 w-8 text-blue-600 mr-3" />
-          <h1 className="text-2xl font-bold">Create New User</h1>
-        </div>
         
         {error && (
           <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md flex items-center">

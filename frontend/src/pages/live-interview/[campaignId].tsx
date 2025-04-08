@@ -24,9 +24,19 @@ interface Campaign {
     max_points: number;
     order_index: number;
   }>;
+  submissionId?: string;
 }
 
-const LiveKitInterviewPage = () => {
+interface Submission {
+  id: string;
+  campaign_id: string;
+  user_id: string;
+  is_complete: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+const LiveKitInterviewPage: React.FC = () => {
   const router = useRouter();
   const { campaignId } = router.query;
   const [token, setToken] = useState<string | null>(null);
@@ -34,38 +44,54 @@ const LiveKitInterviewPage = () => {
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [submissionId, setSubmissionId] = useState<string | null>(null);
   const { handleStartInterview, loading: interviewLoading, error: interviewError } = useLiveKitInterview();
   
   useEffect(() => {
-    const fetchCampaign = async () => {
-      if (!campaignId) return;
-      
-      try {
-        const response = await axios.get(
-          `http://127.0.0.1:5001/interview/campaigns/${campaignId}`
-        );
-        setCampaign(response.data);
-        setError(null);
-      } catch (err) {
-        console.error('Error fetching campaign:', err);
-        if (axios.isAxiosError(err) && err.response?.status === 401) {
-          setError('Please log in to view this campaign');
-          router.push('/login');
-        } else {
-          setError('Failed to load campaign details');
+    if (campaignId) {
+      const fetchCampaignData = async () => {
+        try {
+          const response = await fetch(`/api/campaigns/${campaignId}`);
+          if (!response.ok) {
+            if (response.status === 401) {
+              router.push('/login');
+              return;
+            }
+            throw new Error('Failed to fetch campaign data');
+          }
+          const data = await response.json();
+          setCampaign(data);
+          setSubmissionId(data.submissionId || null);
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'An error occurred');
+        } finally {
+          setLoading(false);
         }
-      } finally {
-        setLoading(false);
-      }
-    };
+      };
 
-    fetchCampaign();
+      fetchCampaignData();
+    }
   }, [campaignId, router]);
+
+  const createSubmission = async (campaignId: string) => {
+    try {
+      const response = await axios.post(
+        `http://127.0.0.1:5000/api/submissions`,
+        {
+          campaign_id: campaignId,
+          is_complete: false
+        }
+      );
+      return response.data;
+    } catch (err) {
+      console.error('Error creating submission:', err);
+      throw new Error('Failed to create submission');
+    }
+  };
   
-  const onFormSubmit = (token: string, roomName: string) => {
-    console.log('Parent component received interview data:', { token, roomName });
+  const onFormSubmit = async (token: string, room: string) => {
     setToken(token);
-    setRoom(roomName);
+    setRoom(room);
   };
   
   const onDisconnect = () => {
@@ -94,7 +120,22 @@ const LiveKitInterviewPage = () => {
       </div>
     );
   }
-  
+
+  if (!campaign) {
+    return <div>Campaign not found</div>;
+  }
+
+  if (token && room) {
+    return (
+      <LiveKitInterviewComponent
+        onDisconnect={onDisconnect}
+        token={token}
+        room={room}
+        submissionId={submissionId || ''}
+      />
+    );
+  }
+
   return (
     <>
       <Head>
@@ -124,7 +165,7 @@ const LiveKitInterviewPage = () => {
             <h1 className="text-3xl font-bold mb-4">{campaign.title}</h1>
             
             <div className="bg-white shadow rounded-lg p-6 mb-6">
-              <div className="grid  gap-6">
+              <div className="grid gap-6">
                 <div>
                   <h2 className="text-xl font-semibold mb-2">Job Description</h2>
                   <p className="text-gray-700 mb-4">{campaign.job_description}</p>
@@ -160,10 +201,16 @@ const LiveKitInterviewPage = () => {
               onClick={async () => {
                 if (!campaignId) return;
                 try {
-                  const { token, room } = await handleStartInterview(campaignId as string);
+                  // First create a submission
+                  const newSubmission = await createSubmission(campaignId as string);
+                  setSubmissionId(newSubmission.id);
+                  
+                  // Then start the interview with the submission ID
+                  const { token, room } = await handleStartInterview(campaignId as string, newSubmission.id);
                   onFormSubmit(token, room);
                 } catch (err) {
-                  // Error is already handled in the hook
+                  console.error('Error starting interview:', err);
+                  setError(err instanceof Error ? err.message : 'Failed to start interview');
                 }
               }}
               disabled={interviewLoading || !campaignId}
@@ -187,6 +234,7 @@ const LiveKitInterviewPage = () => {
             token={token} 
             room={room as string} 
             onDisconnect={onDisconnect}
+            submissionId={submissionId || ''}
           />
         )}
       </div>

@@ -7,9 +7,11 @@ import sys
 import os
 
 # Add the backend directory to the Python path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from livekit.interview_api import AssistantFnc
+backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, backend_dir)
+
 from database import get_db_connection, map_row_to_dict
+from interview_api import AssistantFnc
 from prompts import INTERVIEW_PROMPT_TEMPLATE
 import logging
 

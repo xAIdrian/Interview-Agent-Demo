@@ -10,16 +10,16 @@ export const useLiveKitInterview = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleStartInterview = async (campaignId: string) => {
+  const handleStartInterview = async (campaignId: string, submissionId: string) => {
     setLoading(true);
     setError(null);
 
     try {
-      console.log('Starting interview for campaign:', campaignId);
+      console.log('Starting interview for campaign:', campaignId, 'and submission:', submissionId);
       // const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://interview-server-1zvi.onrender.com';
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5001';
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5000';
       const response = await fetch(
-        `${apiUrl}/api/livekit/token?campaignId=${encodeURIComponent(campaignId)}`,
+        `${apiUrl}/api/livekit/token?campaignId=${encodeURIComponent(campaignId)}&submissionId=${encodeURIComponent(submissionId)}`,
         {
           method: 'GET',
           headers: {
@@ -60,7 +60,7 @@ const LiveKitInterviewForm: React.FC<LiveKitInterviewFormProps> = ({ onSubmit, c
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const { token, room } = await handleStartInterview(campaignId);
+      const { token, room } = await handleStartInterview(campaignId, '');
       onSubmit(token, room);
     } catch (err) {
       // Error is already handled in the hook
