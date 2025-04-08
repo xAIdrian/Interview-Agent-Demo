@@ -3,6 +3,13 @@ import axios from 'axios';
 import Link from 'next/link';
 import { PageTemplate } from '../../../components/PageTemplate';
 import { AuthLogger } from '../../../utils/logging';
+import { 
+  UserPlusIcon, 
+  EyeIcon, 
+  PencilSquareIcon,
+  ShieldCheckIcon,
+  UserIcon
+} from '@heroicons/react/24/outline';
 // Import Tabulator config
 import configureTabulatorDependencies from '../../../utils/tabulator-config';
 // Import Tabulator styles
@@ -75,7 +82,17 @@ const UsersPage = () => {
       title: "Role", 
       field: "is_admin", 
       widthGrow: 1.5, 
-      formatter: (cell: any) => cell.getValue() ? "Admin" : "Candidate" 
+      formatter: (cell: any) => {
+        const isAdmin = cell.getValue();
+        return `
+          <div class="flex items-center justify-center">
+            ${isAdmin ? 
+              '<div class="flex items-center text-indigo-600"><ShieldCheckIcon class="h-5 w-5 mr-1" />Admin</div>' : 
+              '<div class="flex items-center text-gray-600"><UserIcon class="h-5 w-5 mr-1" />Candidate</div>'
+            }
+          </div>
+        `;
+      }
     },
     { 
       title: "Actions", 
@@ -85,9 +102,15 @@ const UsersPage = () => {
       formatter: function(cell: any) {
         const id = cell.getValue();
         return `
-          <div class="flex space-x-2 justify-center">
-            <a href="/admin/users/${id}" class="text-blue-500 hover:text-blue-700">View</a>
-            <a href="/admin/users/${id}/edit" class="text-indigo-500 hover:text-indigo-700">Edit</a>
+          <div class="flex space-x-4 justify-center">
+            <a href="/admin/users/${id}" class="text-blue-500 hover:text-blue-700 flex items-center">
+              <EyeIcon class="h-5 w-5 mr-1" />
+              View
+            </a>
+            <a href="/admin/users/${id}/edit" class="text-indigo-500 hover:text-indigo-700 flex items-center">
+              <PencilSquareIcon class="h-5 w-5 mr-1" />
+              Edit
+            </a>
           </div>
         `;
       },
@@ -128,8 +151,9 @@ const UsersPage = () => {
           <h1 className="text-2xl font-bold">User Management</h1>
           <Link 
             href="/admin/users/create" 
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md font-medium"
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md font-medium flex items-center"
           >
+            <UserPlusIcon className="h-5 w-5 mr-2" />
             Add New User
           </Link>
         </div>

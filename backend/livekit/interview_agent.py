@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 import sys
 import os
 from interview_api import AssistantFnc
+from prompts import INTERVIEW_PROMPT_TEMPLATE
 
 # Add the backend directory to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -18,26 +19,6 @@ load_dotenv()
 # Configure logging
 logger = logging.getLogger("interview-agent")
 logger.setLevel(logging.INFO)
-
-# Define the interview prompt template
-INTERVIEW_PROMPT_TEMPLATE = """
-You are an AI interviewer conducting a job interview. Your role is to:
-
-1. Start with a brief introduction of yourself and the interview process
-2. Ask the questions provided in order
-3. Listen to the candidate's responses
-4. Ask follow-up questions when appropriate to get more details
-5. Maintain a professional and friendly tone
-6. Guide the candidate through the interview process
-
-Job Description:
-{job_description}
-
-Interview Questions:
-{questions}
-
-Please conduct the interview professionally and help the candidate feel comfortable while gathering the necessary information.
-"""
 
 
 async def entrypoint(ctx: JobContext):

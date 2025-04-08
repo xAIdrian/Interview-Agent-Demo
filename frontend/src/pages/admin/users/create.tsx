@@ -3,6 +3,13 @@ import { useRouter } from 'next/navigation';
 import axios from 'axios';
 import { PageTemplate } from '../../../components/PageTemplate';
 import { AuthLogger } from '../../../utils/logging';
+import { 
+  UserPlusIcon, 
+  ArrowPathIcon,
+  CheckCircleIcon,
+  XCircleIcon,
+  ShieldCheckIcon
+} from '@heroicons/react/24/outline';
 
 const CreateUserPage = () => {
   const router = useRouter();
@@ -68,16 +75,21 @@ const CreateUserPage = () => {
   return (
     <PageTemplate title="Create New User">
       <div className="bg-white shadow-md rounded-lg p-6">
-        <h1 className="text-2xl font-bold mb-6">Create New User</h1>
+        <div className="flex items-center mb-6">
+          <UserPlusIcon className="h-8 w-8 text-blue-600 mr-3" />
+          <h1 className="text-2xl font-bold">Create New User</h1>
+        </div>
         
         {error && (
-          <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md">
+          <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md flex items-center">
+            <XCircleIcon className="h-5 w-5 mr-2" />
             {error}
           </div>
         )}
         
         {successMessage && (
-          <div className="mb-4 p-3 bg-green-100 text-green-700 rounded-md">
+          <div className="mb-4 p-3 bg-green-100 text-green-700 rounded-md flex items-center">
+            <CheckCircleIcon className="h-5 w-5 mr-2" />
             {successMessage}
           </div>
         )}
@@ -137,7 +149,8 @@ const CreateUserPage = () => {
               onChange={handleChange}
               className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
             />
-            <label htmlFor="is_admin" className="ml-2 block text-sm text-gray-900">
+            <label htmlFor="is_admin" className="ml-2 block text-sm text-gray-900 flex items-center">
+              <ShieldCheckIcon className="h-5 w-5 mr-1 text-indigo-600" />
               Admin User
             </label>
           </div>
@@ -146,11 +159,21 @@ const CreateUserPage = () => {
             <button
               type="submit"
               disabled={loading}
-              className={`w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+              className={`w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex items-center justify-center ${
                 loading ? 'opacity-75 cursor-not-allowed' : ''
               }`}
             >
-              {loading ? 'Creating...' : 'Create User'}
+              {loading ? (
+                <>
+                  <ArrowPathIcon className="h-5 w-5 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <UserPlusIcon className="h-5 w-5 mr-2" />
+                  Create User
+                </>
+              )}
             </button>
           </div>
         </form>
