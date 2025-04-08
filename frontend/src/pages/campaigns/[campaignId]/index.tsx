@@ -51,43 +51,22 @@ const CampaignDetailsPage = () => {
     const fetchCampaignData = async () => {
       if (!campaignId) return;
 
-      // Ensure campaignId is treated as string
-      const campaignIdString = String(campaignId);
-
       try {
         setIsLoading(true);
-        setError('');
-        
-        // Fetch campaign details
-        const campaignResponse = await axios.get(
-          `${API_BASE_URL}/api/campaigns/${campaignIdString}`
-        );
-        
-        setCampaign(campaignResponse.data);
-        AuthLogger.info('Campaign details loaded successfully');
+        const response = await axios.get(`/api/campaigns/${campaignId}`);
+        setCampaign(response.data);
         
         // Fetch questions for this campaign
-        const questionsResponse = await axios.get(
-          `${API_BASE_URL}/api/questions?campaign_id=${campaignIdString}`
-        );
-        
+        const questionsResponse = await axios.get(`/api/campaigns/${campaignId}`);
         setQuestions(questionsResponse.data);
-        AuthLogger.info(`Loaded ${questionsResponse.data.length} questions for campaign`);
         
-        // Fetch submission count for this campaign
-        try {
-          const submissionsResponse = await axios.get(
-            `${API_BASE_URL}/api/submissions?campaign_id=${campaignIdString}`
-          );
-          
+        // If admin, fetch submission count
+        if (isAdmin) {
+          const submissionsResponse = await axios.get(`/api/submissions?campaign_id=${campaignId}`);
           setSubmissionCount(submissionsResponse.data.length);
-          AuthLogger.info(`Found ${submissionsResponse.data.length} submissions for campaign`);
-        } catch (submissionErr) {
-          console.error('Error fetching submissions:', submissionErr);
-          // Don't set an error for this, just set count to 0
-          setSubmissionCount(0);
-          AuthLogger.error('Failed to fetch submissions', submissionErr);
         }
+        
+        AuthLogger.info(`Loaded campaign #${campaignId} successfully`);
       } catch (err) {
         console.error('Error fetching campaign data:', err);
         if (axios.isAxiosError(err)) {
@@ -111,17 +90,14 @@ const CampaignDetailsPage = () => {
     };
 
     fetchCampaignData();
-  }, [campaignId]);
+  }, [campaignId, isAdmin]);
 
   const handleStartInterview = async () => {
     try {
       setIsLoading(true);
       
-      // Get the auth token from localStorage
-      const token = localStorage.getItem('access_token');
-      
       // Create a submission for this campaign
-      const response = await axios.post(`${API_BASE_URL}/api/submissions`, {
+      const response = await axios.post(`/api/submissions`, {
         campaign_id: String(campaignId)
       });
       
@@ -138,30 +114,39 @@ const CampaignDetailsPage = () => {
   };
 
   return (
-    <PageTemplate title="Campaign Details" maxWidth="lg">
+    <PageTemplate title={isAdmin ? "Campaign Details" : "Position Details"} maxWidth="lg">
       <div className="flex justify-end mb-4 items-center">
         <div className="space-x-2">
           {isAdmin && (
-            <Link 
-              href={`/campaigns/${campaignId}/submissions`}
-              className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700"
-            >
-              View Submissions ({submissionCount})
-            </Link>
+            <>
+              <Link 
+                href={`/campaigns/${campaignId}/submissions`}
+                className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700"
+              >
+                View Submissions ({submissionCount})
+              </Link>
+              <Link 
+                href={`/campaigns/${campaignId}/edit`}
+                className="bg-indigo-500 text-white px-4 py-2 rounded hover:bg-indigo-700"
+              >
+                Edit Campaign
+              </Link>
+            </>
           )}
           {!isAdmin && (
-            <Link 
-              href={`/interview/${campaignId}`}
+            <button
+              onClick={handleStartInterview}
               className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-700"
+              disabled={isLoading}
             >
-              Apply Now
-            </Link>
+              {isLoading ? 'Starting...' : 'Start Interview'}
+            </button>
           )}
           <Link 
             href="/campaigns"
             className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-700"
           >
-            Back to Campaigns
+            Back to {isAdmin ? 'Campaigns' : 'Positions'}
           </Link>
         </div>
       </div>
@@ -172,9 +157,9 @@ const CampaignDetailsPage = () => {
         </div>
       )}
       
-      {!isAdmin && (
-        <div className="mb-4 p-2 bg-yellow-100 text-yellow-700 rounded">
-          Note: Some features require admin privileges.
+      {errorMessage && (
+        <div className="mb-4 p-2 bg-red-100 text-red-700 rounded">
+          {errorMessage}
         </div>
       )}
       
@@ -186,7 +171,7 @@ const CampaignDetailsPage = () => {
         <>
           <div className="bg-white shadow overflow-hidden sm:rounded-lg mb-6">
             <div className="px-4 py-5 sm:px-6">
-              <h2 className="text-lg leading-6 font-medium text-gray-900">Campaign Information</h2>
+              <h2 className="text-lg leading-6 font-medium text-gray-900">Position Information</h2>
             </div>
             <div className="border-t border-gray-200">
               <dl>
@@ -195,6 +180,10 @@ const CampaignDetailsPage = () => {
                   <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{campaign.title}</dd>
                 </div>
                 <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                  <dt className="text-sm font-medium text-gray-500">Job Description</dt>
+                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{campaign.job_description}</dd>
+                </div>
+                <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                   <dt className="text-sm font-medium text-gray-500">Status</dt>
                   <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
                     <span className={`px-2 py-1 rounded ${campaign.is_public ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
@@ -202,60 +191,40 @@ const CampaignDetailsPage = () => {
                     </span>
                   </dd>
                 </div>
-                <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                  <dt className="text-sm font-medium text-gray-500">Maximum Points</dt>
-                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{campaign.max_points}</dd>
-                </div>
-                <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                  <dt className="text-sm font-medium text-gray-500">Max Submissions Per User</dt>
-                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{campaign.max_user_submissions}</dd>
-                </div>
-                <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                  <dt className="text-sm font-medium text-gray-500">Campaign Context</dt>
-                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 whitespace-pre-line">{campaign.campaign_context}</dd>
-                </div>
-                <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                  <dt className="text-sm font-medium text-gray-500">Job Description</dt>
-                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 whitespace-pre-line">{campaign.job_description}</dd>
-                </div>
               </dl>
             </div>
           </div>
 
-          <h2 className="text-xl font-bold mb-4">Questions ({questions.length})</h2>
-          
-          {questions.length > 0 ? (
-            questions.map((question) => (
-              <div key={question.id} className="bg-white shadow overflow-hidden sm:rounded-lg mb-4">
-                <div className="px-4 py-5 sm:px-6">
-                  <h3 className="text-lg leading-6 font-medium text-gray-900">{question.title}</h3>
-                  <p className="mt-1 max-w-2xl text-sm text-gray-500">Max Points: {question.max_points}</p>
-                </div>
-                <div className="border-t border-gray-200">
-                  <dl>
-                    <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                      <dt className="text-sm font-medium text-gray-500">Question</dt>
-                      <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 whitespace-pre-line">{question.body}</dd>
-                    </div>
-                    {isAdmin && (
-                      <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                        <dt className="text-sm font-medium text-gray-500">Scoring Prompt</dt>
-                        <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 whitespace-pre-line">{question.scoring_prompt}</dd>
-                      </div>
-                    )}
-                  </dl>
-                </div>
+          {isAdmin && (
+            <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+              <div className="px-4 py-5 sm:px-6">
+                <h2 className="text-lg leading-6 font-medium text-gray-900">Interview Questions</h2>
               </div>
-            ))
-          ) : (
-            <div className="text-center py-4 bg-gray-50 rounded">
-              <p className="text-gray-500">No questions found for this campaign.</p>
+              <div className="border-t border-gray-200">
+                <ul className="divide-y divide-gray-200">
+                  {questions.map((question, index) => (
+                    <li key={question.id} className="px-4 py-4 sm:px-6">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">Question {index + 1}</p>
+                          <p className="mt-1 text-sm text-gray-500">{question.body}</p>
+                        </div>
+                        <div className="ml-4">
+                          <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
+                            {question.max_points} points
+                          </span>
+                        </div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </div>
           )}
         </>
       ) : (
         <div className="text-center py-8 text-gray-500">
-          Campaign not found. Please check the URL or go back to the dashboard.
+          Campaign not found.
         </div>
       )}
     </PageTemplate>
