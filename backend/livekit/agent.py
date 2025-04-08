@@ -161,7 +161,7 @@ async def entrypoint(ctx: JobContext):
                             # Fetch additional data if needed
                             try:
                                 # Fetch questions
-                                questions_url = f"http://127.0.0.1:5000/api/questions?campaign_id={campaign_id}"
+                                questions_url = f"http://127.0.0.1:5001/api/questions?campaign_id={campaign_id}"
                                 questions_response = requests.get(questions_url)
                                 if questions_response.ok:
                                     questions = questions_response.json()
@@ -218,7 +218,7 @@ async def entrypoint(ctx: JobContext):
                     f"Attempting to fetch submission data for ID: {submission_id}"
                 )
                 submission_url = (
-                    f"http://127.0.0.1:5000/api/submissions/{submission_id}"
+                    f"http://127.0.0.1:5001/api/submissions/{submission_id}"
                 )
                 submission_response = requests.get(
                     submission_url, timeout=5
@@ -243,7 +243,7 @@ async def entrypoint(ctx: JobContext):
                     if campaign_id:
                         # Fetch campaign details
                         campaign_url = (
-                            f"http://127.0.0.1:5000/api/campaigns/{campaign_id}"
+                            f"http://127.0.0.1:5001/api/campaigns/{campaign_id}"
                         )
                         campaign_response = requests.get(campaign_url, timeout=5)
                         if campaign_response.ok:
@@ -262,7 +262,7 @@ async def entrypoint(ctx: JobContext):
 
                         # Fetch questions if not already loaded
                         if not _accumulated_questions:
-                            questions_url = f"http://127.0.0.1:5000/api/questions?campaign_id={campaign_id}"
+                            questions_url = f"http://127.0.0.1:5001/api/questions?campaign_id={campaign_id}"
                             questions_response = requests.get(questions_url, timeout=5)
                             if questions_response.ok:
                                 questions = questions_response.json()

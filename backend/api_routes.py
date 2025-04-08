@@ -41,16 +41,6 @@ from livekit.token_server import LiveKitTokenServer
 # Create a Blueprint for the API routes
 api_bp = Blueprint("api", __name__)
 
-# Apply CORS specifically to the API blueprint
-CORS(
-    api_bp,
-    origins=["*"],
-    supports_credentials=True,
-    allow_headers=["*"],
-    methods=["*"],
-    max_age=3600,
-)
-
 # Configure your S3 bucket name (already created)
 S3_BUCKET = Config.S3_BUCKET_NAME
 
@@ -206,49 +196,6 @@ def handle_campaigns():
 
         finally:
             conn.close()
-
-
-# Update GET /campaigns/<id> to use the helper function
-@api_bp.route("/campaigns/<string:id>", methods=["GET"])
-def get_campaign(id):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-
-    try:
-        # Ensure ID is a string
-        campaign_id = str(id)
-        print(f"Looking for campaign with ID: {campaign_id}")  # Debug log
-
-        # Try to find the campaign with the given ID
-        cursor.execute(
-            "SELECT * FROM campaigns WHERE id = ? OR CAST(id AS TEXT) = ?",
-            (campaign_id, campaign_id),
-        )
-
-        campaign = cursor.fetchone()
-        print(f"Found campaign: {campaign}")  # Debug log
-
-        if campaign:
-            columns = [
-                "id",
-                "title",
-                "max_user_submissions",
-                "max_points",
-                "is_public",
-                "campaign_context",
-                "job_description",
-            ]
-            result = map_row_to_dict(campaign, columns)
-            return jsonify(result)
-        else:
-            print("Campaign not found")  # Debug log
-            return jsonify({"error": "Campaign not found"}), 404
-
-    except Exception as e:
-        print(f"Error retrieving campaign: {str(e)}")  # Debug log
-        return jsonify({"error": f"Error retrieving campaign: {str(e)}"}), 500
-    finally:
-        conn.close()
 
 
 @api_bp.route("/questions", methods=["GET"])

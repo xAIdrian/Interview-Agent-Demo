@@ -9,7 +9,7 @@ import { AuthLogger } from '../utils/logging';
 import Head from 'next/head';
 
 // Define API base URL for consistent usage
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5000';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5001';
 
 // Use the same User interface that matches both the backend and AuthProvider
 interface User {

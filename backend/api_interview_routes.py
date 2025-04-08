@@ -26,14 +26,16 @@ preload_app = True
 
 interview_bp = Blueprint("interview", __name__)
 
-# Configure CORS
+# Configure CORS for the interview blueprint
 CORS(
     interview_bp,
-    origins=["*"],
-    supports_credentials=True,
-    allow_headers=["*"],
-    methods=["*"],
-    max_age=3600,
+    resources={
+        r"/*": {
+            "origins": ["*"],
+            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+            "allow_headers": ["Content-Type", "Authorization", "X-Requested-With"],
+        }
+    },
 )
 
 # Configure logging for Gunicorn
