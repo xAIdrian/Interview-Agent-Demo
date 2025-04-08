@@ -1,23 +1,17 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from livekit.interview_api import DatabaseDriver, InterviewError
-import sqlite3
-import os
 import logging
 from livekit.token_server import LiveKitTokenServer
 import multiprocessing
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
 from datetime import timedelta
 from werkzeug.exceptions import HTTPException
 from flask import Blueprint
+from database import get_db_connection, map_row_to_dict
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-# Define database path
-DB_PATH = os.path.join(os.path.dirname(__file__), "livekit/interview_db.sqlite")
 
 # Gunicorn configuration
 workers = multiprocessing.cpu_count() * 2 + 1
@@ -35,14 +29,11 @@ interview_bp = Blueprint("interview", __name__)
 # Configure CORS
 CORS(
     interview_bp,
-    resources={
-        r"/api/*": {
-            "origins": ["*"],
-            "supports_credentials": True,
-            "allow_headers": ["*"],
-            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        }
-    },
+    origins=["*"],
+    supports_credentials=True,
+    allow_headers=["*"],
+    methods=["*"],
+    max_age=3600,
 )
 
 # Initialize database driver
@@ -111,11 +102,51 @@ def get_livekit_token():
         )
 
 
+@interview_bp.route("/campaigns/<campaignId>", methods=["GET"])
+def get_campaign(campaignId):
+    try:
+        # Get campaign details from database
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Get campaign details
+        cursor.execute("SELECT * FROM campaigns WHERE id = ?", (campaignId,))
+        campaign = cursor.fetchone()
+
+        if not campaign:
+            conn.close()
+            return jsonify({"error": "Campaign not found"}), 404
+
+        # Get campaign columns
+        cursor.execute("PRAGMA table_info(campaigns)")
+        columns = [row[1] for row in cursor.fetchall()]
+        campaign_data = map_row_to_dict(campaign, columns)
+
+        # Get questions for this campaign
+        cursor.execute("SELECT * FROM questions WHERE campaign_id = ?", (campaignId,))
+        questions = cursor.fetchall()
+
+        if questions:
+            cursor.execute("PRAGMA table_info(questions)")
+            question_columns = [row[1] for row in cursor.fetchall()]
+            campaign_data["questions"] = [
+                map_row_to_dict(q, question_columns) for q in questions
+            ]
+        else:
+            campaign_data["questions"] = []
+
+        conn.close()
+        return jsonify(campaign_data)
+    except Exception as e:
+        logger.error(f"Error fetching campaign: {str(e)}")
+        return jsonify({"error": f"Error fetching campaign: {str(e)}"}), 500
+
+
 @interview_bp.route("/candidates", methods=["GET"])
 def get_candidates():
     """Get all available candidate profiles with their interview questions."""
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = get_db_connection()
         cursor = conn.cursor()
 
         cursor.execute("SELECT email, name, position, experience FROM candidates")
@@ -150,28 +181,19 @@ def get_candidates():
                         },
                     }
                 )
-            except sqlite3.Error as e:
+            except Exception as e:
                 logger.error(
                     f"Error fetching questions for candidate {email}: {str(e)}"
                 )
                 # Continue with other candidates even if one fails
                 continue
 
-        conn.close()
         return jsonify(candidates_with_questions)
-    except sqlite3.Error as e:
+    except Exception as e:
         logger.error(f"Database error: {str(e)}")
         raise InterviewError(
             "Failed to fetch candidates",
             code="DATABASE_ERROR",
-            details=str(e),
-            status_code=500,
-        )
-    except Exception as e:
-        logger.error(f"Unexpected error: {str(e)}")
-        raise InterviewError(
-            "An unexpected error occurred",
-            code="UNEXPECTED_ERROR",
             details=str(e),
             status_code=500,
         )
@@ -205,24 +227,6 @@ def get_candidate(email):
             details=str(e),
             status_code=500,
         )
-
-
-@interview_bp.route("/campaigns/<campaignId>", methods=["GET"])
-def get_campaign(campaignId):
-    try:
-        # Get campaign details from database
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM campaigns WHERE id = ?", (campaignId,))
-        campaign = cursor.fetchone()
-        conn.close()
-
-        if campaign:
-            return jsonify(campaign)
-        else:
-            return jsonify({"error": "Campaign not found"}), 404
-    except Exception as e:
-        return jsonify({"error": f"Error fetching campaign: {str(e)}"}), 500
 
 
 @interview_bp.route("/api/candidates/<email>/questions", methods=["GET"])
