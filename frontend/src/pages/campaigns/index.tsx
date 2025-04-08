@@ -179,12 +179,20 @@ const CampaignsPage = () => {
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-2xl font-bold">{isAdmin ? 'Campaigns' : 'Available Positions'}</h2>
             {isAdmin && (
-              <Link 
-                href="/campaigns/create"
-                className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700"
-              >
-                Create Campaign
-              </Link>
+              <div className="flex items-center">
+                <Link 
+                  href="/campaigns/create"
+                  className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700"
+                >
+                  Create Campaign
+                </Link>
+                <Link 
+                  href="/campaigns/create-from-doc"
+                  className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-700 ml-2"
+                >
+                  Create from Doc
+                </Link>
+              </div>
             )}
           </div>
 
