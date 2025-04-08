@@ -5,7 +5,7 @@ import { PageTemplate } from '../../../components/PageTemplate';
 import Link from 'next/link';
 
 // Define API base URL for consistent usage
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://interview-agent-demo.onrender.comnt-demo.onrender.com';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://main-service-48k0.onrender.comnt-demo.onrender.com';
 
 interface Position {
   id: string;

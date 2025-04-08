@@ -78,7 +78,7 @@ const RegisterPage = () => {
 
     setIsLoading(true);
     try {
-      const response = await axios.post('https://interview-agent-demo.onrender.com/register', {
+      const response = await axios.post('https://main-service-48k0.onrender.com/register', {
         name: formData.name,
         email: formData.email,
         password: formData.password

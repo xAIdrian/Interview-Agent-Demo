@@ -68,12 +68,12 @@ const EditCampaignPage = () => {
       
       // Fetch campaign details
       const campaignResponse = await axios.get(
-        `https://interview-agent-demo.onrender.com/api/campaigns/${campaignId}`
+        `https://main-service-48k0.onrender.com/api/campaigns/${campaignId}`
       );
       
       // Fetch questions for this campaign
       const questionsResponse = await axios.get(
-        `https://interview-agent-demo.onrender.com/api/questions?campaign_id=${campaignId}`
+        `https://main-service-48k0.onrender.com/api/questions?campaign_id=${campaignId}`
       );
       
       const campaignData = campaignResponse.data;
@@ -208,7 +208,7 @@ const EditCampaignPage = () => {
     
     try {
       const response = await axios.post(
-        'https://interview-agent-demo.onrender.comnt-demo.onrender.com/api/optimize_prompt',
+        'https://main-service-48k0.onrender.comnt-demo.onrender.com/api/optimize_prompt',
         {
           campaign_name: campaignTitle,
           campaign_context,
@@ -328,7 +328,7 @@ const EditCampaignPage = () => {
       }
       
       const response = await axios.post(
-        `https://interview-agent-demo.onrender.com/api/campaigns/${campaignId}/update`,
+        `https://main-service-48k0.onrender.com/api/campaigns/${campaignId}/update`,
         formData
       );
       
