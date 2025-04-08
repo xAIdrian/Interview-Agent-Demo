@@ -46,10 +46,14 @@ const CampaignsPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [isClient, setIsClient] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const tableRef = useRef<HTMLDivElement>(null);
 
   // Use client-side only rendering to avoid hydration mismatch
   useEffect(() => {
     setIsClient(true);
+    const isAdminUser = localStorage.getItem('isAdmin') === 'true';
+    setIsAdmin(isAdminUser);
   }, []);
 
   useEffect(() => {
@@ -88,7 +92,7 @@ const CampaignsPage = () => {
   const columns: ColumnDefinition[] = [
     { title: "Title", field: "title", widthGrow: 3 },
     { 
-      title: "Job Description", 
+      title: "Description", 
       field: "job_description", 
       widthGrow: 4,
       formatter: (cell: any) => {
@@ -96,10 +100,8 @@ const CampaignsPage = () => {
         return text.length > 100 ? text.substring(0, 100) + '...' : text;
       }
     },
-    { title: "Max User Submissions", field: "max_user_submissions", hozAlign: "center" as "center", widthGrow: 2 },
-    { title: "Max Points", field: "max_points", hozAlign: "center" as "center", widthGrow: 1 },
     { 
-      title: "Is Public", 
+      title: "Status", 
       field: "is_public", 
       hozAlign: "center" as "center", 
       widthGrow: 1,
@@ -117,7 +119,6 @@ const CampaignsPage = () => {
       widthGrow: 1,
       formatter: function(cell: any) {
         const id = String(cell.getValue());
-        const isAdmin = localStorage.getItem('isAdmin') === 'true';
         
         if (isAdmin) {
           return `<div class="flex items-center justify-center">
@@ -128,7 +129,7 @@ const CampaignsPage = () => {
           </div>`;
         } else {
           return `<div class="flex items-center justify-center">
-            <a href="/live-interview/${id}" class="text-green-500 hover:text-green-700 flex items-center">
+            <a href="/campaigns/${id}" class="text-green-500 hover:text-green-700 flex items-center">
               <UserPlusIcon class="h-5 w-5 mr-1" />
               Apply
             </a>
@@ -136,9 +137,7 @@ const CampaignsPage = () => {
         }
       },
       cellClick: function(e: any, cell: any) {
-        // Ensure ID is a string
         const id = String(cell.getValue());
-        const isAdmin = localStorage.getItem('isAdmin') === 'true';
         
         if (isAdmin) {
           window.location.href = `/campaigns/${id}`;
@@ -157,9 +156,9 @@ const CampaignsPage = () => {
     paginationSizeSelector: [5, 10, 20, 50],
     movableColumns: true,
     resizableRows: true,
-    height: "auto", // Use auto height instead of fixed
-    renderVerticalBuffer: 0, // Minimize extra space at bottom
-    layoutColumnsOnNewData: true, // Ensures columns resize when data changes
+    height: "auto",
+    renderVerticalBuffer: 0,
+    layoutColumnsOnNewData: true,
   };
 
   if (!isClient) {
@@ -169,28 +168,20 @@ const CampaignsPage = () => {
   return (
     <>
       <Head>
-        <title>Campaigns | Gulpin AI Interview</title>
+        <title>{isAdmin ? 'Campaigns' : 'Available Positions'} | Gulpin AI Interview</title>
       </Head>
-      <PageTemplate title="Campaigns" maxWidth="lg">
+      <PageTemplate title={isAdmin ? 'Campaigns' : 'Available Positions'} maxWidth="lg">
         <div className="w-full bg-white shadow-md rounded-lg p-6">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold">Campaigns</h2>
-            <div className="flex space-x-4">
+            <h2 className="text-2xl font-bold">{isAdmin ? 'Campaigns' : 'Available Positions'}</h2>
+            {isAdmin && (
               <Link 
-                href="/campaigns/create" 
-                className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700 flex items-center"
+                href="/campaigns/create"
+                className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700"
               >
-                <DocumentPlusIcon className="h-5 w-5 mr-2" />
                 Create Campaign
               </Link>
-              <Link 
-                href="/campaigns/create-from-doc" 
-                className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-700 flex items-center"
-              >
-                <DocumentTextIcon className="h-5 w-5 mr-2" />
-                Import from Doc
-              </Link>
-            </div>
+            )}
           </div>
 
           {error && (
@@ -204,22 +195,13 @@ const CampaignsPage = () => {
               <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-700"></div>
             </div>
           ) : (
-            <>
-              {campaigns.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  No campaigns found. Create a new campaign to get started.
-                </div>
-              ) : (
-                <div className="overflow-x-auto tabulator-container">
-                  <ReactTabulator
-                    data={campaigns}
-                    columns={columns}
-                    options={options}
-                    className="campaigns-table"
-                  />
-                </div>
-              )}
-            </>
+            <div ref={tableRef}>
+              <ReactTabulator
+                data={campaigns}
+                columns={columns}
+                options={options}
+              />
+            </div>
           )}
         </div>
       </PageTemplate>

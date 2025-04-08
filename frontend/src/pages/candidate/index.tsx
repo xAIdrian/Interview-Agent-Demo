@@ -95,25 +95,6 @@ const CandidateIndexPage = () => {
                 </div>
               </div>
             </Link>
-
-            {/* Interview Performance Card */}
-            <Link href="/submissions/performance" className="block">
-              <div className="bg-white overflow-hidden shadow rounded-lg hover:shadow-lg transition-all duration-200 hover:scale-[1.02]">
-                <div className="p-6">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0 bg-purple-100 rounded-md p-3">
-                      <ChartBarIcon className="h-6 w-6 text-purple-600" />
-                    </div>
-                    <div className="ml-4">
-                      <h3 className="text-lg font-medium text-gray-900">Interview Performance</h3>
-                      <p className="mt-1 text-sm text-gray-500">
-                        View your interview results and feedback
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </Link>
           </div>
         </div>
       </div>
