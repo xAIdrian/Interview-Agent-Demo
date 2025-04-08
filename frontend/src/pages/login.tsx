@@ -45,7 +45,7 @@ const LoginPage = () => {
   return (
     <>
       <Head>
-        <title>Login | Gulpin AI Interview</title>
+        <title>Login | Noor</title>
       </Head>
       <PageTemplate title="Login">
         <div className="max-w-md mx-auto">

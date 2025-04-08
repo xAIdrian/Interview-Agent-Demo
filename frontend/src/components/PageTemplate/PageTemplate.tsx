@@ -3,13 +3,14 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useAuth } from '../../app/components/AuthProvider';
 import { AuthLogger } from '../../utils/logging';
-
+import Image from 'next/image';
 interface PageTemplateProps {
   children: React.ReactNode;
   title?: string;
   centered?: boolean;
   maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'full';
 }
+import noorLogo from '../../../public/noor.png';
 
 export const PageTemplate: React.FC<PageTemplateProps> = ({
   children,
@@ -65,7 +66,13 @@ export const PageTemplate: React.FC<PageTemplateProps> = ({
             <div className="flex items-center">
               <div className="flex-shrink-0">
                 <Link href={isAdmin ? "/admin" : "/candidate"} className="flex items-center">
-                  <span className="font-bold text-xl text-blue-600">Gulpin</span>
+                  <Image 
+                    src={noorLogo} 
+                    alt="Noor Logo" 
+                    width={200} 
+                    height={200} 
+                    className="h-8 w-auto"
+                  />
                 </Link>
               </div>
               

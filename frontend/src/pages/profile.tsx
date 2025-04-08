@@ -226,7 +226,7 @@ const ProfilePage = () => {
   return (
     <>
       <Head>
-        <title>My Profile | Gulpin AI Interview</title>
+        <title>My Profile</title>
       </Head>
       <ProtectedRoute>
         <PageTemplate title="Edit Profile" maxWidth="md">
