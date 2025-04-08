@@ -15,7 +15,6 @@ interface LiveKitInterviewComponentProps {
   onDisconnect: () => void;
   token: string;
   room: string;
-  userName: string;
 }
 
 interface MessageProps {
@@ -135,7 +134,7 @@ const OnboardingModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   );
 };
 
-const LiveKitInterviewComponent: React.FC<LiveKitInterviewComponentProps> = ({ onDisconnect, token, room, userName }) => {
+const LiveKitInterviewComponent: React.FC<LiveKitInterviewComponentProps> = ({ onDisconnect, token, room }) => {
   const livekitUrl = 'wss://default-test-oyjqa9xh.livekit.cloud';
   const [showOnboarding, setShowOnboarding] = React.useState(true);
 
@@ -147,7 +146,7 @@ const LiveKitInterviewComponent: React.FC<LiveKitInterviewComponentProps> = ({ o
       <div className="bg-white rounded-lg overflow-hidden shadow-lg">
         <div className="p-4 bg-blue-600 text-white">
           <div className="flex justify-between items-center">
-            <h2 className="text-xl font-bold">Interview Session: {userName}</h2>
+            <h2 className="text-xl font-bold">Interview Session</h2>
             <button 
               onClick={onDisconnect}
               className="px-3 py-1 bg-white text-blue-600 rounded hover:bg-blue-50 transition-colors"

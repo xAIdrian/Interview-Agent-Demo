@@ -2002,7 +2002,7 @@ def get_livekit_token():
         return response, 200
 
     # Get parameters from the request
-    name = request.args.get("name", "anonymous")
+    campaign_id = request.args.get("campaignId", "")
     room = request.args.get("room")
 
     try:
@@ -2014,7 +2014,7 @@ def get_livekit_token():
             room = f"interview-{str(uuid.uuid4())[:8]}"
 
         # Generate token
-        token = LiveKitTokenServer.generate_token(name, room)
+        token = LiveKitTokenServer.generate_token(campaign_id, room)
 
         # Create response without explicit CORS headers (let global middleware handle it)
         response = jsonify({"token": token, "room": room})

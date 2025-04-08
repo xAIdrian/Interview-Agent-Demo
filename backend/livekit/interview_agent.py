@@ -3,17 +3,22 @@ from livekit.agents import AutoSubscribe, JobContext, WorkerOptions, cli, llm
 from livekit.agents.multimodal import MultimodalAgent
 from livekit.plugins import openai
 from dotenv import load_dotenv
-from interview_api import AssistantFnc, DatabaseDriver
+import sys
+import os
+from interview_api import AssistantFnc
+
+# Add the backend directory to the Python path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from database import get_db_connection, map_row_to_dict
 from prompts import WELCOME_MESSAGE, demo_agent_prompt_template
 import logging
-import os
 
 # Load environment variables
 load_dotenv()
 
 # Configure production logging
-LOG_DIR = "/home/ec2-user/backend/logs"
-os.makedirs(LOG_DIR, exist_ok=True)
+# LOG_DIR = "/home/ec2-user/backend/logs"
+# os.makedirs(LOG_DIR, exist_ok=True)
 
 # Configure logging with file handler
 logger = logging.getLogger("interview-agent")
@@ -27,50 +32,58 @@ async def entrypoint(ctx: JobContext):
 
     await ctx.connect(auto_subscribe=AutoSubscribe.SUBSCRIBE_ALL)
     participant = await ctx.wait_for_participant()
-    print(f"\n👤 Participant joined: {participant.identity}")
+    print(f"\n👤 Participant joined: {participant}")
 
-    # Extract name from participant identity
-    name = participant.identity
-    print(f"👤 Candidate name: {name}")
+    # Use the identity directly as the campaign ID
+    campaign_id = participant.identity
+    print(f"📋 Campaign ID: {campaign_id}")
 
-    # Fetch candidate data from database
+    # Fetch campaign data from database
     try:
-        db = DatabaseDriver()
-        candidate_data = db.get_candidate_by_name(name)
-        if not candidate_data:
-            print(f"❌ No candidate found for name: {name}")
-            raise ValueError(f"Candidate not found for name: {name}")
+        conn = get_db_connection()
+        cursor = conn.cursor()
 
-        print(f"\n✅ Candidate data:")
-        print(f"  Name: {candidate_data.name}")
-        print(f"  Position: {candidate_data.position}")
-        print(f"  Experience: {candidate_data.experience}")
+        # Get campaign details
+        cursor.execute("SELECT * FROM campaigns WHERE id = ?", (campaign_id,))
+        campaign = cursor.fetchone()
 
-        # Get questions for the candidate's position
-        technical_questions = db.get_questions_for_position_and_stage(
-            candidate_data.position, "technical_questions"
-        )
-        behavioral_questions = db.get_questions_for_position_and_stage(
-            candidate_data.position, "behavioral_questions"
-        )
+        if not campaign:
+            print(f"❌ No campaign found for ID: {campaign_id}")
+            raise ValueError(f"Campaign not found for ID: {campaign_id}")
 
-        print(f"\n📚 Questions loaded:")
-        print(f"  Technical: {len(technical_questions)} questions")
-        print(f"  Behavioral: {len(behavioral_questions)} questions")
+        # Get campaign columns
+        cursor.execute("PRAGMA table_info(campaigns)")
+        columns = [row[1] for row in cursor.fetchall()]
+        campaign_data = map_row_to_dict(campaign, columns)
+
+        # Get questions for this campaign
+        cursor.execute("SELECT * FROM questions WHERE campaign_id = ?", (campaign_id,))
+        questions = cursor.fetchall()
+
+        if questions:
+            cursor.execute("PRAGMA table_info(questions)")
+            question_columns = [row[1] for row in cursor.fetchall()]
+            campaign_data["questions"] = [
+                map_row_to_dict(q, question_columns) for q in questions
+            ]
+        else:
+            campaign_data["questions"] = []
+
+        print(f"\n✅ Campaign data:")
+        print(f"  Title: {campaign_data['title']}")
+        print(f"  Description: {campaign_data['job_description']}")
+        print(f"  Context: {campaign_data['campaign_context']}")
+        print(f"\n📚 Questions loaded: {len(campaign_data['questions'])} questions")
 
         # Format questions for the prompt
-        questions_prompt = "\nTechnical Questions:\n"
-        for i, q in enumerate(technical_questions, 1):
-            questions_prompt += f"{i}. {q}\n"
+        questions_prompt = "\nInterview Questions:\n"
+        for i, q in enumerate(campaign_data["questions"], 1):
+            questions_prompt += f"{i}. {q['title']}\n{q['body']}\n"
 
-        questions_prompt += "\nBehavioral Questions:\n"
-        for i, q in enumerate(behavioral_questions, 1):
-            questions_prompt += f"{i}. {q}\n"
-
-        # Initialize the assistant with candidate data
+        # Initialize the assistant with campaign data
         assistant_fnc = AssistantFnc()
-        assistant_fnc.set_candidate_data(candidate_data)
-        print("\n✅ Assistant initialized with candidate data")
+        assistant_fnc.set_campaign_data(campaign_data)
+        print("\n✅ Assistant initialized with campaign data")
 
         # Initialize the model and agent with custom instructions
         model = openai.realtime.RealtimeModel(
@@ -122,6 +135,8 @@ async def entrypoint(ctx: JobContext):
     except Exception as e:
         print(f"❌ Error in interview setup: {e}")
         raise
+    finally:
+        conn.close()
 
     print("\n" + "=" * 50)
     print("🏁 Interview Session Ready")

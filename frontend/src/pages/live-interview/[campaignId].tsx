@@ -29,7 +29,6 @@ const LiveKitInterviewPage = () => {
   const { campaignId } = router.query;
   const [token, setToken] = useState<string | null>(null);
   const [room, setRoom] = useState<string | null>(null);
-  const [userName, setUserName] = useState<string>('');
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -61,9 +60,8 @@ const LiveKitInterviewPage = () => {
     fetchCampaign();
   }, [campaignId, router]);
   
-  const onFormSubmit = (name: string, token: string, roomName: string) => {
-    console.log('Parent component received interview data:', { name, token, roomName });
-    setUserName(name);
+  const onFormSubmit = (token: string, roomName: string) => {
+    console.log('Parent component received interview data:', { token, roomName });
     setToken(token);
     setRoom(roomName);
   };
@@ -142,14 +140,15 @@ const LiveKitInterviewPage = () => {
           <div className="max-w-4xl mx-auto bg-white p-8 rounded-lg shadow-md">
             <button
               onClick={async () => {
+                if (!campaignId) return;
                 try {
-                  const { token, room } = await handleStartInterview('Candidate');
-                  onFormSubmit('Candidate', token, room);
+                  const { token, room } = await handleStartInterview(campaignId as string);
+                  onFormSubmit(token, room);
                 } catch (err) {
                   // Error is already handled in the hook
                 }
               }}
-              disabled={interviewLoading}
+              disabled={interviewLoading || !campaignId}
               className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {interviewLoading ? (
@@ -169,7 +168,6 @@ const LiveKitInterviewPage = () => {
           <LiveKitInterviewComponent 
             token={token} 
             room={room as string} 
-            userName={userName}
             onDisconnect={onDisconnect}
           />
         )}
