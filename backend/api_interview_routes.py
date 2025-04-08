@@ -1,6 +1,6 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-from livekit.interview_api import DatabaseDriver, InterviewError
+from livekit.interview_api import InterviewError
 import logging
 from livekit.token_server import LiveKitTokenServer
 import multiprocessing
@@ -35,9 +35,6 @@ CORS(
     methods=["*"],
     max_age=3600,
 )
-
-# Initialize database driver
-db = DatabaseDriver()
 
 # Configure logging for Gunicorn
 accesslog = "-"  # Log to stdout
@@ -75,37 +72,10 @@ def health_check():
     return jsonify({"status": "ok", "message": "Interview API is operational"})
 
 
-@interview_bp.route("/api/livekit/token", methods=["GET", "OPTIONS"])
-def get_livekit_token():
-    """Generate and return a LiveKit token for joining a room"""
-    if request.method == "OPTIONS":
-        return jsonify({"status": "ok"})
-
-    try:
-        name = request.args.get("name", "anonymous")
-        room = request.args.get("room")
-
-        if not room:
-            import uuid
-
-            room = f"interview-{str(uuid.uuid4())[:8]}"
-
-        token = LiveKitTokenServer.generate_token(name, room)
-        return jsonify({"token": token, "room": room}), 200
-    except Exception as e:
-        logger.error(f"Error generating LiveKit token: {str(e)}")
-        raise InterviewError(
-            "Failed to generate interview token",
-            code="TOKEN_GENERATION_ERROR",
-            details=str(e),
-            status_code=500,
-        )
-
-
 @interview_bp.route("/campaigns/<campaignId>", methods=["GET"])
 def get_campaign(campaignId):
+    """Get campaign details and associated questions."""
     try:
-        # Get campaign details from database
         conn = get_db_connection()
         cursor = conn.cursor()
 
@@ -142,257 +112,75 @@ def get_campaign(campaignId):
         return jsonify({"error": f"Error fetching campaign: {str(e)}"}), 500
 
 
-@interview_bp.route("/candidates", methods=["GET"])
-def get_candidates():
-    """Get all available candidate profiles with their interview questions."""
+@interview_bp.route("/campaigns/<campaignId>/questions", methods=["GET"])
+def get_campaign_questions(campaignId):
+    """Get all questions for a specific campaign."""
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        cursor.execute("SELECT email, name, position, experience FROM candidates")
-        candidates = cursor.fetchall()
+        # Verify campaign exists
+        cursor.execute("SELECT id FROM campaigns WHERE id = ?", (campaignId,))
+        if not cursor.fetchone():
+            conn.close()
+            return jsonify({"error": "Campaign not found"}), 404
 
-        candidates_with_questions = []
-        for candidate in candidates:
-            email, name, position, experience = candidate
+        # Get questions
+        cursor.execute("SELECT * FROM questions WHERE campaign_id = ?", (campaignId,))
+        questions = cursor.fetchall()
 
-            try:
-                cursor.execute(
-                    "SELECT question FROM questions WHERE position = ? AND stage = ?",
-                    (position.lower(), "technical_questions"),
-                )
-                technical_questions = [row[0] for row in cursor.fetchall()]
+        if questions:
+            cursor.execute("PRAGMA table_info(questions)")
+            columns = [row[1] for row in cursor.fetchall()]
+            questions_data = [map_row_to_dict(q, columns) for q in questions]
+        else:
+            questions_data = []
 
-                cursor.execute(
-                    "SELECT question FROM questions WHERE position = ? AND stage = ?",
-                    (position.lower(), "behavioral_questions"),
-                )
-                behavioral_questions = [row[0] for row in cursor.fetchall()]
-
-                candidates_with_questions.append(
-                    {
-                        "email": email,
-                        "name": name,
-                        "position": position,
-                        "experience": experience,
-                        "questions": {
-                            "technical_questions": technical_questions,
-                            "behavioral_questions": behavioral_questions,
-                        },
-                    }
-                )
-            except Exception as e:
-                logger.error(
-                    f"Error fetching questions for candidate {email}: {str(e)}"
-                )
-                # Continue with other candidates even if one fails
-                continue
-
-        return jsonify(candidates_with_questions)
+        conn.close()
+        return jsonify(questions_data)
     except Exception as e:
-        logger.error(f"Database error: {str(e)}")
-        raise InterviewError(
-            "Failed to fetch candidates",
-            code="DATABASE_ERROR",
-            details=str(e),
-            status_code=500,
-        )
+        logger.error(f"Error fetching campaign questions: {str(e)}")
+        return jsonify({"error": f"Error fetching campaign questions: {str(e)}"}), 500
 
 
-@interview_bp.route("/candidates/<email>", methods=["GET"])
-def get_candidate(email):
-    """Get a specific candidate's profile by email."""
+@interview_bp.route("/campaigns/<campaignId>/start", methods=["POST"])
+def start_campaign_interview(campaignId):
+    """Start an interview for a specific campaign."""
     try:
-        candidate = db.get_candidate_by_email(email)
-        if not candidate:
-            raise InterviewError(
-                "Candidate not found", code="CANDIDATE_NOT_FOUND", status_code=404
-            )
+        conn = get_db_connection()
+        cursor = conn.cursor()
 
-        return jsonify(
-            {
-                "email": candidate.email,
-                "name": candidate.name,
-                "position": candidate.position,
-                "experience": candidate.experience,
-            }
-        )
-    except InterviewError:
-        raise
+        # Verify campaign exists
+        cursor.execute("SELECT * FROM campaigns WHERE id = ?", (campaignId,))
+        campaign = cursor.fetchone()
+
+        if not campaign:
+            conn.close()
+            return jsonify({"error": "Campaign not found"}), 404
+
+        # Get campaign columns
+        cursor.execute("PRAGMA table_info(campaigns)")
+        columns = [row[1] for row in cursor.fetchall()]
+        campaign_data = map_row_to_dict(campaign, columns)
+
+        # Get questions
+        cursor.execute("SELECT * FROM questions WHERE campaign_id = ?", (campaignId,))
+        questions = cursor.fetchall()
+
+        if questions:
+            cursor.execute("PRAGMA table_info(questions)")
+            question_columns = [row[1] for row in cursor.fetchall()]
+            campaign_data["questions"] = [
+                map_row_to_dict(q, question_columns) for q in questions
+            ]
+        else:
+            campaign_data["questions"] = []
+
+        conn.close()
+        return jsonify(campaign_data)
     except Exception as e:
-        logger.error(f"Error fetching candidate {email}: {str(e)}")
-        raise InterviewError(
-            "Failed to fetch candidate details",
-            code="FETCH_ERROR",
-            details=str(e),
-            status_code=500,
-        )
-
-
-@interview_bp.route("/api/candidates/<email>/questions", methods=["GET"])
-def get_candidate_questions(email):
-    """Get interview questions for a specific candidate based on their position."""
-    try:
-        candidate = db.get_candidate_by_email(email)
-        if not candidate:
-            raise InterviewError(
-                "Candidate not found", code="CANDIDATE_NOT_FOUND", status_code=404
-            )
-
-        technical_questions = db.get_questions_for_position_and_stage(
-            candidate.position, "technical_questions"
-        )
-        behavioral_questions = db.get_questions_for_position_and_stage(
-            candidate.position, "behavioral_questions"
-        )
-
-        return jsonify(
-            {
-                "technical_questions": technical_questions,
-                "behavioral_questions": behavioral_questions,
-            }
-        )
-    except InterviewError:
-        raise
-    except Exception as e:
-        logger.error(f"Error fetching questions for candidate {email}: {str(e)}")
-        raise InterviewError(
-            "Failed to fetch interview questions",
-            code="QUESTIONS_FETCH_ERROR",
-            details=str(e),
-            status_code=500,
-        )
-
-
-@interview_bp.route("/api/candidates", methods=["POST"])
-def create_candidate():
-    """Create a new candidate profile."""
-    try:
-        data = request.get_json()
-        if not data:
-            raise InterviewError(
-                "No data provided", code="MISSING_DATA", status_code=400
-            )
-
-        required_fields = ["email", "name", "position", "experience"]
-        missing_fields = [field for field in required_fields if field not in data]
-        if missing_fields:
-            raise InterviewError(
-                f"Missing required fields: {', '.join(missing_fields)}",
-                code="MISSING_FIELDS",
-                status_code=400,
-            )
-
-        candidate = db.create_candidate(
-            email=data["email"],
-            name=data["name"],
-            position=data["position"],
-            experience=data["experience"],
-        )
-
-        return (
-            jsonify(
-                {
-                    "message": "Candidate created successfully",
-                    "candidate": {
-                        "email": candidate.email,
-                        "name": candidate.name,
-                        "position": candidate.position,
-                        "experience": candidate.experience,
-                    },
-                }
-            ),
-            201,
-        )
-    except InterviewError:
-        raise
-    except Exception as e:
-        logger.error(f"Error creating candidate: {str(e)}")
-        raise InterviewError(
-            "Failed to create candidate",
-            code="CREATION_ERROR",
-            details=str(e),
-            status_code=500,
-        )
-
-
-@interview_bp.route("/api/questions", methods=["POST"])
-def add_question():
-    """Add a new interview question."""
-    try:
-        data = request.get_json()
-        if not data:
-            raise InterviewError(
-                "No data provided", code="MISSING_DATA", status_code=400
-            )
-
-        required_fields = ["position", "stage", "question"]
-        missing_fields = [field for field in required_fields if field not in data]
-        if missing_fields:
-            raise InterviewError(
-                f"Missing required fields: {', '.join(missing_fields)}",
-                code="MISSING_FIELDS",
-                status_code=400,
-            )
-
-        result = db.add_interview_question(
-            position=data["position"], stage=data["stage"], question=data["question"]
-        )
-
-        return jsonify({"message": result}), 201
-    except InterviewError:
-        raise
-    except Exception as e:
-        logger.error(f"Error adding question: {str(e)}")
-        raise InterviewError(
-            "Failed to add question",
-            code="QUESTION_ADD_ERROR",
-            details=str(e),
-            status_code=500,
-        )
-
-
-@interview_bp.route("/api/candidates/<email>/interview", methods=["GET"])
-def get_candidate_interview_data(email):
-    """Get all interview data for a candidate in a single request."""
-    try:
-        candidate = db.get_candidate_by_email(email)
-        if not candidate:
-            raise InterviewError(
-                "Candidate not found", code="CANDIDATE_NOT_FOUND", status_code=404
-            )
-
-        technical_questions = db.get_questions_for_position_and_stage(
-            candidate.position, "technical_questions"
-        )
-        behavioral_questions = db.get_questions_for_position_and_stage(
-            candidate.position, "behavioral_questions"
-        )
-
-        return jsonify(
-            {
-                "candidate": {
-                    "email": candidate.email,
-                    "name": candidate.name,
-                    "position": candidate.position,
-                    "experience": candidate.experience,
-                },
-                "questions": {
-                    "technical_questions": technical_questions,
-                    "behavioral_questions": behavioral_questions,
-                },
-            }
-        )
-    except InterviewError:
-        raise
-    except Exception as e:
-        logger.error(f"Error fetching interview data for candidate {email}: {str(e)}")
-        raise InterviewError(
-            "Failed to fetch interview data",
-            code="INTERVIEW_DATA_ERROR",
-            details=str(e),
-            status_code=500,
-        )
+        logger.error(f"Error starting campaign interview: {str(e)}")
+        return jsonify({"error": f"Error starting campaign interview: {str(e)}"}), 500
 
 
 if __name__ == "__main__":
