@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 import Head from 'next/head';
 import { PageTemplate } from '../../components/PageTemplate';
+import { useAuth } from '../../app/components/AuthProvider';
 import { 
   DocumentPlusIcon, 
   DocumentTextIcon, 
@@ -38,22 +40,21 @@ interface Campaign {
   max_user_submissions: number;
   max_points: number;
   is_public: boolean;
-  job_description: string; // Added job description
+  job_description: string;
 }
 
 const CampaignsPage = () => {
+  const router = useRouter();
+  const { user, isAuthenticated, isAdmin } = useAuth();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [isClient, setIsClient] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
   const tableRef = useRef<HTMLDivElement>(null);
 
   // Use client-side only rendering to avoid hydration mismatch
   useEffect(() => {
     setIsClient(true);
-    const isAdminUser = localStorage.getItem('isAdmin') === 'true';
-    setIsAdmin(isAdminUser);
   }, []);
 
   useEffect(() => {
@@ -89,6 +90,14 @@ const CampaignsPage = () => {
     fetchCampaigns();
   }, [isClient]);
 
+  const handleActionClick = (id: string) => {
+    if (isAdmin) {
+      router.push(`/campaigns/${id}/edit`);
+    } else {
+      router.push(`/campaigns/${id}`);
+    }
+  };
+
   const columns: ColumnDefinition[] = [
     { title: "Title", field: "title", widthGrow: 3 },
     { 
@@ -122,28 +131,23 @@ const CampaignsPage = () => {
         
         if (isAdmin) {
           return `<div class="flex items-center justify-center">
-            <a href="/campaigns/${id}" class="text-blue-500 hover:text-blue-700 flex items-center">
+            <button class="text-blue-500 hover:text-blue-700 flex items-center">
               <EyeIcon class="h-5 w-5 mr-1" />
               View
-            </a>
+            </button>
           </div>`;
         } else {
           return `<div class="flex items-center justify-center">
-            <a href="/campaigns/${id}" class="text-green-500 hover:text-green-700 flex items-center">
+            <button class="text-green-500 hover:text-green-700 flex items-center">
               <UserPlusIcon class="h-5 w-5 mr-1" />
               Apply
-            </a>
+            </button>
           </div>`;
         }
       },
       cellClick: function(e: any, cell: any) {
         const id = String(cell.getValue());
-        
-        if (isAdmin) {
-          window.location.href = `/campaigns/${id}`;
-        } else {
-          window.location.href = `/interview/${id}`;
-        }
+        handleActionClick(id);
       }
     }
   ];
