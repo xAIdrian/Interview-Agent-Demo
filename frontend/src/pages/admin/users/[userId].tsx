@@ -26,7 +26,7 @@ const UserDetailPage = () => {
       
       try {
         setIsLoading(true);
-        const response = await axios.get(`/api/users/${userId}`);
+        const response = await axios.get(`https://main-service-48k0.onrender.com/api/users/${userId}`);
         setUser(response.data);
         AuthLogger.info(`Loaded user #${userId} successfully`);
       } catch (err) {
@@ -50,7 +50,7 @@ const UserDetailPage = () => {
     if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) return;
     
     try {
-      await axios.delete(`/api/users/${userId}`);
+      await axios.delete(`https://main-service-48k0.onrender.com/api/users/${userId}`);
       AuthLogger.info(`User ${userId} deleted successfully`);
       router.push('/admin/users');
     } catch (err) {
