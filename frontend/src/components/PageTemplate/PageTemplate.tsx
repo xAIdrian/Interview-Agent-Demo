@@ -26,6 +26,14 @@ export const PageTemplate: React.FC<PageTemplateProps> = ({
     const pathWithoutQuery = router.asPath.split("?")[0];
     const pathArray = pathWithoutQuery.split("/").filter(path => path !== "");
     
+    // Get the home route based on user role
+    const homeRoute = isAdmin ? "/admin" : "/candidate";
+    
+    // If we're at the root path, return just the home breadcrumb
+    if (pathArray.length === 0) {
+      return [{ href: homeRoute, label: "Home" }];
+    }
+    
     const breadcrumbs = pathArray.map((path, index) => {
       const href = "/" + pathArray.slice(0, index + 1).join("/");
       return {
@@ -34,7 +42,7 @@ export const PageTemplate: React.FC<PageTemplateProps> = ({
       };
     });
     
-    return [{ href: "/", label: "Home" }, ...breadcrumbs];
+    return [{ href: homeRoute, label: "Home" }, ...breadcrumbs];
   };
   
   const breadcrumbs = generateBreadcrumbs();
@@ -56,7 +64,7 @@ export const PageTemplate: React.FC<PageTemplateProps> = ({
           <div className="flex justify-between h-16">
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <Link href="/" className="flex items-center">
+                <Link href={isAdmin ? "/admin" : "/candidate"} className="flex items-center">
                   <span className="font-bold text-xl text-blue-600">Gulpin</span>
                 </Link>
               </div>
@@ -83,33 +91,31 @@ export const PageTemplate: React.FC<PageTemplateProps> = ({
             </div>
             
             {/* Desktop Right Navigation Items */}
-            <div className="hidden md:flex md:items-center md:space-x-3">
+            <div className="hidden md:flex md:items-center md:space-x-4">
               {isAuthenticated ? (
-                <div className="relative ml-3">
-                  <div className="flex items-center space-x-3">
-                    <Link href="/profile" className="text-sm font-medium text-gray-700 hover:text-gray-800">
-                      {user?.name || 'Profile'}
-                    </Link>
-                    <button
-                      onClick={onLogout}
-                      className="inline-flex items-center justify-center rounded-md border border-transparent bg-gray-100 px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-200 focus:outline-none"
-                    >
-                      Log out
-                    </button>
+                <>
+                  <div className="text-sm text-gray-500">
+                    Signed in as <span className="font-medium text-gray-800">{user?.name}</span>
                   </div>
-                </div>
+                  <Link 
+                    href="/profile" 
+                    className="text-gray-600 hover:text-gray-900"
+                  >
+                    Profile
+                  </Link>
+                  <button
+                    onClick={onLogout}
+                    className="text-gray-600 hover:text-gray-900"
+                  >
+                    Log out
+                  </button>
+                </>
               ) : (
                 <>
-                  <Link
-                    href="/login"
-                    className="inline-flex items-center justify-center rounded-md border border-transparent bg-gray-100 px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-200 focus:outline-none"
-                  >
+                  <Link href="/login" className="text-gray-600 hover:text-gray-900">
                     Log in
                   </Link>
-                  <Link
-                    href="/register"
-                    className="inline-flex items-center justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none"
-                  >
+                  <Link href="/register" className="text-blue-600 hover:text-blue-800">
                     Sign up
                   </Link>
                 </>

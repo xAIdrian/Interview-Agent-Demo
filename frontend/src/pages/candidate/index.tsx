@@ -76,25 +76,6 @@ const CandidateIndexPage = () => {
                 </div>
               </div>
             </Link>
-
-            {/* Profile Management Card */}
-            <Link href="/profile" className="block">
-              <div className="bg-white overflow-hidden shadow rounded-lg hover:shadow-lg transition-all duration-200 hover:scale-[1.02]">
-                <div className="p-6">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0 bg-green-100 rounded-md p-3">
-                      <UserCircleIcon className="h-6 w-6 text-green-600" />
-                    </div>
-                    <div className="ml-4">
-                      <h3 className="text-lg font-medium text-gray-900">Profile</h3>
-                      <p className="mt-1 text-sm text-gray-500">
-                        Manage your profile and preferences
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </Link>
           </div>
         </div>
       </div>
