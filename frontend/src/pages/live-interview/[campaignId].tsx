@@ -74,19 +74,20 @@ const LiveKitInterviewPage: React.FC = () => {
   }, [campaignId, router]);
 
   const createSubmission = async (campaignId: string) => {
-    try {
-      const response = await axios.post(
-        `http://127.0.0.1:5001/api/submissions`,
-        {
-          campaign_id: campaignId,
-          is_complete: false
-        }
-      );
-      return response.data;
-    } catch (err) {
-      console.error('Error creating submission:', err);
-      throw new Error('Failed to create submission');
-    }
+    // try {
+    //   const response = await axios.post(
+    //     `http://127.0.0.1:5001/api/submissions`,
+    //     {
+    //       campaign_id: campaignId,
+    //       is_complete: false,
+    //       user_id: "00000000-0000-0000-0000-000000000000",
+    //     }
+    //   );
+    //   return response.data;
+    // } catch (err) {
+    //   console.error('Error creating submission:', err);
+    //   throw new Error('Failed to create submission');
+    // }
   };
   
   const onFormSubmit = async (token: string, room: string) => {
@@ -202,11 +203,11 @@ const LiveKitInterviewPage: React.FC = () => {
                 if (!campaignId) return;
                 try {
                   // First create a submission
-                  const newSubmission = await createSubmission(campaignId as string);
-                  setSubmissionId(newSubmission.id);
+                  // const newSubmission = await createSubmission(campaignId as string);
+                  // setSubmissionId(newSubmission.id);
                   
                   // Then start the interview with the submission ID
-                  const { token, room } = await handleStartInterview(campaignId as string, newSubmission.id);
+                  const { token, room } = await handleStartInterview(campaignId as string);
                   onFormSubmit(token, room);
                 } catch (err) {
                   console.error('Error starting interview:', err);

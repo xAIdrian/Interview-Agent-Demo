@@ -10,6 +10,7 @@ import {
 } from '@livekit/components-react';
 import '@livekit/components-styles';
 import { Track } from 'livekit-client';
+import axios from 'axios';
 
 interface LiveKitInterviewComponentProps {
   onDisconnect: () => void;
@@ -34,7 +35,7 @@ const Message: React.FC<MessageProps> = ({ type, text }) => {
   );
 };
 
-const SimpleVoiceAssistant: React.FC = () => {
+const SimpleVoiceAssistant: React.FC<{ onTranscriptUpdate: (transcript: any[]) => void }> = ({ onTranscriptUpdate }) => {
   const { state, audioTrack, agentTranscriptions } = useVoiceAssistant();
   const localParticipant = useLocalParticipant();
   const { segments: userTranscriptions } = useTrackTranscription({
@@ -51,7 +52,8 @@ const SimpleVoiceAssistant: React.FC = () => {
       ...(userTranscriptions?.map((t) => ({ ...t, type: 'user' as const })) ?? []),
     ].sort((a, b) => a.firstReceivedTime - b.firstReceivedTime);
     setMessages(allMessages);
-  }, [agentTranscriptions, userTranscriptions]);
+    onTranscriptUpdate(allMessages);
+  }, [agentTranscriptions, userTranscriptions, onTranscriptUpdate]);
 
   return (
     <div className="voice-assistant-container">
@@ -143,6 +145,24 @@ const LiveKitInterviewComponent: React.FC<LiveKitInterviewComponentProps> = ({
 }) => {
   const livekitUrl = 'wss://default-test-oyjqa9xh.livekit.cloud';
   const [showOnboarding, setShowOnboarding] = React.useState(true);
+  const [transcript, setTranscript] = React.useState<any[]>([]);
+
+  const handleTranscriptUpdate = (newTranscript: any[]) => {
+    setTranscript(newTranscript);
+  };
+
+  const handleDisconnect = async () => {
+    // try {
+    //   // Submit the transcript before disconnecting
+    //   await axios.put(`http://127.0.0.1:5001/api/submissions/${submissionId}`, {
+    //     transcript
+    //   });
+    // } catch (error) {
+    //   console.error('Error submitting interview:', error);
+    // } finally {
+      onDisconnect();
+    // }
+  };
 
   return (
     <div className="livekit-interview">
@@ -154,7 +174,7 @@ const LiveKitInterviewComponent: React.FC<LiveKitInterviewComponentProps> = ({
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-bold">Interview Session</h2>
             <button 
-              onClick={onDisconnect}
+              onClick={handleDisconnect}
               className="px-3 py-1 bg-white text-blue-600 rounded hover:bg-blue-50 transition-colors"
             >
               End Interview
@@ -169,10 +189,10 @@ const LiveKitInterviewComponent: React.FC<LiveKitInterviewComponentProps> = ({
             connect={true}
             video={false}
             audio={true}
-            onDisconnected={onDisconnect}
+            onDisconnected={handleDisconnect}
           >
             <RoomAudioRenderer />
-            <SimpleVoiceAssistant />
+            <SimpleVoiceAssistant onTranscriptUpdate={handleTranscriptUpdate} />
           </LiveKitRoom>
         </div>
       </div>
