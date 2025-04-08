@@ -68,38 +68,16 @@ interface LiveKitInterviewFormProps {
   onSubmit: (name: string, token: string, roomName: string) => void;
 }
 
-const LiveKitInterviewForm: React.FC<LiveKitInterviewFormProps> = ({ onSubmit }) => {
-  const [candidates, setCandidates] = useState<Candidate[]>([]);
-  const [selectedQuestions, setSelectedQuestions] = useState<Candidate['questions'] | null>(null);
-  const [loading, setLoading] = useState(true);
+export const useLiveKitInterview = () => {
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchCandidates = async () => {
-      try {
-        const response = await axios.get('https://interview-server-1zvi.onrender.com/api/candidates');
-        setCandidates(response.data);
-      } catch (err) {
-        setError('Failed to load candidates');
-        console.error('Error fetching candidates:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchCandidates();
-  }, []);
-
-  const handleViewQuestions = (questions: Candidate['questions']) => {
-    setSelectedQuestions(questions);
-  };
-
-  const handleStartInterview = async (email: string, name: string) => {
+  const handleStartInterview = async (name: string) => {
     setLoading(true);
     setError(null);
 
     try {
-      console.log('Starting interview for candidate:', { email, name });
+      console.log('Starting interview for candidate:', { name });
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://interview-server-1zvi.onrender.com';
       const response = await fetch(`${apiUrl}/api/livekit/token?name=${encodeURIComponent(name)}`, {
         method: 'GET',
@@ -114,15 +92,37 @@ const LiveKitInterviewForm: React.FC<LiveKitInterviewFormProps> = ({ onSubmit })
       
       const data = await response.json();
       console.log('Received token data:', { token: data.token, room: data.room });
-      onSubmit(name, data.token, data.room);
+      return { token: data.token, room: data.room };
     } catch (err: any) {
       console.error('Error getting token:', err);
       setError(
         err.message || 
         'Failed to connect to the interview server. Please check if the backend is running.'
       );
+      throw err;
     } finally {
       setLoading(false);
+    }
+  };
+
+  return {
+    handleStartInterview,
+    loading,
+    error
+  };
+};
+
+const LiveKitInterviewForm: React.FC<LiveKitInterviewFormProps> = ({ onSubmit }) => {
+  const { handleStartInterview, loading, error } = useLiveKitInterview();
+  const [name, setName] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const { token, room } = await handleStartInterview(name);
+      onSubmit(name, token, room);
+    } catch (err) {
+      // Error is already handled in the hook
     }
   };
 
@@ -142,54 +142,27 @@ const LiveKitInterviewForm: React.FC<LiveKitInterviewFormProps> = ({ onSubmit })
 
   return (
     <div className="max-w-4xl mx-auto bg-white p-8 rounded-lg shadow-md">
-      <h2 className="text-2xl font-semibold mb-6">Select Your Profile</h2>
-      
-      <div className="overflow-x-auto">
-        <table className="min-w-full bg-white rounded-lg overflow-hidden shadow">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Position</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Experience</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200">
-            {candidates.map((candidate) => (
-              <tr key={candidate.email} className="hover:bg-gray-50">
-                <td className="px-6 py-4 whitespace-nowrap">{candidate.name}</td>
-                <td className="px-6 py-4 whitespace-nowrap">{candidate.position}</td>
-                <td className="px-6 py-4 whitespace-nowrap">{candidate.experience} year(s)</td>
-                <td className="px-6 py-4 whitespace-nowrap space-x-2">
-                  <button
-                    onClick={() => handleViewQuestions(candidate.questions)}
-                    className="px-3 py-1 bg-blue-100 text-blue-600 rounded hover:bg-blue-200"
-                  >
-                    View Questions
-                  </button>
-                  <button
-                    onClick={() => handleStartInterview(candidate.email, candidate.name)}
-                    className="px-3 py-1 bg-green-100 text-green-600 rounded hover:bg-green-200"
-                  >
-                    Start Interview
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      
-      {selectedQuestions && (
-        <QuestionsModal 
-          questions={selectedQuestions} 
-          onClose={() => setSelectedQuestions(null)} 
-        />
-      )}
-      
-      <div className="mt-6 text-sm text-gray-600">
-        <p>Select your profile to view interview questions and start the interview process.</p>
-      </div>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+            Your Name
+          </label>
+          <input
+            type="text"
+            id="name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+            required
+          />
+        </div>
+        <button
+          type="submit"
+          className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+        >
+          Start Interview
+        </button>
+      </form>
     </div>
   );
 };
