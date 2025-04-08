@@ -19,7 +19,7 @@ const RegisterPage = () => {
   const [apiError, setApiError] = useState('');
   
   const router = useRouter();
-  const { register, error, clearError, isAuthenticated } = useAuth();
+  const { error, clearError, isAuthenticated } = useAuth();
 
   // If already authenticated, redirect to positions page
   useEffect(() => {
@@ -78,7 +78,7 @@ const RegisterPage = () => {
 
     setIsLoading(true);
     try {
-      const response = await axios.post('http://127.0.0.1:5001/register', {
+      const response = await axios.post('https://interview-agent-demo.onrender.com/register', {
         name: formData.name,
         email: formData.email,
         password: formData.password

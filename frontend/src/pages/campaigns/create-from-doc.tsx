@@ -124,7 +124,7 @@ const CreateCampaignFromDocPage = () => {
       let response;
       try {
         response = await axios.post(
-          'http://127.0.0.1:5001/api/campaigns/create-from-doc',
+          'https://interview-agent-demo.onrender.com/api/campaigns/create-from-doc',
           formData,
           {
             timeout: 60000 // 60 second timeout
@@ -258,7 +258,7 @@ const CreateCampaignFromDocPage = () => {
     
     try {
       const response = await axios.post(
-        'http://127.0.0.1:5001/api/optimize_prompt',
+        'https://interview-agent-demo.onrender.com/api/optimize_prompt',
         {
           campaign_name: campaignTitle,
           campaign_context,
@@ -371,7 +371,7 @@ const CreateCampaignFromDocPage = () => {
     
     try {
       const response = await axios.post(
-        'http://127.0.0.1:5001/api/test-campaigns',
+        'https://interview-agent-demo.onrender.comnt-demo.onrender.com/api/test-campaigns',
         formData
       );
       

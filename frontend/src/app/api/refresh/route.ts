@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import axios from 'axios';
 
-const FLASK_API_URL = process.env.NEXT_PUBLIC_FLASK_API_URL || 'http://127.0.0.1:5001';
+const FLASK_API_URL = process.env.NEXT_PUBLIC_FLASK_API_URL || 'https://interview-agent-demo.onrender.comnt-demo.onrender.com';
 
 export async function POST(req: NextRequest) {
   try {

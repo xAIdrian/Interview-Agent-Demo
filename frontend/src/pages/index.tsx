@@ -7,7 +7,7 @@ import Head from 'next/head';
 import { PageTemplate } from '../components/PageTemplate';
 
 // Define API base URL for consistent usage
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5001';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://interview-agent-demo.onrender.comnt-demo.onrender.comnt-demo.onrender.comnt-demo.onrender.comnt-demo.onrender.comnt-demo.onrender.comnt-demo.onrender.comnt-demo.onrender.comnt-demo.onrender.comnt-demo.onrender.comnt-demo.onrender.comnt-demo.onrender.com';
 
 const HomePage = () => {
   const router = useRouter();

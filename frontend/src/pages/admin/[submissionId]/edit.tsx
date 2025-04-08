@@ -4,7 +4,7 @@ import axios from 'axios';
 import { PageTemplate } from '../../../components/PageTemplate';
 
 // Define API base URL for consistent usage
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5001';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://interview-agent-demo.onrender.com';
 
 interface Submission {
   id: string;
