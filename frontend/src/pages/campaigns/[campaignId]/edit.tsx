@@ -68,12 +68,12 @@ const EditCampaignPage = () => {
       
       // Fetch campaign details
       const campaignResponse = await axios.get(
-        `http://127.0.0.1:5000/api/campaigns/${campaignId}`
+        `http://127.0.0.1:5001/api/campaigns/${campaignId}`
       );
       
       // Fetch questions for this campaign
       const questionsResponse = await axios.get(
-        `http://127.0.0.1:5000/api/questions?campaign_id=${campaignId}`
+        `http://127.0.0.1:5001/api/questions?campaign_id=${campaignId}`
       );
       
       const campaignData = campaignResponse.data;
@@ -208,7 +208,7 @@ const EditCampaignPage = () => {
     
     try {
       const response = await axios.post(
-        'http://127.0.0.1:5000/api/optimize_prompt',
+        'http://127.0.0.1:5001/api/optimize_prompt',
         {
           campaign_name: campaignTitle,
           campaign_context,
@@ -328,7 +328,7 @@ const EditCampaignPage = () => {
       }
       
       const response = await axios.post(
-        `http://127.0.0.1:5000/api/campaigns/${campaignId}/update`,
+        `http://127.0.0.1:5001/api/campaigns/${campaignId}/update`,
         formData
       );
       

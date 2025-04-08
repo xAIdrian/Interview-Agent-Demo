@@ -5,12 +5,12 @@ from livekit.plugins import openai
 from dotenv import load_dotenv
 import sys
 import os
-from interview_api import AssistantFnc
-from prompts import INTERVIEW_PROMPT_TEMPLATE
 
 # Add the backend directory to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from livekit.interview_api import AssistantFnc
 from database import get_db_connection, map_row_to_dict
+from prompts import INTERVIEW_PROMPT_TEMPLATE
 import logging
 
 # Load environment variables

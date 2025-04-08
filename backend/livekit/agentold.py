@@ -35,8 +35,8 @@ TRANSCRIPT_DIR = os.path.join(os.path.dirname(__file__), "transcripts")
 os.makedirs(TRANSCRIPT_DIR, exist_ok=True)
 
 AUTH_HEADER = "Bearer dVCjV5QO8t"
-CAMPAIGNS_API_URL = "http://127.0.0.1:5000/api/campaigns/{campaign_id}"
-QUESTIONS_API_URL = "http://127.0.0.1:5000/api/questions?campaign_id={campaign_id}"
+CAMPAIGNS_API_URL = "http://127.0.0.1:5001/api/campaigns/{campaign_id}"
+QUESTIONS_API_URL = "http://127.0.0.1:5001/api/questions?campaign_id={campaign_id}"
 
 # Store transcript entries
 transcript_entries = []
@@ -488,7 +488,7 @@ async def fetch_submission_data(submission_id):
     """Fetch submission data including resume text and campaign details"""
     try:
         logger.info(f"📄 Fetching submission data for ID: {submission_id}")
-        submission_url = f"http://127.0.0.1:5000/api/submissions/{submission_id}"
+        submission_url = f"http://127.0.0.1:5001/api/submissions/{submission_id}"
         response = requests.get(submission_url)
         response.raise_for_status()
 
@@ -497,7 +497,7 @@ async def fetch_submission_data(submission_id):
         # Get campaign details
         campaign_id = submission_data.get("campaign_id")
         if campaign_id:
-            campaign_url = f"http://127.0.0.1:5000/api/campaigns/{campaign_id}"
+            campaign_url = f"http://127.0.0.1:5001/api/campaigns/{campaign_id}"
             campaign_response = requests.get(campaign_url)
             campaign_response.raise_for_status()
             campaign_data = campaign_response.json()

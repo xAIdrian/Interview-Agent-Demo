@@ -42,7 +42,7 @@ const LiveKitInterviewPage = () => {
       
       try {
         const response = await axios.get(
-          `http://127.0.0.1:5000/interview/campaigns/${campaignId}`
+          `http://127.0.0.1:5001/interview/campaigns/${campaignId}`
         );
         setCampaign(response.data);
         setError(null);
