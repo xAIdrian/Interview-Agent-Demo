@@ -8,11 +8,11 @@ export async function GET(req: NextRequest) {
 
   try {
     // First fetch the submission to get the campaign_id
-    const submissionResponse = await axios.get(`http://127.0.0.1:5001/api/submissions/${submissionId}`);
+    const submissionResponse = await axios.get(`https://interview-agent-demo.onrender.com/api/submissions/${submissionId}`);
     const submission = submissionResponse.data;
 
     // Then fetch the campaign data using the campaign_id from the submission
-    const campaignResponse = await axios.get(`http://127.0.0.1:5001/api/campaigns/${submission.campaign_id}`);
+    const campaignResponse = await axios.get(`https://interview-agent-demo.onrender.com/api/campaigns/${submission.campaign_id}`);
     
     // Combine the data
     const interviewData = {
