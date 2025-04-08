@@ -8,7 +8,7 @@ const App = ({ Component, pageProps }: AppProps) => {
   return (
     <NetworkErrorBoundary>
       <Head>
-        <title>Gulpin AI Interview Platform</title>
+        <title>Noor</title>
         <meta name="description" content="AI-powered interview platform for candidates and employers" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
