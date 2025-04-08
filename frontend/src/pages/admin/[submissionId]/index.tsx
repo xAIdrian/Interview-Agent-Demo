@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { AuthLogger } from '../../../utils/logging';
 
 // Define API base URL for consistent usage
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5001';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5000';
 
 interface Submission {
   id: string;
@@ -147,8 +147,7 @@ const SubmissionPage = () => {
   return (
     <PageTemplate title={`Submission ${submission?.id || ''}`}>
       <div className="w-full bg-white shadow-md rounded-lg p-6">
-        <div className="flex justify-between mb-4 items-center">
-          <h1 className="text-2xl font-bold">Submission Details</h1>
+        <div className="flex justify-end mb-4 items-center">
           {submission && isAdmin && (
             <Link 
               href={`/submission/${submissionId}/edit`}

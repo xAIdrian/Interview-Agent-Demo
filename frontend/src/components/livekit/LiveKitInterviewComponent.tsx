@@ -15,6 +15,7 @@ interface LiveKitInterviewComponentProps {
   onDisconnect: () => void;
   token: string;
   room: string;
+  submissionId: string;
 }
 
 interface MessageProps {
@@ -134,7 +135,12 @@ const OnboardingModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   );
 };
 
-const LiveKitInterviewComponent: React.FC<LiveKitInterviewComponentProps> = ({ onDisconnect, token, room }) => {
+const LiveKitInterviewComponent: React.FC<LiveKitInterviewComponentProps> = ({ 
+  onDisconnect, 
+  token, 
+  room,
+  submissionId 
+}) => {
   const livekitUrl = 'wss://default-test-oyjqa9xh.livekit.cloud';
   const [showOnboarding, setShowOnboarding] = React.useState(true);
 

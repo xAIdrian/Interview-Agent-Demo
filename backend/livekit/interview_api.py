@@ -3,11 +3,6 @@ import enum
 from typing import List
 import logging
 from dataclasses import dataclass
-import sys
-import os
-
-# Add the backend directory to the Python path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from database import get_db_connection, map_row_to_dict
 
 logger = logging.getLogger("interview-api")

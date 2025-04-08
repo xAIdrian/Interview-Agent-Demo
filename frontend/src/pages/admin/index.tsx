@@ -22,11 +22,10 @@ const AdminIndexPage = () => {
   }, [router]);
 
   return (
-    <PageTemplate>
+    <PageTemplate title="Admin Dashboard">
       <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
-          <div className="flex items-center justify-between mb-8">
-            <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
+          <div className="flex items-center justify-end mb-8">
             <div className="flex items-center space-x-4">
               <Link 
                 href="/profile" 
@@ -89,25 +88,6 @@ const AdminIndexPage = () => {
                       <h3 className="text-lg font-medium text-gray-900">Submissions</h3>
                       <p className="mt-1 text-sm text-gray-500">
                         Review candidate submissions
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </Link>
-
-            {/* Analytics Card */}
-            <Link href="/admin/analytics" className="block">
-              <div className="bg-white overflow-hidden shadow rounded-lg hover:shadow-lg transition-all duration-200 hover:scale-[1.02]">
-                <div className="p-6">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0 bg-purple-100 rounded-md p-3">
-                      <ChartBarIcon className="h-6 w-6 text-purple-600" />
-                    </div>
-                    <div className="ml-4">
-                      <h3 className="text-lg font-medium text-gray-900">Analytics</h3>
-                      <p className="mt-1 text-sm text-gray-500">
-                        View campaign and submission analytics
                       </p>
                     </div>
                   </div>

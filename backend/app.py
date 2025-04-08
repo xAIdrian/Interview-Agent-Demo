@@ -52,9 +52,12 @@ CORS(
     app,
     resources={
         r"/*": {
-            "origins": ["*"],
-            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-            "allow_headers": ["Content-Type", "Authorization", "X-Requested-With"],
+            "origins": "*",
+            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"],
+            "allow_headers": ["*"],
+            "expose_headers": ["*"],
+            "supports_credentials": True,  # Enable credentials support
+            "max_age": 3600,
         }
     },
 )
@@ -1250,4 +1253,4 @@ def handle_options(path):
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5001)
+    app.run(debug=True)
