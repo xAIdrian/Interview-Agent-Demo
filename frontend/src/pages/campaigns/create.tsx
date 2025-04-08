@@ -1,9 +1,18 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
 import { useRouter } from 'next/router';
 import { PrimaryButton } from '../../components/Button';
 import { PageTemplate } from '../../components/PageTemplate';
-import { INTERNAL_API_TOKEN } from '../../utils/internalApiToken';
+import axios from '../../utils/axios';
+import { useAuth } from '../../app/components/AuthProvider';
+import { Spinner } from '../../components/ui/Spinner';
+import { 
+  PlusCircleIcon, 
+  TrashIcon, 
+  SparklesIcon,
+  ArrowPathIcon,
+  CheckCircleIcon,
+  XCircleIcon
+} from '@heroicons/react/24/outline';
 
 // Define interface for Question object
 interface Question {
@@ -26,6 +35,7 @@ interface Campaign {
 
 const CreateCampaignPage = () => {
   const router = useRouter();
+  const { isAuthenticated } = useAuth();
   const [isClient, setIsClient] = useState(false);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -152,20 +162,12 @@ const CreateCampaignPage = () => {
     setError('');
     
     try {
-      const response = await axios.post(
-        'http://127.0.0.1:5000/api/optimize_prompt',
-        {
-          campaign_name: campaignTitle,
-          campaign_context,
-          question: questionTitle,
-          prompt: scoring_prompt
-        },
-        {
-          headers: {
-            'Authorization': `Bearer ${INTERNAL_API_TOKEN}`
-          }
-        }
-      );
+      const response = await axios.post('/api/optimize_prompt', {
+        campaign_name: campaignTitle,
+        campaign_context,
+        question: questionTitle,
+        prompt: scoring_prompt
+      });
       
       // Store optimized prompt
       setOptimizedPrompts({
@@ -221,75 +223,36 @@ const CreateCampaignPage = () => {
     });
   };
   
-  // Submit the form
+  // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
     setIsSubmitting(true);
-    
-    // Validate form
-    if (!campaign.title.trim()) {
-      setError('Campaign title is required');
-      setIsSubmitting(false);
-      return;
-    }
-    
-    if (campaign.questions.length === 0) {
-      setError('At least one question is required');
-      setIsSubmitting(false);
-      return;
-    }
-    
-    for (const question of campaign.questions) {
-      if (!question.title.trim()) {
-        setError('All questions must have a title');
-        setIsSubmitting(false);
-        return;
-      }
-      
-      if (!question.scoring_prompt.trim()) {
-        setError('All questions must have a scoring prompt');
-        setIsSubmitting(false);
-        return;
-      }
-      
-      if (question.max_points <= 0) {
-        setError('All questions must have max points greater than 0');
-        setIsSubmitting(false);
-        return;
-      }
-    }
-    
-    // Prepare data for API
-    const formData = {
-      ...campaign,
-      questions: campaign.questions.map(q => ({
-        ...q,
-        body: q.title // Use question title as body
-      }))
-    };
-    
+    setError('');
+
     try {
-      const response = await axios.post(
-        'http://127.0.0.1:5000/api/campaigns',
-        formData,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${INTERNAL_API_TOKEN}`
-          }
+      // Prepare questions data
+      const questionsData = campaign.questions.map(q => ({
+        ...q,
+        body: q.title // Set body to title when submitting
+      }));
+
+      const response = await axios.post('/api/test-campaigns', {
+        ...campaign,
+        questions: questionsData
+      }, {
+        headers: {
+          'Content-Type': 'application/json'
         }
-      );
-      
-      if (response.status === 201) {
-        // Redirect to campaigns list
+      });
+
+      if (response.data.success) {
         router.push('/campaigns');
       } else {
-        setError('Failed to create campaign');
+        setError(response.data.message || 'Failed to create campaign');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating campaign:', error);
-      setError('Failed to create campaign. Please try again.');
+      setError(error.response?.data?.message || 'Failed to create campaign. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -298,222 +261,201 @@ const CreateCampaignPage = () => {
   return (
     <PageTemplate title="Create Campaign" maxWidth="lg">
       <div className="w-full bg-white shadow-md rounded-lg p-6">
-        <h2 className="text-2xl font-bold mb-6">Create New Campaign</h2>
-        
-        {/* Display any error message */}
-        {error && (
-          <div className="mb-4 p-2 bg-red-100 text-red-700 rounded">
-            {error}
-          </div>
-        )}
-        
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Campaign details */}
+          {/* Campaign Details */}
           <div className="space-y-4">
-            <div>
-              <label htmlFor="title" className="block text-sm font-medium text-gray-700">
-                Campaign Title
-              </label>
-              <input
-                id="title"
-                name="title"
-                type="text"
-                value={campaign.title}
-                onChange={handleCampaignChange}
-                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500"
-                required
-              />
-            </div>
+            <h2 className="text-xl font-semibold">Campaign Details</h2>
             
             <div>
-              <label htmlFor="campaign_context" className="block text-sm font-medium text-gray-700">
-                Campaign Context
-              </label>
-              <textarea
-                id="campaign_context"
-                name="campaign_context"
-                value={campaign.campaign_context}
+              <label className="block text-sm font-medium text-gray-700">Title</label>
+              <input
+                type="text"
+                name="title"
+                value={campaign.title}
                 onChange={handleCampaignChange}
-                rows={4}
-                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Provide context about this role to help guide AI scoring"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                required
               />
             </div>
 
             <div>
-              <label htmlFor="job_description" className="block text-sm font-medium text-gray-700">
-                Job Description
-              </label>
+              <label className="block text-sm font-medium text-gray-700">Job Description</label>
               <textarea
-                id="job_description"
                 name="job_description"
                 value={campaign.job_description}
                 onChange={handleCampaignChange}
                 rows={4}
-                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Enter the complete job description for this role"
-              />
-            </div>
-            
-            <div>
-              <label htmlFor="max_user_submissions" className="block text-sm font-medium text-gray-700">
-                Max User Submissions
-              </label>
-              <input
-                id="max_user_submissions"
-                name="max_user_submissions"
-                type="number"
-                value={campaign.max_user_submissions}
-                onChange={handleCampaignChange}
-                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500"
-                min="1"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                 required
               />
             </div>
-            
-            <div className="flex items-center">
-              <input
-                id="is_public"
-                name="is_public"
-                type="checkbox"
-                checked={campaign.is_public}
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Campaign Context</label>
+              <textarea
+                name="campaign_context"
+                value={campaign.campaign_context}
                 onChange={handleCampaignChange}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                rows={4}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                required
               />
-              <label htmlFor="is_public" className="ml-2 block text-sm text-gray-700">
-                Publish Immediately
-              </label>
+            </div>
+
+            <div className="flex space-x-4">
+              <div className="flex-1">
+                <label className="block text-sm font-medium text-gray-700">Max User Submissions</label>
+                <input
+                  type="number"
+                  name="max_user_submissions"
+                  value={campaign.max_user_submissions}
+                  onChange={handleCampaignChange}
+                  min="1"
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  required
+                />
+              </div>
+
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  name="is_public"
+                  checked={campaign.is_public}
+                  onChange={handleCampaignChange}
+                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <label className="ml-2 block text-sm text-gray-900">Public Campaign</label>
+              </div>
             </div>
           </div>
-          
-          {/* Questions */}
-          <div>
-            <h3 className="text-xl font-bold mb-4">Questions</h3>
-            
-            <div className="space-y-8">
-              {campaign.questions.map((question, index) => (
-                <div key={index} className="p-4 border border-gray-200 rounded-md bg-gray-50">
-                  <div className="space-y-4">
-                    <div>
-                      <label 
-                        htmlFor={`question_${index}_title`}
-                        className="block text-sm font-medium text-gray-700"
-                      >
-                        Question
-                      </label>
-                      <input
-                        id={`question_${index}_title`}
-                        name="title"
-                        type="text"
-                        value={question.title}
-                        onChange={(e) => handleQuestionChange(index, e)}
-                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500"
-                        required
-                      />
-                    </div>
-                    
-                    <div>
-                      <label 
-                        htmlFor={`question_${index}_scoring_prompt`}
-                        className="block text-sm font-medium text-gray-700"
-                      >
-                        Scoring Prompt
-                      </label>
-                      <textarea
-                        id={`question_${index}_scoring_prompt`}
-                        name="scoring_prompt"
-                        value={question.scoring_prompt}
-                        onChange={(e) => handleQuestionChange(index, e)}
-                        rows={4}
-                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500"
-                        required
-                      />
-                      <button
-                        type="button"
-                        onClick={() => optimizePrompt(index)}
-                        disabled={optimizing[index]}
-                        className="mt-2 bg-green-500 text-white px-4 py-1 rounded hover:bg-green-700 text-sm disabled:bg-green-300"
-                      >
-                        {optimizing[index] ? 'Optimizing...' : 'Optimize with AI'}
-                      </button>
-                      
-                      {/* Optimized prompt container */}
-                      {showOptimized[index] && (
-                        <div className="mt-3">
-                          <label className="block text-sm font-medium text-gray-700">
-                            AI Optimized Prompt:
-                          </label>
-                          <div className="mt-2 p-3 bg-gray-100 border border-gray-300 rounded-md">
-                            {optimizedPrompts[index]}
-                          </div>
-                          <div className="flex space-x-2 mt-2">
-                            <button
-                              type="button"
-                              onClick={() => useOptimizedPrompt(index)}
-                              className="bg-blue-500 text-white px-4 py-1 rounded hover:bg-blue-700 text-sm"
-                            >
-                              Use optimized
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => useOriginalPrompt(index)}
-                              className="bg-gray-500 text-white px-4 py-1 rounded hover:bg-gray-700 text-sm"
-                            >
-                              Use original
-                            </button>
-                          </div>
-                        </div>
+
+          {/* Questions Section */}
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-semibold">Questions</h2>
+              <button
+                type="button"
+                onClick={addQuestion}
+                className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                <PlusCircleIcon className="h-5 w-5 mr-2" />
+                Add Question
+              </button>
+            </div>
+
+            {campaign.questions.map((question, index) => (
+              <div key={index} className="border rounded-lg p-4 space-y-4">
+                <div className="flex justify-between items-start">
+                  <h3 className="text-lg font-medium">Question {index + 1}</h3>
+                  <button
+                    type="button"
+                    onClick={() => removeQuestion(index)}
+                    className="text-red-600 hover:text-red-800"
+                  >
+                    <TrashIcon className="h-5 w-5" />
+                  </button>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Question Title</label>
+                  <input
+                    type="text"
+                    name="title"
+                    value={question.title}
+                    onChange={(e) => handleQuestionChange(index, e)}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Scoring Prompt</label>
+                  <div className="mt-1 flex space-x-2">
+                    <textarea
+                      name="scoring_prompt"
+                      value={question.scoring_prompt}
+                      onChange={(e) => handleQuestionChange(index, e)}
+                      rows={3}
+                      className="flex-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => optimizePrompt(index)}
+                      disabled={optimizing[index]}
+                      className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50"
+                    >
+                      {optimizing[index] ? (
+                        <ArrowPathIcon className="h-5 w-5 animate-spin" />
+                      ) : (
+                        <SparklesIcon className="h-5 w-5" />
                       )}
-                    </div>
-                    
-                    <div>
-                      <label 
-                        htmlFor={`question_${index}_max_points`}
-                        className="block text-sm font-medium text-gray-700"
-                      >
-                        Max Points
-                      </label>
-                      <input
-                        id={`question_${index}_max_points`}
-                        name="max_points"
-                        type="number"
-                        value={question.max_points}
-                        onChange={(e) => handleQuestionChange(index, e)}
-                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500"
-                        min="1"
-                        required
-                      />
-                    </div>
-                    
-                    {/* Delete question button (don't show for first question) */}
-                    {campaign.questions.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeQuestion(index)}
-                        className="mt-2 bg-red-500 text-white px-4 py-1 rounded hover:bg-red-700 text-sm"
-                      >
-                        Delete Question
-                      </button>
-                    )}
+                    </button>
                   </div>
                 </div>
-              ))}
-            </div>
-            
-            {/* Add question button */}
-            <button
-              type="button"
-              onClick={addQuestion}
-              className="mt-4 bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-700"
-            >
-              Add Another Question
-            </button>
+
+                {showOptimized[index] && (
+                  <div className="mt-2 p-3 bg-purple-50 rounded-md">
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <p className="text-sm text-purple-700">{optimizedPrompts[index]}</p>
+                      </div>
+                      <div className="flex space-x-2 ml-4">
+                        <button
+                          type="button"
+                          onClick={() => useOptimizedPrompt(index)}
+                          className="text-green-600 hover:text-green-800"
+                        >
+                          <CheckCircleIcon className="h-5 w-5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => useOriginalPrompt(index)}
+                          className="text-red-600 hover:text-red-800"
+                        >
+                          <XCircleIcon className="h-5 w-5" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Max Points</label>
+                  <input
+                    type="number"
+                    name="max_points"
+                    value={question.max_points}
+                    onChange={(e) => handleQuestionChange(index, e)}
+                    min="1"
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+              </div>
+            ))}
           </div>
-          
-          {/* Submit button */}
-          <div className="pt-4">
-            <PrimaryButton type="submit" disabled={isSubmitting} fullWidth>
-              {isSubmitting ? 'Creating...' : 'Create Campaign'}
+
+          {error && (
+            <div className="p-3 bg-red-50 text-red-700 rounded-md">
+              {error}
+            </div>
+          )}
+
+          <div className="flex justify-end">
+            <PrimaryButton
+              type="submit"
+              disabled={isSubmitting}
+              className="flex items-center"
+            >
+              {isSubmitting ? (
+                <>
+                  <ArrowPathIcon className="h-5 w-5 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                'Create Campaign'
+              )}
             </PrimaryButton>
           </div>
         </form>

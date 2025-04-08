@@ -5,6 +5,7 @@ import { PageTemplate } from '../components/PageTemplate';
 import { useAuth } from '../app/components/AuthProvider';
 import { Spinner } from '../components/ui/Spinner';
 import Head from 'next/head';
+import axios from 'axios';
 
 const RegisterPage = () => {
   const [formData, setFormData] = useState({
@@ -15,6 +16,7 @@ const RegisterPage = () => {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [validationError, setValidationError] = useState('');
+  const [apiError, setApiError] = useState('');
   
   const router = useRouter();
   const { register, error, clearError, isAuthenticated } = useAuth();
@@ -32,6 +34,9 @@ const RegisterPage = () => {
       ...prevState,
       [name]: value
     }));
+    // Clear errors when user starts typing
+    if (validationError) setValidationError('');
+    if (apiError) setApiError('');
   };
 
   const validateForm = () => {
@@ -64,6 +69,7 @@ const RegisterPage = () => {
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setValidationError('');
+    setApiError('');
     clearError();
 
     if (!validateForm()) {
@@ -71,17 +77,44 @@ const RegisterPage = () => {
     }
 
     setIsLoading(true);
-    const success = await register(formData.name, formData.email, formData.password);
-    setIsLoading(false);
+    try {
+      const response = await axios.post('http://127.0.0.1:5001/register', {
+        name: formData.name,
+        email: formData.email,
+        password: formData.password
+      }, {
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
 
-    if (success) {
-      // Redirect to login with a message about successful registration
-      router.push('/login?registered=true');
+      if (response.data.success) {
+        // Store user data in localStorage
+        localStorage.setItem('user', JSON.stringify(response.data.user));
+        // Redirect to homepage with success message
+        router.push({
+          pathname: '/',
+          query: {
+            registered: 'true',
+            message: response.data.message
+          }
+        });
+      } else {
+        setApiError(response.data.message || 'Registration failed');
+      }
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        setApiError(error.response?.data?.message || 'Registration failed. Please try again.');
+      } else {
+        setApiError('An unexpected error occurred');
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  // Display either validation error or auth provider error
-  const displayError = validationError || error;
+  // Display either validation error or API error
+  const displayError = validationError || apiError || error;
 
   return (
     <>

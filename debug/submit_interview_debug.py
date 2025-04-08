@@ -6,7 +6,7 @@ import sys
 from typing import List, Dict, Any, Optional
 
 # Constants
-API_BASE_URL = "http://127.0.0.1:5000/api"  # Update if your API is hosted elsewhere
+API_BASE_URL = "http://127.0.0.1:5001/api"  # Update if your API is hosted elsewhere
 
 
 def get_submission_details(submission_id: str) -> Optional[Dict[str, Any]]:
