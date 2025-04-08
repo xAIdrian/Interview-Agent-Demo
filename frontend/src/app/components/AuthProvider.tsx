@@ -2,7 +2,8 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import axios, { isAxiosError } from 'axios';
+import { isAxiosError } from 'axios';
+import axios from '../../utils/axios';
 import { AuthLogger } from '../../utils/logging';
 
 interface User {
@@ -17,12 +18,11 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   error: string | null;
-  login: (email: string, password: string) => Promise<boolean>;
-  register: (name: string, email: string, password: string) => Promise<boolean>;
-  logout: () => Promise<void>;
-  clearError: () => void;
   isAuthenticated: boolean;
   isAdmin: boolean;
+  login: (email: string, password: string) => Promise<boolean>;
+  logout: () => void;
+  clearError: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -42,25 +42,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(true);
       
       try {
-        // Get user profile from the server
-        const response = await axios.get('/api/profile');
-        
-        if (response.data && response.data.id) {
-          setUser(response.data);
-          AuthLogger.info('User authenticated from session');
+        const storedUser = localStorage.getItem('user');
+        if (storedUser) {
+          const parsedUser = JSON.parse(storedUser);
+          setUser(parsedUser);
+          AuthLogger.info('User authenticated from localStorage');
         } else {
           setUser(null);
           AuthLogger.info('No authenticated user');
         }
       } catch (err) {
-        // If error is 401 (Unauthorized), don't treat it as an error
-        if (isAxiosError(err) && err.response?.status === 401) {
-          setUser(null);
-          AuthLogger.info('No authenticated user');
-        } else {
-          setUser(null);
-          AuthLogger.info('No authenticated user or session expired');
-        }
+        setUser(null);
+        AuthLogger.info('Error reading user data from localStorage');
       } finally {
         setLoading(false);
       }
@@ -79,14 +72,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       const response = await axios.post('/login', { email, password });
       
-      // Log the full response in development mode to debug
-      if (process.env.NODE_ENV === 'development') {
-        AuthLogger.debug('Login response received:', JSON.stringify(response.data, null, 2));
-      }
-      
-      // Store user data
       if (response.data.user) {
         setUser(response.data.user);
+        localStorage.setItem('user', JSON.stringify(response.data.user));
         AuthLogger.info('Login successful');
         return true;
       } else {
@@ -99,13 +87,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       if (isAxiosError(err)) {
         if (err.response) {
-          // Server responded with error
           setError(err.response.data.message || 'Login failed');
         } else if (err.request) {
-          // Request made but no response
           setError('No response from server. Please check your connection.');
         } else {
-          // Something else went wrong
           setError('An unexpected error occurred');
         }
       } else {
@@ -118,68 +103,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Register function
-  const register = async (name: string, email: string, password: string): Promise<boolean> => {
-    try {
-      setLoading(true);
-      clearError();
-      
-      const response = await axios.post('/register', { name, email, password });
-      
-      if (response.data.success) {
-        AuthLogger.info('Registration successful');
-        return true;
-      } else {
-        setError(response.data.message || 'Registration failed');
-        return false;
-      }
-    } catch (err) {
-      if (isAxiosError(err)) {
-        setError(err.response?.data?.message || 'Registration failed');
-      } else {
-        setError('An unexpected error occurred');
-      }
-      return false;
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // Logout function
-  const logout = async () => {
-    try {
-      setLoading(true);
-      await axios.post('/logout');
-      setUser(null);
-      AuthLogger.info('Logout successful');
-      router.push('/login');
-    } catch (err) {
-      AuthLogger.error('Logout error:', err);
-      // Even if logout fails, clear user data and redirect
-      setUser(null);
-      router.push('/login');
-    } finally {
-      setLoading(false);
-    }
+  const logout = () => {
+    setUser(null);
+    localStorage.removeItem('user');
+    router.push('/login');
   };
 
   const value = {
     user,
     loading,
     error,
-    login,
-    register,
-    logout,
-    clearError,
     isAuthenticated: !!user,
-    isAdmin: user?.role === 'admin'
+    isAdmin: user?.is_admin || false,
+    login,
+    logout,
+    clearError
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {

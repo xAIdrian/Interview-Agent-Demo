@@ -14,7 +14,7 @@ import "../../../styles/tabulator.css"; // Import custom tabulator styles
 configureTabulatorDependencies();
 
 // Define API base URL for consistent usage
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5000';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5001';
 
 interface Submission {
   id: string;
@@ -260,8 +260,7 @@ const CampaignSubmissionsPage = () => {
 
   return (
     <PageTemplate title={`${campaign?.title || 'Campaign'} Submissions`} maxWidth="lg">
-      <div className="flex justify-between mb-4 items-center">
-        <h1 className="text-2xl font-bold">{campaign?.title || 'Campaign'} Submissions</h1>
+      <div className="flex justify-end mb-4 items-center">
         <Link 
           href={`/campaigns/${campaignId}`}
           className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-700"
