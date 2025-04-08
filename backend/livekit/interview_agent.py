@@ -10,19 +10,34 @@ from interview_api import AssistantFnc
 # Add the backend directory to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from database import get_db_connection, map_row_to_dict
-from prompts import WELCOME_MESSAGE, demo_agent_prompt_template
 import logging
 
 # Load environment variables
 load_dotenv()
 
-# Configure production logging
-# LOG_DIR = "/home/ec2-user/backend/logs"
-# os.makedirs(LOG_DIR, exist_ok=True)
-
-# Configure logging with file handler
+# Configure logging
 logger = logging.getLogger("interview-agent")
 logger.setLevel(logging.INFO)
+
+# Define the interview prompt template
+INTERVIEW_PROMPT_TEMPLATE = """
+You are an AI interviewer conducting a job interview. Your role is to:
+
+1. Start with a brief introduction of yourself and the interview process
+2. Ask the questions provided in order
+3. Listen to the candidate's responses
+4. Ask follow-up questions when appropriate to get more details
+5. Maintain a professional and friendly tone
+6. Guide the candidate through the interview process
+
+Job Description:
+{job_description}
+
+Interview Questions:
+{questions}
+
+Please conduct the interview professionally and help the candidate feel comfortable while gathering the necessary information.
+"""
 
 
 async def entrypoint(ctx: JobContext):
@@ -57,7 +72,10 @@ async def entrypoint(ctx: JobContext):
         campaign_data = map_row_to_dict(campaign, columns)
 
         # Get questions for this campaign
-        cursor.execute("SELECT * FROM questions WHERE campaign_id = ?", (campaign_id,))
+        cursor.execute(
+            "SELECT * FROM questions WHERE campaign_id = ? ORDER BY order_index",
+            (campaign_id,),
+        )
         questions = cursor.fetchall()
 
         if questions:
@@ -76,9 +94,17 @@ async def entrypoint(ctx: JobContext):
         print(f"\n📚 Questions loaded: {len(campaign_data['questions'])} questions")
 
         # Format questions for the prompt
-        questions_prompt = "\nInterview Questions:\n"
-        for i, q in enumerate(campaign_data["questions"], 1):
-            questions_prompt += f"{i}. {q['title']}\n{q['body']}\n"
+        questions_prompt = "\n".join(
+            [
+                f"{i+1}. {q['title']}\n{q['body']}\n"
+                for i, q in enumerate(campaign_data["questions"])
+            ]
+        )
+
+        # Create the interview prompt
+        interview_prompt = INTERVIEW_PROMPT_TEMPLATE.format(
+            job_description=campaign_data["job_description"], questions=questions_prompt
+        )
 
         # Initialize the assistant with campaign data
         assistant_fnc = AssistantFnc()
@@ -87,7 +113,7 @@ async def entrypoint(ctx: JobContext):
 
         # Initialize the model and agent with custom instructions
         model = openai.realtime.RealtimeModel(
-            instructions=demo_agent_prompt_template,
+            instructions=interview_prompt,
             voice="shimmer",
             temperature=0.8,
             modalities=["audio", "text"],
