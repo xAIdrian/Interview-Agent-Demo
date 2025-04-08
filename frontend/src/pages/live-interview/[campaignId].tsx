@@ -76,7 +76,7 @@ const LiveKitInterviewPage: React.FC = () => {
   const createSubmission = async (campaignId: string) => {
     try {
       const response = await axios.post(
-        `http://127.0.0.1:5000/api/submissions`,
+        `http://127.0.0.1:5001/api/submissions`,
         {
           campaign_id: campaignId,
           is_complete: false
