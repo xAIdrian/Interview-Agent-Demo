@@ -14,7 +14,7 @@ import "../../../styles/tabulator.css"; // Import custom tabulator styles
 configureTabulatorDependencies();
 
 // Define API base URL for consistent usage
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://main-service-48k0.onrender.com';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5001';
 
 interface Submission {
   id: string;

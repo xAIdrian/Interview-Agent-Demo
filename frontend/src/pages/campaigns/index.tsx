@@ -21,6 +21,7 @@ import 'react-tabulator/lib/css/tabulator.min.css';
 // Import custom tabulator styles
 import '../../styles/tabulator.css';
 import { AuthLogger } from '../../utils/logging';
+import { Toast } from '../../components/ui/Toast';
 
 // Initialize Tabulator with required dependencies
 configureTabulatorDependencies();
@@ -50,6 +51,7 @@ const CampaignsPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [isClient, setIsClient] = useState(false);
+  const [showToast, setShowToast] = useState(false);
   const tableRef = useRef<HTMLDivElement>(null);
 
   // Use client-side only rendering to avoid hydration mismatch
@@ -183,12 +185,20 @@ const CampaignsPage = () => {
                 <Link 
                   href="/campaigns/create"
                   className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setShowToast(true);
+                  }}
                 >
                   Create Campaign
                 </Link>
                 <Link 
                   href="/campaigns/create-from-doc"
                   className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-700 ml-2"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setShowToast(true);
+                  }}
                 >
                   Create from Doc
                 </Link>
@@ -217,6 +227,12 @@ const CampaignsPage = () => {
           )}
         </div>
       </PageTemplate>
+      {showToast && (
+        <Toast 
+          message="Coming Soon!" 
+          onClose={() => setShowToast(false)}
+        />
+      )}
     </>
   );
 };

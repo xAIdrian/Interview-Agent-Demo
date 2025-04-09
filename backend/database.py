@@ -6,8 +6,7 @@ import sqlite3
 import os
 
 # Create SQLAlchemy engine with connection pooling for SQLite
-
-db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "interview_agent.db")
+db_path = os.path.join(os.path.dirname(__file__), "interview_agent.db")
 engine = create_engine(
     f"sqlite:///{db_path}",
     poolclass=QueuePool,
