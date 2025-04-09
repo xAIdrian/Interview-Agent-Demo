@@ -17,7 +17,7 @@ export const useLiveKitInterview = () => {
     try {
       console.log('Starting interview for campaign:', campaignId, 'and submission:');
       // const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://interview-server-1zvi.onrender.com';
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5001';
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://main-service-48k0.onrender.com';
       const response = await fetch(
         `${apiUrl}/api/livekit/token?campaignId=${encodeURIComponent(campaignId)}`,
         {

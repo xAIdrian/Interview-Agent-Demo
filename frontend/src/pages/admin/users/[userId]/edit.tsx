@@ -36,7 +36,7 @@ const EditUserPage = () => {
       
       try {
         setIsLoading(true);
-        const response = await axios.get(`http://127.0.0.1:5001/api/users/${userId}`);
+        const response = await axios.get(`https://main-service-48k0.onrender.com/api/users/${userId}`);
         const userData = response.data;
         setUser(userData);
         
@@ -89,12 +89,12 @@ const EditUserPage = () => {
         is_admin: formData.is_admin
       };
       
-      await axios.put(`http://127.0.0.1:5001/api/users/${userId}`, updatedData);
+      await axios.put(`https://main-service-48k0.onrender.com/api/users/${userId}`, updatedData);
       
       // If reset_password is true, make additional API call
       if (formData.reset_password) {
         // This would depend on your API structure - here's a placeholder
-        await axios.post(`http://127.0.0.1:5001/api/users/${userId}/reset-password`, {});
+        await axios.post(`https://main-service-48k0.onrender.com/api/users/${userId}/reset-password`, {});
         AuthLogger.info(`Password reset requested for user #${userId}`);
       }
       
