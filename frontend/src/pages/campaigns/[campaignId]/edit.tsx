@@ -208,7 +208,7 @@ const EditCampaignPage = () => {
     
     try {
       const response = await axios.post(
-        'https://main-service-48k0.onrender.comnt-demo.onrender.com/api/optimize_prompt',
+        'https://main-service-48k0.onrender.com/api/optimize_prompt',
         {
           campaign_name: campaignTitle,
           campaign_context,
