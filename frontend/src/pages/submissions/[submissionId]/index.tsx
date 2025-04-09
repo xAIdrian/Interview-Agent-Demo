@@ -7,7 +7,7 @@ import { PrimaryButton } from '../../../components/Button/PrimaryButton';
 import { AuthLogger } from '../../../utils/logging';
 
 // API base URL
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://main-service-48k0.onrender.com';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5001';
 
 // Interfaces
 interface User {

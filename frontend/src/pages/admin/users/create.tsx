@@ -39,7 +39,7 @@ const CreateUserPage = () => {
       setError('');
       
       // Submit the data to create user API endpoint
-      const response = await axios.post('https://main-service-48k0.onrender.com/api/users', formData);
+      const response = await axios.post('http://127.0.0.1:5001/api/users', formData);
       
       setSuccessMessage('User created successfully!');
       AuthLogger.info('User created:', response.data);

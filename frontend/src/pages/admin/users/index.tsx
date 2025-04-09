@@ -54,7 +54,7 @@ const UsersPage = () => {
     const fetchUsers = async () => {
       try {
         setIsLoading(true);
-        const response = await axios.get('https://main-service-48k0.onrender.com/api/users');
+        const response = await axios.get('http://127.0.0.1:5001/api/users');
         setUsers(response.data);
         AuthLogger.info(`Loaded ${response.data.length} users successfully`);
       } catch (err) {

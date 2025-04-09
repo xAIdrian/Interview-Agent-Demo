@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { PageTemplate } from '../../components/PageTemplate';
 import Link from 'next/link';
@@ -9,9 +9,11 @@ import {
   ChartBarIcon,
   Cog6ToothIcon
 } from '@heroicons/react/24/outline';
+import { Toast } from '../../components/ui/Toast';
 
 const CandidateIndexPage = () => {
   const router = useRouter();
+  const [showToast, setShowToast] = useState(false);
 
   useEffect(() => {
     // Check if user is admin
@@ -59,7 +61,14 @@ const CandidateIndexPage = () => {
             </Link>
 
             {/* My Applications Card */}
-            <Link href="/submissions" className="block">
+            <Link 
+              href="/submissions" 
+              className="block"
+              onClick={(e) => {
+                e.preventDefault();
+                setShowToast(true);
+              }}
+            >
               <div className="bg-white overflow-hidden shadow rounded-lg hover:shadow-lg transition-all duration-200 hover:scale-[1.02]">
                 <div className="p-6">
                   <div className="flex items-center">
@@ -79,6 +88,12 @@ const CandidateIndexPage = () => {
           </div>
         </div>
       </div>
+      {showToast && (
+        <Toast 
+          message="Coming Soon!" 
+          onClose={() => setShowToast(false)}
+        />
+      )}
     </PageTemplate>
   );
 };
