@@ -9,7 +9,7 @@ import axios from 'axios';
 export default async (req: NextApiRequest, res: NextApiResponse) => {
   if (req.method === 'POST') {
     try {
-      const response = await axios.post('https://main-service-48k0.onrender.comnt-demo.onrender.comnt-demo.onrender.comnt-demo.onrender.comnt-demo.onrender.com/register', req.body);
+      const response = await axios.post('https://main-service-48k0.onrender.com/register', req.body);
       res.status(response.status).json(response.data);
     } catch (error) {
       res.status(500).json({ error: 'Registration failed' });

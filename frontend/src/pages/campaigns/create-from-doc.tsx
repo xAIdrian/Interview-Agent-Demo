@@ -371,7 +371,7 @@ const CreateCampaignFromDocPage = () => {
     
     try {
       const response = await axios.post(
-        'https://main-service-48k0.onrender.comnt-demo.onrender.com/api/test-campaigns',
+        'https://main-service-48k0.onrender.com/api/test-campaigns',
         formData
       );
       
