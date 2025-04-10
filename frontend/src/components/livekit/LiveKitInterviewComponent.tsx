@@ -12,6 +12,8 @@ import '@livekit/components-styles';
 import { Track } from 'livekit-client';
 import axios from 'axios';
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5001';
+
 interface LiveKitInterviewComponentProps {
   onDisconnect: () => void;
   token: string;
@@ -152,16 +154,21 @@ const LiveKitInterviewComponent: React.FC<LiveKitInterviewComponentProps> = ({
   };
 
   const handleDisconnect = async () => {
-    // try {
-    //   // Submit the transcript before disconnecting
-    //   await axios.put(`https://main-service-48k0.onrender.comnt-demo.onrender.comnt-demo.onrender.comnt-demo.onrender.comnt-demo.onrender.com/api/submissions/${submissionId}`, {
-    //     transcript
-    //   });
-    // } catch (error) {
-    //   console.error('Error submitting interview:', error);
-    // } finally {
+    try {
+      // Format transcript as a string before sending
+      const formattedTranscript = transcript
+        .map(entry => `${entry.speaker}: ${entry.text}`)
+        .join('\n');
+
+      // Submit the transcript before disconnecting
+      await axios.put(`${API_BASE_URL}/api/submissions/${submissionId}`, {
+        transcript: formattedTranscript
+      });
+    } catch (error) {
+      console.error('Error submitting interview:', error);
+    } finally {
       onDisconnect();
-    // }
+    }
   };
 
   return (
