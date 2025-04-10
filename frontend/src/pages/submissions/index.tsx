@@ -42,6 +42,9 @@ interface Submission {
   updated_at: string;
   campaign_title: string;
   user_name: string;
+  user_email: string;
+  is_complete: boolean;
+  total_points: number | null;
 }
 
 // Define API base URL for consistent usage
@@ -70,13 +73,19 @@ const SubmissionsPage = () => {
         setIsLoading(true);
         const response = await axios.get(`${API_BASE_URL}/api/submissions`);
         
-        // Ensure all submission IDs are strings
-        const submissionsWithStringIds = response.data.map((submission: any) => ({
-          ...submission,
-          id: String(submission.id),
-          campaign_id: String(submission.campaign_id)
-        }));
+        console.log('Raw response data:', response.data);
         
+        // Ensure all submission IDs are strings
+        const submissionsWithStringIds = response.data.map((submission: any) => {
+          console.log('Processing submission:', submission);
+          return {
+            ...submission,
+            id: String(submission.id),
+            campaign_id: String(submission.campaign_id)
+          };
+        });
+        
+        console.log('Processed submissions:', submissionsWithStringIds);
         setSubmissions(submissionsWithStringIds);
         AuthLogger.info(`Loaded ${submissionsWithStringIds.length} submissions successfully`);
       } catch (err) {
@@ -102,18 +111,34 @@ const SubmissionsPage = () => {
 
   const columns: ColumnDefinition[] = [
     { title: "Campaign", field: "campaign_title", widthGrow: 2 },
-    { title: "Candidate", field: "user_name", widthGrow: 2 },
+    { 
+      title: "Candidate", 
+      field: "user_name",
+      widthGrow: 2,
+      formatter: (cell: any) => {
+        const row = cell.getRow().getData();
+        return `${row.user_name}<br><span class="text-sm text-gray-500">${row.user_email}</span>`;
+      }
+    },
     { 
       title: "Status", 
-      field: "status", 
+      field: "is_complete", 
       hozAlign: "center" as "center", 
       widthGrow: 1,
       formatter: (cell: any) => {
-        const status = cell.getValue();
-        const isCompleted = status === 'completed';
+        const isCompleted = cell.getValue();
         return isCompleted ? 
           '<div class="flex items-center justify-center text-green-600"><CheckCircleIcon class="h-5 w-5" /></div>' : 
           '<div class="flex items-center justify-center text-yellow-600"><XCircleIcon class="h-5 w-5" /></div>';
+      }
+    },
+    { 
+      title: "Score", 
+      field: "total_points", 
+      widthGrow: 1,
+      formatter: (cell: any) => {
+        const score = cell.getValue();
+        return score !== null ? score : 'Not scored';
       }
     },
     { 
