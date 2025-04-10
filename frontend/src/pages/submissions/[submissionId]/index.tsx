@@ -218,7 +218,10 @@ const SubmissionDetailsPage = () => {
 
   // Delete submission
   const deleteSubmission = async () => {
-    if (!submission) return;
+    if (!submissionId) {
+      setError('No submission ID provided');
+      return;
+    }
     
     // Confirm deletion
     if (!window.confirm('Are you sure you want to delete this submission? This action cannot be undone.')) {
@@ -226,12 +229,17 @@ const SubmissionDetailsPage = () => {
     }
     
     try {
-      await axios.delete(`${API_BASE_URL}/api/submissions/${submission.id}`);
+      await axios.delete(`${API_BASE_URL}/api/submissions/${submissionId}`);
       
-      AuthLogger.info(`Deleted submission ${submission.id}`);
+      AuthLogger.info(`Deleted submission ${submissionId}`);
       
       // Redirect back to submissions list
-      router.push(`/campaigns/${submission.campaign_id}/submissions`);
+      // If we have a valid campaign_id, use it, otherwise go to the main submissions page
+      if (submission?.campaign_id && submission.campaign_id !== 'undefined') {
+        router.push(`/campaigns/${submission.campaign_id}/submissions`);
+      } else {
+        router.push('/submissions');
+      }
     } catch (err) {
       console.error('Error deleting submission:', err);
       
