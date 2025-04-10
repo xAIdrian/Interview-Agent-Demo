@@ -82,10 +82,6 @@ const AdminIndexPage = () => {
             <Link 
               href="/submissions" 
               className="block"
-              onClick={(e) => {
-                e.preventDefault();
-                setShowToast(true);
-              }}
             >
               <div className="bg-white overflow-hidden shadow rounded-lg hover:shadow-lg transition-all duration-200 hover:scale-[1.02]">
                 <div className="p-6">

@@ -30,7 +30,6 @@ interface Question {
 const CampaignDetailsPage = () => {
   const router = useRouter();
   const { campaignId } = router.query;
-  
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -53,16 +52,16 @@ const CampaignDetailsPage = () => {
 
       try {
         setIsLoading(true);
-        const response = await axios.get(`/api/campaigns/${campaignId}`);
+        const response = await axios.get(`${API_BASE_URL}/api/campaigns/${campaignId}`);
         setCampaign(response.data);
         
         // Fetch questions for this campaign
-        const questionsResponse = await axios.get(`/api/campaigns/${campaignId}`);
+        const questionsResponse = await axios.get(`${API_BASE_URL}/api/campaigns/${campaignId}`);
         setQuestions(questionsResponse.data);
         
         // If admin, fetch submission count
         if (isAdmin) {
-          const submissionsResponse = await axios.get(`/api/submissions?campaign_id=${campaignId}`);
+          const submissionsResponse = await axios.get(`${API_BASE_URL}/api/submissions?campaign_id=${campaignId}`);
           setSubmissionCount(submissionsResponse.data.length);
         }
         
@@ -95,14 +94,6 @@ const CampaignDetailsPage = () => {
   const handleStartInterview = async () => {
     try {
       setIsLoading(true);
-      
-      // Create a submission for this campaign
-      // const response = await axios.post(`/api/submissions`, {
-      //   campaign_id: String(campaignId)
-      // });
-      
-      // // Ensure the submission ID is a string
-      // const newSubmissionId = String(response.data.id);
       
       // Navigate to the interview page with the submission ID
       router.push(`/live-interview/${campaignId}`);

@@ -6,10 +6,8 @@ import Head from 'next/head';
 import { PageTemplate } from '../../components/PageTemplate';
 import { useAuth } from '../../app/components/AuthProvider';
 import { 
-  DocumentPlusIcon, 
   DocumentTextIcon, 
   EyeIcon, 
-  UserPlusIcon,
   CheckCircleIcon,
   XCircleIcon
 } from '@heroicons/react/24/outline';
@@ -34,23 +32,25 @@ const ReactTabulator = dynamic(() => import('react-tabulator').then(mod => mod.R
   ssr: false,
 });
 
-// Update Campaign interface
-interface Campaign {
+// Update Submission interface
+interface Submission {
   id: string;
-  title: string;
-  max_user_submissions: number;
-  max_points: number;
-  is_public: boolean;
-  job_description: string;
+  campaign_id: string;
+  user_id: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  campaign_title: string;
+  user_name: string;
 }
 
 // Define API base URL for consistent usage
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5001';
 
-const CampaignsPage = () => {
+const SubmissionsPage = () => {
   const router = useRouter();
   const { user, isAuthenticated, isAdmin } = useAuth();
-  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [isClient, setIsClient] = useState(false);
@@ -65,65 +65,64 @@ const CampaignsPage = () => {
   useEffect(() => {
     if (!isClient) return;
 
-    const fetchCampaigns = async () => {
+    const fetchSubmissions = async () => {
       try {
         setIsLoading(true);
-        const response = await axios.get(`${API_BASE_URL}/api/campaigns`);
+        const response = await axios.get(`${API_BASE_URL}/api/submissions`);
         
-        // Ensure all campaign IDs are strings
-        const campaignsWithStringIds = response.data.map((campaign: any) => ({
-          ...campaign,
-          id: String(campaign.id)
+        // Ensure all submission IDs are strings
+        const submissionsWithStringIds = response.data.map((submission: any) => ({
+          ...submission,
+          id: String(submission.id),
+          campaign_id: String(submission.campaign_id)
         }));
         
-        setCampaigns(campaignsWithStringIds);
-        AuthLogger.info(`Loaded ${campaignsWithStringIds.length} campaigns successfully`);
+        setSubmissions(submissionsWithStringIds);
+        AuthLogger.info(`Loaded ${submissionsWithStringIds.length} submissions successfully`);
       } catch (err) {
-        console.error('Error fetching campaigns:', err);
-        setError('Failed to load campaigns. Please try again.');
+        console.error('Error fetching submissions:', err);
+        setError('Failed to load submissions. Please try again.');
         
         if (axios.isAxiosError(err)) {
-          AuthLogger.error('Error fetching campaigns:', err.response?.status, err.response?.data);
+          AuthLogger.error('Error fetching submissions:', err.response?.status, err.response?.data);
         } else {
-          AuthLogger.error('Unexpected error fetching campaigns:', err);
+          AuthLogger.error('Unexpected error fetching submissions:', err);
         }
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchCampaigns();
+    fetchSubmissions();
   }, [isClient]);
 
   const handleActionClick = (id: string) => {
-    if (isAdmin) {
-      router.push(`/campaigns/${id}/edit`);
-    } else {
-      router.push(`/campaigns/${id}`);
-    }
+    router.push(`/submissions/${id}`);
   };
 
   const columns: ColumnDefinition[] = [
-    { title: "Title", field: "title", widthGrow: 3 },
-    { 
-      title: "Description", 
-      field: "job_description", 
-      widthGrow: 4,
-      formatter: (cell: any) => {
-        const text = cell.getValue() || '';
-        return text.length > 100 ? text.substring(0, 100) + '...' : text;
-      }
-    },
+    { title: "Campaign", field: "campaign_title", widthGrow: 2 },
+    { title: "Candidate", field: "user_name", widthGrow: 2 },
     { 
       title: "Status", 
-      field: "is_public", 
+      field: "status", 
       hozAlign: "center" as "center", 
       widthGrow: 1,
       formatter: (cell: any) => {
-        const isPublic = cell.getValue();
-        return isPublic ? 
+        const status = cell.getValue();
+        const isCompleted = status === 'completed';
+        return isCompleted ? 
           '<div class="flex items-center justify-center text-green-600"><CheckCircleIcon class="h-5 w-5" /></div>' : 
-          '<div class="flex items-center justify-center text-red-600"><XCircleIcon class="h-5 w-5" /></div>';
+          '<div class="flex items-center justify-center text-yellow-600"><XCircleIcon class="h-5 w-5" /></div>';
+      }
+    },
+    { 
+      title: "Submitted", 
+      field: "created_at", 
+      widthGrow: 2,
+      formatter: (cell: any) => {
+        const date = new Date(cell.getValue());
+        return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
       }
     },
     { 
@@ -131,24 +130,13 @@ const CampaignsPage = () => {
       field: "id", 
       hozAlign: "center" as "center",
       widthGrow: 1,
-      formatter: function(cell: any) {
-        const id = String(cell.getValue());
-        
-        if (isAdmin) {
-          return `<div class="flex items-center justify-center">
-            <button class="text-blue-500 hover:text-blue-700 flex items-center">
-              <EyeIcon class="h-5 w-5 mr-1" />
-              View
-            </button>
-          </div>`;
-        } else {
-          return `<div class="flex items-center justify-center">
-            <button class="text-green-500 hover:text-green-700 flex items-center">
-              <UserPlusIcon class="h-5 w-5 mr-1" />
-              Apply
-            </button>
-          </div>`;
-        }
+      formatter: function() {
+        return `<div class="flex items-center justify-center">
+          <button class="text-blue-500 hover:text-blue-700 flex items-center">
+            <EyeIcon class="h-5 w-5 mr-1" />
+            View
+          </button>
+        </div>`;
       },
       cellClick: function(e: any, cell: any) {
         const id = String(cell.getValue());
@@ -177,36 +165,12 @@ const CampaignsPage = () => {
   return (
     <>
       <Head>
-        <title>{isAdmin ? 'Campaigns' : 'Available Positions'} | Gulpin AI Interview</title>
+        <title>Submissions | Gulpin AI Interview</title>
       </Head>
-      <PageTemplate title={isAdmin ? 'Campaigns' : 'Available Positions'} maxWidth="lg">
+      <PageTemplate title="Submissions" maxWidth="lg">
         <div className="w-full bg-white shadow-md rounded-lg p-6">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold">{isAdmin ? 'Campaigns' : 'Available Positions'}</h2>
-            {isAdmin && (
-              <div className="flex items-center">
-                <Link 
-                  href="/campaigns/create"
-                  className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setShowToast(true);
-                  }}
-                >
-                  Create Campaign
-                </Link>
-                <Link 
-                  href="/campaigns/create-from-doc"
-                  className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-700 ml-2"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setShowToast(true);
-                  }}
-                >
-                  Create from Doc
-                </Link>
-              </div>
-            )}
+            <h2 className="text-2xl font-bold">Submissions</h2>
           </div>
 
           {error && (
@@ -222,7 +186,7 @@ const CampaignsPage = () => {
           ) : (
             <div ref={tableRef}>
               <ReactTabulator
-                data={campaigns}
+                data={submissions}
                 columns={columns}
                 options={options}
               />
@@ -240,4 +204,4 @@ const CampaignsPage = () => {
   );
 };
 
-export default CampaignsPage;
+export default SubmissionsPage;

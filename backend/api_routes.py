@@ -759,16 +759,13 @@ def create_question():
 def create_submission():
     # Validate request data
     data = request.get_json()
-    if not data or "campaign_id" not in data:
-        return jsonify({"error": "campaign_id is required"}), 400
+    print("🚀 ~ data:", data)
+    if not data or "campaign_id" not in data or "user_id" not in data:
+        return jsonify({"error": "campaign_id and user_id are required"}), 400
 
-    # Get user ID from session
-    user_id = session.get("user_id")
-    if not user_id:
-        return jsonify({"error": "Authentication required"}), 401
-
-    # Ensure campaign_id is a string
+    # Ensure IDs are strings
     campaign_id = str(data["campaign_id"])
+    user_id = str(data["user_id"])
 
     try:
         conn = get_db_connection()
@@ -781,10 +778,17 @@ def create_submission():
             conn.close()
             return jsonify({"error": "Campaign not found"}), 404
 
+        # Check if user exists
+        cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
+        user = cursor.fetchone()
+        if not user:
+            conn.close()
+            return jsonify({"error": "User not found"}), 404
+
         # Generate UUID using Python's uuid module
         submission_id = str(uuid.uuid4())
 
-        # Create submission with UUID and authenticated user ID
+        # Create submission with UUID, campaign_id, and user_id
         cursor.execute(
             "INSERT INTO submissions (id, campaign_id, user_id) VALUES (?, ?, ?) RETURNING *",
             (submission_id, campaign_id, user_id),
@@ -1133,11 +1137,94 @@ def update_question(id):
 
 
 @api_bp.route("/submissions/<string:id>", methods=["PUT"])
-# @admin_required
 def update_submission(id):
     data = request.json
-    update_table("submissions", id, data)
-    return jsonify({"message": "Submission updated successfully"}), 200
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    try:
+        # First check if the submission exists
+        cursor.execute("SELECT id FROM submissions WHERE id = ?", (id,))
+        if not cursor.fetchone():
+            conn.close()
+            return jsonify({"error": "Submission not found"}), 404
+
+        # Handle transcript separately if provided
+        if "transcript" in data:
+            # Convert transcript to string based on its type
+            transcript = data["transcript"]
+            if isinstance(transcript, dict):
+                # If it's a dictionary, format it as "speaker: text"
+                transcript = "\n".join([f"{k}: {v}" for k, v in transcript.items()])
+            elif isinstance(transcript, list):
+                transcript = "\n".join(transcript)
+
+            # Get the first question for this submission's campaign
+            cursor.execute(
+                """
+                SELECT q.id 
+                FROM questions q
+                JOIN submissions s ON q.campaign_id = s.campaign_id
+                WHERE s.id = ?
+                LIMIT 1
+                """,
+                (id,),
+            )
+            question = cursor.fetchone()
+
+            if question:
+                question_id = question[0]
+                # First check if an answer already exists
+                cursor.execute(
+                    """
+                    SELECT id FROM submission_answers 
+                    WHERE submission_id = ? AND question_id = ?
+                    """,
+                    (id, question_id),
+                )
+                existing_answer = cursor.fetchone()
+
+                if existing_answer:
+                    # Update existing answer
+                    cursor.execute(
+                        """
+                        UPDATE submission_answers 
+                        SET transcript = ?
+                        WHERE submission_id = ? AND question_id = ?
+                        """,
+                        (transcript, id, question_id),
+                    )
+                else:
+                    # Insert new answer with a new UUID
+                    import uuid
+
+                    new_id = str(uuid.uuid4())
+                    cursor.execute(
+                        """
+                        INSERT INTO submission_answers 
+                        (id, submission_id, question_id, transcript)
+                        VALUES (?, ?, ?, ?)
+                        """,
+                        (new_id, id, question_id, transcript),
+                    )
+
+            # Remove transcript from data so we don't try to update it in submissions table
+            del data["transcript"]
+
+        # Update other fields in submissions table
+        if data:
+            set_clause = ", ".join([f"{key} = ?" for key in data.keys()])
+            values = list(data.values()) + [id]
+            sql = f"UPDATE submissions SET {set_clause} WHERE id = ?"
+            cursor.execute(sql, values)
+
+        conn.commit()
+        return jsonify({"message": "Submission updated successfully"}), 200
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
 
 
 @api_bp.route("/submission_answers/<string:id>", methods=["PUT"])
