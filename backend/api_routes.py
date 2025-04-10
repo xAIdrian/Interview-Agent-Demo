@@ -283,35 +283,46 @@ def get_question(id):
 
 @api_bp.route("/submissions", methods=["GET"])
 def get_submissions():
-    conn = get_db_connection()
-    cursor = conn.cursor()
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
 
-    # Build query with filters
-    args = request.args.to_dict()
-    base_query = "SELECT * FROM submissions"
+        # Build the base query with joins - include both name and email
+        query = """
+            SELECT s.*, c.title AS campaign_title, u.name AS user_name, u.email AS user_email
+            FROM submissions s
+            JOIN campaigns c ON s.campaign_id = c.id
+            JOIN users u ON s.user_id = u.id
+        """
 
-    # Apply filters if any
-    if args:
-        filter_query, filter_values = build_filter_query(args)
-        cursor.execute(f"{base_query} {filter_query}", filter_values)
-    else:
-        cursor.execute(base_query)
+        # Get filter parameters
+        filters = request.args.to_dict()
+        if filters:
+            query += build_filter_query(filters)
 
-    submissions = cursor.fetchall()
-    columns = [
-        "id",
-        "campaign_id",
-        "user_id",
-        "created_at",
-        "total_points",
-        "is_complete",
-    ]
+        print("Executing query:", query)
+        cursor.execute(query)
+        rows = cursor.fetchall()
+        print("Raw database rows:", rows)
 
-    # Map rows to dictionaries with string IDs
-    result = [map_row_to_dict(submission, columns) for submission in submissions]
+        # Get column names from cursor description
+        columns = [desc[0] for desc in cursor.description]
 
-    conn.close()
-    return jsonify(result)
+        # Map rows to dictionaries using column names
+        submissions = []
+        for row in rows:
+            submission = {}
+            for i, col in enumerate(columns):
+                submission[col] = row[i]
+            submissions.append(submission)
+
+        print("Mapped submissions:", submissions)
+
+        conn.close()
+        return jsonify(submissions)
+    except Exception as e:
+        print("Error in get_submissions:", str(e))
+        return jsonify({"error": str(e)}), 500
 
 
 @api_bp.route("/submission_answers", methods=["GET"])
