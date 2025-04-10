@@ -294,7 +294,7 @@ const SubmissionDetailsPage = () => {
           <div className="flex justify-between mb-6">
             <div className="flex space-x-3">
               <Link 
-                href={`/campaigns/${submission.campaign_id}/submissions`}
+                href={`/submissions`}
                 className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-700"
               >
                 Back to Submissions

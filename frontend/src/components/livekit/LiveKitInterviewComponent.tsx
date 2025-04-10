@@ -11,6 +11,8 @@ import {
 import '@livekit/components-styles';
 import { Track } from 'livekit-client';
 import axios from 'axios';
+import { Modal } from '@/components/ui/Modal';
+import { Spinner } from '@/components/ui/Spinner';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5001';
 
@@ -148,6 +150,8 @@ const LiveKitInterviewComponent: React.FC<LiveKitInterviewComponentProps> = ({
   const livekitUrl = 'wss://default-test-oyjqa9xh.livekit.cloud';
   const [showOnboarding, setShowOnboarding] = React.useState(true);
   const [transcript, setTranscript] = React.useState<any[]>([]);
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [submitError, setSubmitError] = React.useState<string | null>(null);
 
   const handleTranscriptUpdate = (newTranscript: any[]) => {
     setTranscript(newTranscript);
@@ -155,19 +159,31 @@ const LiveKitInterviewComponent: React.FC<LiveKitInterviewComponentProps> = ({
 
   const handleDisconnect = async () => {
     try {
+      setIsSubmitting(true);
+      setSubmitError(null);
+
       // Format transcript as a string before sending
       const formattedTranscript = transcript
         .map(entry => `${entry.speaker}: ${entry.text}`)
         .join('\n');
 
-      // Submit the transcript before disconnecting
-      await axios.put(`${API_BASE_URL}/api/submissions/${submissionId}`, {
-        transcript: formattedTranscript
+      // Submit the transcript for scoring
+      const response = await axios.post(`${API_BASE_URL}/api/submit_interview`, {
+        transcript: formattedTranscript,
+        submission_id: submissionId
       });
+
+      if (response.status === 200) {
+        // Success - proceed with disconnection
+        onDisconnect();
+      } else {
+        throw new Error('Failed to submit interview for scoring');
+      }
     } catch (error) {
       console.error('Error submitting interview:', error);
+      setSubmitError(error instanceof Error ? error.message : 'Failed to submit interview for scoring');
     } finally {
-      onDisconnect();
+      setIsSubmitting(false);
     }
   };
 
@@ -176,6 +192,31 @@ const LiveKitInterviewComponent: React.FC<LiveKitInterviewComponentProps> = ({
       {showOnboarding && (
         <OnboardingModal onClose={() => setShowOnboarding(false)} />
       )}
+      
+      {/* Loading Modal */}
+      <Modal 
+        isOpen={isSubmitting}
+        title="Submitting Interview"
+      >
+        <div className="flex flex-col items-center space-y-4">
+          <Spinner size="large" />
+          <p className="text-gray-600 text-center">
+            Please wait while we process your interview and generate your score...
+          </p>
+        </div>
+      </Modal>
+
+      {/* Error Modal */}
+      <Modal 
+        isOpen={!!submitError}
+        title="Submission Error"
+        onClose={() => setSubmitError(null)}
+      >
+        <div className="text-red-600 text-center p-4">
+          {submitError}
+        </div>
+      </Modal>
+
       <div className="bg-white rounded-lg overflow-hidden shadow-lg">
         <div className="p-4 bg-blue-600 text-white">
           <div className="flex justify-between items-center">
@@ -183,6 +224,7 @@ const LiveKitInterviewComponent: React.FC<LiveKitInterviewComponentProps> = ({
             <button 
               onClick={handleDisconnect}
               className="px-3 py-1 bg-white text-blue-600 rounded hover:bg-blue-50 transition-colors"
+              disabled={isSubmitting}
             >
               End Interview
             </button>
