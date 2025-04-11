@@ -152,6 +152,7 @@ const LiveKitInterviewComponent: React.FC<LiveKitInterviewComponentProps> = ({
   const [transcript, setTranscript] = React.useState<any[]>([]);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [submitError, setSubmitError] = React.useState<string | null>(null);
+  const [scoringResult, setScoringResult] = React.useState<any>(null);
 
   const handleTranscriptUpdate = (newTranscript: any[]) => {
     setTranscript(newTranscript);
@@ -161,6 +162,7 @@ const LiveKitInterviewComponent: React.FC<LiveKitInterviewComponentProps> = ({
     try {
       setIsSubmitting(true);
       setSubmitError(null);
+      setScoringResult(null);
 
       // Format transcript as a string before sending
       const formattedTranscript = transcript
@@ -173,11 +175,14 @@ const LiveKitInterviewComponent: React.FC<LiveKitInterviewComponentProps> = ({
         submission_id: submissionId
       });
 
-      if (response.status === 200) {
-        // Success - proceed with disconnection
-        onDisconnect();
+      if (response.status === 200 && response.data.success) {
+        setScoringResult(response.data);
+        // Wait a moment to show the success message before disconnecting
+        setTimeout(() => {
+          onDisconnect();
+        }, 2000);
       } else {
-        throw new Error('Failed to submit interview for scoring');
+        throw new Error(response.data.message || 'Failed to submit interview for scoring');
       }
     } catch (error) {
       console.error('Error submitting interview:', error);
@@ -196,7 +201,7 @@ const LiveKitInterviewComponent: React.FC<LiveKitInterviewComponentProps> = ({
       {/* Loading Modal */}
       <Modal 
         isOpen={isSubmitting}
-        title="Submitting Interview"
+        title="Processing Interview"
       >
         <div className="flex flex-col items-center space-y-4">
           <Spinner size="large" />
@@ -205,6 +210,37 @@ const LiveKitInterviewComponent: React.FC<LiveKitInterviewComponentProps> = ({
           </p>
         </div>
       </Modal>
+
+      {/* Success Modal */}
+      {/* <Modal 
+        isOpen={!!scoringResult}
+        title="Interview Scored Successfully"
+      >
+        <div className="flex flex-col items-center space-y-4">
+          <div className="text-green-600 text-center">
+            <p className="text-xl font-semibold">Your interview has been scored!</p>
+            <p className="mt-2">
+              Score: {scoringResult?.total_score} / {scoringResult?.max_possible_score}
+            </p>
+          </div>
+          <div className="w-full max-h-96 overflow-y-auto">
+            {scoringResult?.scores?.map((score: any, index: number) => (
+              <div key={index} className="mb-4 p-4 bg-gray-50 rounded-lg">
+                <h4 className="font-medium">Question {index + 1}</h4>
+                <p className="text-sm text-gray-600">{score.question}</p>
+                <div className="mt-2">
+                  <span className="font-medium">Score: </span>
+                  <span>{score.score} / {score.max_points}</span>
+                </div>
+                <div className="mt-2">
+                  <span className="font-medium">Feedback: </span>
+                  <p className="text-sm text-gray-700">{score.rationale}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Modal> */}
 
       {/* Error Modal */}
       <Modal 
