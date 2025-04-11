@@ -7,6 +7,8 @@ import { Spinner } from '../components/ui/Spinner';
 import Head from 'next/head';
 import axios from 'axios';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5001';
+
 const RegisterPage = () => {
   const [formData, setFormData] = useState({
     name: '',
@@ -78,7 +80,7 @@ const RegisterPage = () => {
 
     setIsLoading(true);
     try {
-      const response = await axios.post('https://main-service-48k0.onrender.com/register', {
+      const response = await axios.post(`${API_URL}/register`, {
         name: formData.name,
         email: formData.email,
         password: formData.password

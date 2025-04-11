@@ -4,11 +4,7 @@ import Link from 'next/link';
 import { PageTemplate } from '../../../components/PageTemplate';
 import { AuthLogger } from '../../../utils/logging';
 import { 
-  UserPlusIcon, 
-  EyeIcon, 
-  PencilSquareIcon,
-  ShieldCheckIcon,
-  UserIcon
+  UserPlusIcon
 } from '@heroicons/react/24/outline';
 // Import Tabulator config
 import configureTabulatorDependencies from '../../../utils/tabulator-config';
@@ -17,6 +13,8 @@ import 'react-tabulator/lib/styles.css';
 import 'react-tabulator/lib/css/tabulator.min.css';
 // Import custom tabulator styles
 import '../../../styles/tabulator.css';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5001';
 
 // Initialize Tabulator with required dependencies
 configureTabulatorDependencies();
@@ -54,7 +52,7 @@ const UsersPage = () => {
     const fetchUsers = async () => {
       try {
         setIsLoading(true);
-        const response = await axios.get('https://main-service-48k0.onrender.com/api/users');
+        const response = await axios.get(`${API_URL}/api/users`);
         setUsers(response.data);
         AuthLogger.info(`Loaded ${response.data.length} users successfully`);
       } catch (err) {

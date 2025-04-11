@@ -4,6 +4,8 @@ import { useRouter } from 'next/router';
 import { PrimaryButton } from '../../../components/Button';
 import { PageTemplate } from '../../../components/PageTemplate';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5001';
+
 // Define interface for Question object
 interface Question {
   id?: string; // ID is required for existing questions
@@ -68,12 +70,12 @@ const EditCampaignPage = () => {
       
       // Fetch campaign details
       const campaignResponse = await axios.get(
-        `https://main-service-48k0.onrender.com/api/campaigns/${campaignId}`
+        `${API_URL}/api/campaigns/${campaignId}`
       );
       
       // Fetch questions for this campaign
       const questionsResponse = await axios.get(
-        `https://main-service-48k0.onrender.com/api/questions?campaign_id=${campaignId}`
+        `${API_URL}/api/questions?campaign_id=${campaignId}`
       );
       
       const campaignData = campaignResponse.data;
@@ -208,7 +210,7 @@ const EditCampaignPage = () => {
     
     try {
       const response = await axios.post(
-        'https://main-service-48k0.onrender.com/api/optimize_prompt',
+        `${API_URL}/api/optimize_prompt`,
         {
           campaign_name: campaignTitle,
           campaign_context,
@@ -328,7 +330,7 @@ const EditCampaignPage = () => {
       }
       
       const response = await axios.post(
-        `https://main-service-48k0.onrender.com/api/campaigns/${campaignId}/update`,
+        `${API_URL}/api/campaigns/${campaignId}/update`,
         formData
       );
       

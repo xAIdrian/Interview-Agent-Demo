@@ -11,7 +11,8 @@ import {
   SparklesIcon,
   ArrowPathIcon,
   CheckCircleIcon,
-  XCircleIcon
+  XCircleIcon,
+  UserGroupIcon
 } from '@heroicons/react/24/outline';
 
 // Define interface for Question object
@@ -31,6 +32,14 @@ interface Campaign {
   max_user_submissions: number;
   is_public: boolean;
   questions: Question[];
+}
+
+// Add interface for User
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  is_admin: boolean;
 }
 
 const CreateCampaignPage = () => {
@@ -61,9 +70,33 @@ const CreateCampaignPage = () => {
   const [optimizedPrompts, setOptimizedPrompts] = useState<{[key: number]: string}>({});
   const [showOptimized, setShowOptimized] = useState<{[key: number]: boolean}>({});
   
+  // Candidate states
+  const [candidates, setCandidates] = useState<User[]>([]);
+  const [selectedCandidates, setSelectedCandidates] = useState<string[]>([]);
+  const [isLoadingCandidates, setIsLoadingCandidates] = useState(false);
+  
   // Use client-side only rendering
   useEffect(() => {
     setIsClient(true);
+  }, []);
+  
+  // Add useEffect to fetch candidates
+  useEffect(() => {
+    const fetchCandidates = async () => {
+      setIsLoadingCandidates(true);
+      try {
+        const response = await axios.get('/api/users');
+        const nonAdminUsers = response.data.filter((user: User) => !user.is_admin);
+        setCandidates(nonAdminUsers);
+      } catch (error) {
+        console.error('Error fetching candidates:', error);
+        setError('Failed to load candidates');
+      } finally {
+        setIsLoadingCandidates(false);
+      }
+    };
+
+    fetchCandidates();
   }, []);
   
   if (!isClient) {
@@ -223,6 +256,17 @@ const CreateCampaignPage = () => {
     });
   };
   
+  // Add handler for candidate selection
+  const handleCandidateSelection = (userId: string) => {
+    setSelectedCandidates(prev => {
+      if (prev.includes(userId)) {
+        return prev.filter(id => id !== userId);
+      } else {
+        return [...prev, userId];
+      }
+    });
+  };
+  
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -236,6 +280,7 @@ const CreateCampaignPage = () => {
         body: q.title // Set body to title when submitting
       }));
 
+      // First create the campaign
       const response = await axios.post('/api/test-campaigns', {
         ...campaign,
         questions: questionsData
@@ -246,6 +291,20 @@ const CreateCampaignPage = () => {
       });
 
       if (response.data.success) {
+        const campaignId = response.data.data.id;
+        
+        // If candidates were selected, assign them to the campaign
+        if (selectedCandidates.length > 0) {
+          try {
+            await axios.post(`/api/campaigns/${campaignId}/assignments`, {
+              user_ids: selectedCandidates
+            });
+          } catch (error) {
+            console.error('Error assigning candidates:', error);
+            // Continue with redirect even if assignment fails
+          }
+        }
+        
         router.push('/campaigns');
       } else {
         setError(response.data.message || 'Failed to create campaign');
@@ -326,6 +385,49 @@ const CreateCampaignPage = () => {
                 />
                 <label className="ml-2 block text-sm text-gray-900">Public Campaign</label>
               </div>
+            </div>
+          </div>
+
+          {/* Add Candidate Selection Section */}
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-semibold">Candidate Assignment</h2>
+              <UserGroupIcon className="h-6 w-6 text-gray-500" />
+            </div>
+            
+            <div className="border rounded-lg p-4 space-y-4">
+              <p className="text-sm text-gray-600">
+                Select candidates to assign to this campaign. You can also assign candidates later.
+              </p>
+              
+              {isLoadingCandidates ? (
+                <div className="flex justify-center">
+                  <Spinner size="small" />
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {candidates.map((candidate) => (
+                    <div
+                      key={candidate.id}
+                      className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                        selectedCandidates.includes(candidate.id)
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                      onClick={() => handleCandidateSelection(candidate.id)}
+                    >
+                      <div className="font-medium">{candidate.name}</div>
+                      <div className="text-sm text-gray-600">{candidate.email}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              {candidates.length === 0 && !isLoadingCandidates && (
+                <div className="text-center text-gray-500 py-4">
+                  No candidates available to assign.
+                </div>
+              )}
             </div>
           </div>
 
