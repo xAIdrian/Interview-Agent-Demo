@@ -3,7 +3,7 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import axios from 'axios';
 import LiveKitInterviewComponent from '@/components/livekit/LiveKitInterviewComponent';
-import { useLiveKitInterview } from '@/components/livekit/LiveKitInterviewForm';
+import { useLiveKitInterview } from '@/components/livekit/useLiveKitInterview';
 import Link from 'next/link';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/app/components/AuthProvider';
