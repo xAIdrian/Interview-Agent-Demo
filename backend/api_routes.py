@@ -38,6 +38,9 @@ import re
 import bcrypt
 from livekit.token_server import LiveKitTokenServer
 from datetime import datetime
+import sqlite3
+import random
+import string
 
 # Create a Blueprint for the API routes
 api_bp = Blueprint("api", __name__)
@@ -262,18 +265,37 @@ def get_campaign(id):
 
 
 @api_bp.route("/questions", methods=["GET"])
-# @admin_required
 def get_questions():
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    filter_query, filter_values = build_filter_query(request.args)
-    cursor.execute(f"SELECT * FROM questions {filter_query}", filter_values)
+    # Get filter parameters
+    filters = request.args.to_dict()
 
+    # Build base query
+    query = "SELECT * FROM questions"
+    params = []
+
+    # Add WHERE clause if filters exist
+    if filters:
+        conditions = []
+        for key, value in filters.items():
+            if key == "campaign_id":
+                conditions.append("campaign_id = ?")
+                params.append(value)
+            else:
+                conditions.append(f"{key} = ?")
+                params.append(value)
+
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+
+    # Execute query
+    cursor.execute(query, params)
     questions = cursor.fetchall()
-    columns = ["id", "campaign_id", "title", "body", "scoring_prompt", "max_points"]
 
-    # Use the helper function to map rows to dictionaries with string IDs
+    # Map rows to dictionaries
+    columns = ["id", "campaign_id", "title", "body", "scoring_prompt", "max_points"]
     result = [map_row_to_dict(question, columns) for question in questions]
 
     conn.close()
@@ -572,11 +594,8 @@ def create_user():
         user_id = str(uuid.uuid4())
 
         # Generate a default password if not provided
-        password_hash = data.get("password_hash")
-        if not password_hash:
-            # In a real application, you would use a proper password hashing algorithm
-            temporary_password = "changeme123"
-            password_hash = temporary_password
+        password = data.get("password", "changeme123")
+        password_hash = generate_password_hash(password, method="pbkdf2:sha256")
 
         # Insert the new user
         cursor.execute(
@@ -602,17 +621,16 @@ def create_user():
         result = map_row_to_dict(new_user, columns)
 
         # If we generated a temporary password, include it in the response
-        if data.get("password_hash") is None:
-            result["temporary_password"] = temporary_password
+        if data.get("password") is None:
+            result["temporary_password"] = password
 
-        conn.close()
         return jsonify(result), 201
 
-    except Exception as e:
-        if conn:
-            conn.rollback()
-            conn.close()
-        return jsonify({"error": f"Failed to create user: {str(e)}"}), 500
+    except sqlite3.Error as e:
+        conn.rollback()
+        return jsonify({"error": f"Error: {str(e)}"}), 400
+    finally:
+        conn.close()
 
 
 @api_bp.route("/users/create", methods=["POST"])
@@ -622,9 +640,9 @@ def create_new_user():
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # Generate a temporary password or use a default one
-    temporary_password = "changeme123"
-    password_hash = temporary_password  # In production, use proper hashing
+    # Generate a temporary password
+    password = "".join(random.choices(string.ascii_letters + string.digits, k=12))
+    password_hash = generate_password_hash(password, method="pbkdf2:sha256")
 
     try:
         cursor.execute(
@@ -640,7 +658,7 @@ def create_new_user():
             jsonify(
                 {
                     "message": "User created successfully",
-                    "temporaryPassword": temporary_password,
+                    "temporaryPassword": password,
                 }
             ),
             201,
@@ -1035,9 +1053,9 @@ def update_user(id):
             params.append(name)
 
         if password:
-            hashed_password = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt())
+            password_hash = generate_password_hash(password, method="pbkdf2:sha256")
             update_parts.append("password_hash = ?")
-            params.append(hashed_password.decode("utf-8"))
+            params.append(password_hash)
 
         if is_admin is not None:
             update_parts.append("is_admin = ?")
@@ -1119,7 +1137,7 @@ def update_campaign_with_questions(id):
     total_max_points = 0
     for question in data["questions"]:
         if question["id"]:  # Existing question - update it
-            question_id = int(question["id"])
+            question_id = question["id"]  # Keep as string, don't convert to int
             updated_question_ids.append(question_id)
             cursor.execute(
                 """
@@ -1138,12 +1156,15 @@ def update_campaign_with_questions(id):
             )
             total_max_points += question["max_points"]
         else:  # New question - insert it
+            # Generate a new UUID for the question
+            question_id = str(uuid.uuid4())
             cursor.execute(
                 """
                 INSERT INTO questions (id, campaign_id, title, body, scoring_prompt, max_points)
-                VALUES (UUID_SHORT(), ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?)
             """,
                 (
+                    question_id,
                     id,
                     question["title"],
                     question["body"],
@@ -2314,3 +2335,115 @@ def test_create_campaign():
         )
         response.headers.add("Access-Control-Allow-Origin", "*")
         return response, 400
+
+
+@api_bp.route("/campaigns/<string:campaign_id>/assignments", methods=["POST"])
+def assign_candidates(campaign_id):
+    """Assign candidates to a campaign."""
+    try:
+        data = request.json
+        user_ids = data.get("user_ids", [])
+        current_user_id = session.get("user_id")
+
+        if not user_ids:
+            return jsonify({"error": "No user IDs provided"}), 400
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Verify campaign exists
+        cursor.execute("SELECT id FROM campaigns WHERE id = ?", (campaign_id,))
+        if not cursor.fetchone():
+            conn.close()
+            return jsonify({"error": "Campaign not found"}), 404
+
+        # Verify all users exist and are not admins
+        placeholders = ",".join(["?" for _ in user_ids])
+        cursor.execute(
+            f"""
+            SELECT id, is_admin 
+            FROM users 
+            WHERE id IN ({placeholders})
+        """,
+            user_ids,
+        )
+
+        users = cursor.fetchall()
+        if len(users) != len(user_ids):
+            conn.close()
+            return jsonify({"error": "One or more users not found"}), 404
+
+        for user in users:
+            if user[1]:  # is_admin is True
+                conn.close()
+                return jsonify({"error": "Cannot assign admin users to campaigns"}), 400
+
+        # Insert assignments
+        for user_id in user_ids:
+            try:
+                # Generate a UUID using Python's uuid module
+                assignment_id = str(uuid.uuid4())
+                cursor.execute(
+                    """
+                    INSERT INTO campaign_assignments (id, campaign_id, user_id, created_by)
+                    VALUES (?, ?, ?, ?)
+                """,
+                    (assignment_id, campaign_id, user_id, current_user_id),
+                )
+            except sqlite3.IntegrityError:
+                # Skip if assignment already exists
+                continue
+
+        conn.commit()
+        conn.close()
+        return jsonify({"message": "Candidates assigned successfully"})
+    except Exception as e:
+        if conn:
+            conn.rollback()
+            conn.close()
+        return jsonify({"error": str(e)}), 500
+
+
+@api_bp.route("/assigned_campaigns", methods=["GET"])
+def get_assigned_campaigns():
+    """Get campaigns assigned to a user."""
+    try:
+        # Get user_id from query parameters
+        user_id = request.args.get("user_id")
+        if not user_id:
+            return jsonify({"error": "user_id parameter is required"}), 400
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Get campaigns assigned to the user
+        cursor.execute(
+            """
+            SELECT c.* 
+            FROM campaigns c
+            JOIN campaign_assignments ca ON c.id = ca.campaign_id
+            WHERE ca.user_id = ?
+        """,
+            (user_id,),
+        )
+
+        campaigns = cursor.fetchall()
+        columns = [
+            "id",
+            "title",
+            "max_user_submissions",
+            "max_points",
+            "is_public",
+            "campaign_context",
+            "job_description",
+            "created_by",
+            "created_at",
+            "updated_at",
+        ]
+        result = [map_row_to_dict(campaign, columns) for campaign in campaigns]
+        conn.close()
+        return jsonify(result)
+    except Exception as e:
+        if conn:
+            conn.close()
+        return jsonify({"error": str(e)}), 500
