@@ -304,6 +304,10 @@ def get_question(id):
 @api_bp.route("/submissions", methods=["GET"])
 def get_submissions():
     try:
+        # Get user identity from session
+        user_id = session.get("user_id")
+        is_admin = session.get("is_admin", False)
+
         conn = get_db_connection()
         cursor = conn.cursor()
 
@@ -317,14 +321,21 @@ def get_submissions():
 
         # Get filter parameters
         filters = request.args.to_dict()
-        if filters:
-            filter_query, filter_values = build_filter_query(filters)
-            query += " " + filter_query
-            print("Executing query:", query)
-            cursor.execute(query, filter_values)
-        else:
-            print("Executing query:", query)
-            cursor.execute(query)
+
+        # For non-admin users, always filter by their user_id
+        if not is_admin and user_id:
+            filters["s.user_id"] = user_id
+
+        # Build WHERE clause and get parameters
+        where_clause, params = build_filter_query(filters)
+        if where_clause:
+            query += " " + where_clause
+
+        print("Executing query:", query)
+        print("With parameters:", params)
+
+        # Execute query with parameters as a list
+        cursor.execute(query, list(params.values()) if params else [])
 
         rows = cursor.fetchall()
         print("Raw database rows:", rows)

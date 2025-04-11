@@ -34,17 +34,23 @@ def get_db_connection():
     return sqlite3.connect(db_path)
 
 
-def build_filter_query(table_name, filters):
-    query = f"SELECT * FROM {table_name} WHERE "
-    params = []
+def build_filter_query(filters):
+    """Build a WHERE clause for SQL queries with proper parameter handling."""
+    if not filters:
+        return "", {}
+
     conditions = []
+    params = {}
 
     for key, value in filters.items():
-        conditions.append(f"{key} = :{key}")
-        params[key] = value
+        if value is not None:  # Only add conditions for non-null values
+            conditions.append(f"{key} = ?")
+            params[key] = value
 
-    query += " AND ".join(conditions)
-    return query, params
+    if not conditions:
+        return "", {}
+
+    return "WHERE " + " AND ".join(conditions), params
 
 
 def create_users_table():
