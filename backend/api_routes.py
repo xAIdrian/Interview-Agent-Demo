@@ -70,9 +70,28 @@ def admin_required(f):
 def build_filter_query(args):
     filter_clauses = []
     filter_values = []
+
+    # Map frontend field names to their corresponding table aliases
+    table_aliases = {
+        "user_id": "s.user_id",
+        "campaign_id": "s.campaign_id",
+        "is_complete": "s.is_complete",
+        "total_points": "s.total_points",
+        "created_at": "s.created_at",
+        "updated_at": "s.updated_at",
+        "completed_at": "s.completed_at",
+        "email": "u.email",
+        "name": "u.name",
+        "campaign_title": "c.title",
+    }
+
     for key, value in args.items():
-        filter_clauses.append(f"{key} = ?")
+        field = table_aliases.get(
+            key, f"s.{key}"
+        )  # Default to submissions table if no alias found
+        filter_clauses.append(f"{field} = ?")
         filter_values.append(value)
+
     filter_query = " AND ".join(filter_clauses)
     if filter_query:
         filter_query = "WHERE " + filter_query
@@ -299,10 +318,14 @@ def get_submissions():
         # Get filter parameters
         filters = request.args.to_dict()
         if filters:
-            query += build_filter_query(filters)
+            filter_query, filter_values = build_filter_query(filters)
+            query += " " + filter_query
+            print("Executing query:", query)
+            cursor.execute(query, filter_values)
+        else:
+            print("Executing query:", query)
+            cursor.execute(query)
 
-        print("Executing query:", query)
-        cursor.execute(query)
         rows = cursor.fetchall()
         print("Raw database rows:", rows)
 
