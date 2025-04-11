@@ -19,7 +19,7 @@ from functools import wraps
 import boto3
 import uuid
 from config import Config
-from scoring_agent import optimize_with_ai
+from scoring_agent import optimize_with_ai, generate_submission_scoring
 import tempfile
 import os
 from werkzeug.utils import secure_filename
@@ -37,6 +37,7 @@ import json
 import re
 import bcrypt
 from livekit.token_server import LiveKitTokenServer
+from datetime import datetime
 
 # Create a Blueprint for the API routes
 api_bp = Blueprint("api", __name__)
@@ -770,7 +771,6 @@ def create_question():
 def create_submission():
     # Validate request data
     data = request.get_json()
-    print("🚀 ~ data:", data)
     if not data or "campaign_id" not in data or "user_id" not in data:
         return jsonify({"error": "campaign_id and user_id are required"}), 400
 
@@ -2012,7 +2012,7 @@ def submit_interview():
 
         # Get campaign details
         cursor.execute(
-            "SELECT title, campaign_context, description FROM campaigns WHERE id = ?",
+            "SELECT title, campaign_context, job_description FROM campaigns WHERE id = ?",
             (campaign_id,),
         )
         campaign_row = cursor.fetchone()
@@ -2044,6 +2044,7 @@ def submit_interview():
 
         conn.close()
 
+        # Generate scores
         scores = generate_submission_scoring(campaign, questions, transcript)
         print(scores)
 
@@ -2057,13 +2058,16 @@ def submit_interview():
 
             # Update each answer in submission_answers
             for score in scores:
+                # Generate a UUID for the answer
+                answer_id = str(uuid.uuid4())
                 cursor.execute(
                     """
                     INSERT INTO submission_answers 
                     (id, submission_id, question_id, transcript, score, score_rationale)
-                    VALUES (uuid_short(), ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?)
                 """,
                     (
+                        answer_id,
                         submission_id,
                         score["question_id"],
                         score["response"],
@@ -2085,16 +2089,35 @@ def submit_interview():
 
             conn.commit()
 
+            # Return detailed response
+            return (
+                jsonify(
+                    {
+                        "success": True,
+                        "message": "Interview scored successfully",
+                        "submission_id": submission_id,
+                        "total_score": total_score,
+                        "max_possible_score": sum(q["max_points"] for q in questions),
+                        "scores": scores,
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                ),
+                200,
+            )
+
         except Exception as e:
             conn.rollback()
             raise e
         finally:
             conn.close()
 
-        print("Received transcript:", transcript)
-        return jsonify({"success": True}), 200
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return (
+            jsonify(
+                {"error": str(e), "message": "Failed to process interview scoring"}
+            ),
+            500,
+        )
 
 
 # Add LiveKit token endpoint
