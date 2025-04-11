@@ -71,17 +71,26 @@ const SubmissionsPage = () => {
     const fetchSubmissions = async () => {
       try {
         setIsLoading(true);
-        const response = await axios.get(`${API_BASE_URL}/api/submissions`);
+        const response = await axios.get(`${API_BASE_URL}/api/submissions`, {
+          withCredentials: true // Add this to send cookies with the request
+        });
+        
+        if (!response.data) {
+          throw new Error('No data received from server');
+        }
         
         console.log('Raw response data:', response.data);
         
-        // Ensure all submission IDs are strings
+        // Ensure all submission IDs are strings and handle potential null values
         const submissionsWithStringIds = response.data.map((submission: any) => {
           console.log('Processing submission:', submission);
           return {
             ...submission,
-            id: String(submission.id),
-            campaign_id: String(submission.campaign_id)
+            id: String(submission.id || ''),
+            campaign_id: String(submission.campaign_id || ''),
+            user_id: String(submission.user_id || ''),
+            is_complete: Boolean(submission.is_complete),
+            total_points: submission.total_points !== null ? Number(submission.total_points) : null
           };
         });
         
@@ -90,11 +99,18 @@ const SubmissionsPage = () => {
         AuthLogger.info(`Loaded ${submissionsWithStringIds.length} submissions successfully`);
       } catch (err) {
         console.error('Error fetching submissions:', err);
-        setError('Failed to load submissions. Please try again.');
         
         if (axios.isAxiosError(err)) {
+          if (err.response?.status === 401) {
+            setError('Please log in to view your submissions.');
+          } else if (err.response?.status === 403) {
+            setError('You do not have permission to view these submissions.');
+          } else {
+            setError('Failed to load submissions. Please try again.');
+          }
           AuthLogger.error('Error fetching submissions:', err.response?.status, err.response?.data);
         } else {
+          setError('An unexpected error occurred. Please try again.');
           AuthLogger.error('Unexpected error fetching submissions:', err);
         }
       } finally {
@@ -102,8 +118,13 @@ const SubmissionsPage = () => {
       }
     };
 
-    fetchSubmissions();
-  }, [isClient]);
+    if (isAuthenticated) {
+      fetchSubmissions();
+    } else {
+      setError('Please log in to view your submissions.');
+      setIsLoading(false);
+    }
+  }, [isClient, isAuthenticated]);
 
   const handleActionClick = (id: string) => {
     router.push(`/submissions/${id}`);
@@ -111,7 +132,7 @@ const SubmissionsPage = () => {
 
   const columns: ColumnDefinition[] = [
     { title: "Campaign", field: "campaign_title", widthGrow: 2 },
-    { 
+    ...(isAdmin ? [{
       title: "Candidate", 
       field: "user_name",
       widthGrow: 2,
@@ -119,7 +140,7 @@ const SubmissionsPage = () => {
         const row = cell.getRow().getData();
         return `${row.user_name}<br><span class="text-sm text-gray-500">${row.user_email}</span>`;
       }
-    },
+    }] : []),
     { 
       title: "Status", 
       field: "is_complete", 
@@ -190,12 +211,12 @@ const SubmissionsPage = () => {
   return (
     <>
       <Head>
-        <title>Submissions | Gulpin AI Interview</title>
+        <title>{isAdmin ? 'All Submissions' : 'My Submissions'} | Gulpin AI Interview</title>
       </Head>
-      <PageTemplate title="Submissions" maxWidth="lg">
+      <PageTemplate title={isAdmin ? 'All Submissions' : 'My Submissions'} maxWidth="lg">
         <div className="w-full bg-white shadow-md rounded-lg p-6">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold">Submissions</h2>
+            <h2 className="text-2xl font-bold">{isAdmin ? 'All Submissions' : 'My Submissions'}</h2>
           </div>
 
           {error && (
