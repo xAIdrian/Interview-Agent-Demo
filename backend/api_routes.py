@@ -1586,7 +1586,10 @@ def login():
         return jsonify({"error": "Email and password are required"}), 400
 
     conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)  # Use dictionary cursor for named columns
+    # Set row factory to return dictionaries
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
     cursor.execute("SELECT * FROM users WHERE email = ?", (email,))
     user = cursor.fetchone()
     conn.close()
@@ -1613,13 +1616,14 @@ def login():
     print(f"Session after login: {session}")
     print(f"Admin status: {session.get('is_admin')}")  # Debug log
 
-    # Return user data
+    # Return user data with redirect URL
     return jsonify(
         {
             "id": str(user["id"]),
             "email": user["email"],
             "name": user["name"],
             "is_admin": bool(user["is_admin"]),
+            "redirect_to": "/admin" if bool(user["is_admin"]) else "/candidate",
         }
     )
 
@@ -2337,113 +2341,109 @@ def test_create_campaign():
         return response, 400
 
 
-@api_bp.route("/campaigns/<string:campaign_id>/assignments", methods=["POST"])
-def assign_candidates(campaign_id):
-    """Assign candidates to a campaign."""
-    try:
-        data = request.json
-        user_ids = data.get("user_ids", [])
-        current_user_id = session.get("user_id")
+@api_bp.route("/campaigns/<string:campaign_id>/assignments", methods=["GET", "POST"])
+def handle_campaign_assignments(campaign_id):
+    """Handle campaign assignments (GET and POST)."""
+    if request.method == "GET":
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
 
-        if not user_ids:
-            return jsonify({"error": "No user IDs provided"}), 400
+            # Get assignments for this campaign
+            cursor.execute(
+                """
+                SELECT ca.*, u.name, u.email
+                FROM campaign_assignments ca
+                JOIN users u ON ca.user_id = u.id
+                WHERE ca.campaign_id = ?
+            """,
+                (campaign_id,),
+            )
 
-        conn = get_db_connection()
-        cursor = conn.cursor()
+            assignments = cursor.fetchall()
+            columns = [
+                "id",
+                "campaign_id",
+                "user_id",
+                "created_by",
+                "created_at",
+                "name",
+                "email",
+            ]
+            result = [
+                map_row_to_dict(assignment, columns) for assignment in assignments
+            ]
 
-        # Verify campaign exists
-        cursor.execute("SELECT id FROM campaigns WHERE id = ?", (campaign_id,))
-        if not cursor.fetchone():
             conn.close()
-            return jsonify({"error": "Campaign not found"}), 404
-
-        # Verify all users exist and are not admins
-        placeholders = ",".join(["?" for _ in user_ids])
-        cursor.execute(
-            f"""
-            SELECT id, is_admin 
-            FROM users 
-            WHERE id IN ({placeholders})
-        """,
-            user_ids,
-        )
-
-        users = cursor.fetchall()
-        if len(users) != len(user_ids):
-            conn.close()
-            return jsonify({"error": "One or more users not found"}), 404
-
-        for user in users:
-            if user[1]:  # is_admin is True
+            return jsonify(result)
+        except Exception as e:
+            if conn:
                 conn.close()
-                return jsonify({"error": "Cannot assign admin users to campaigns"}), 400
+            return jsonify({"error": str(e)}), 500
 
-        # Insert assignments
-        for user_id in user_ids:
-            try:
-                # Generate a UUID using Python's uuid module
-                assignment_id = str(uuid.uuid4())
-                cursor.execute(
-                    """
-                    INSERT INTO campaign_assignments (id, campaign_id, user_id, created_by)
-                    VALUES (?, ?, ?, ?)
-                """,
-                    (assignment_id, campaign_id, user_id, current_user_id),
-                )
-            except sqlite3.IntegrityError:
-                # Skip if assignment already exists
-                continue
+    elif request.method == "POST":
+        try:
+            data = request.json
+            user_ids = data.get("user_ids", [])
+            current_user_id = session.get("user_id")
 
-        conn.commit()
-        conn.close()
-        return jsonify({"message": "Candidates assigned successfully"})
-    except Exception as e:
-        if conn:
-            conn.rollback()
+            if not user_ids:
+                return jsonify({"error": "No user IDs provided"}), 400
+
+            conn = get_db_connection()
+            cursor = conn.cursor()
+
+            # Verify campaign exists
+            cursor.execute("SELECT id FROM campaigns WHERE id = ?", (campaign_id,))
+            if not cursor.fetchone():
+                conn.close()
+                return jsonify({"error": "Campaign not found"}), 404
+
+            # Verify all users exist and are not admins
+            placeholders = ",".join(["?" for _ in user_ids])
+            cursor.execute(
+                f"""
+                SELECT id, is_admin 
+                FROM users 
+                WHERE id IN ({placeholders})
+            """,
+                user_ids,
+            )
+
+            users = cursor.fetchall()
+            if len(users) != len(user_ids):
+                conn.close()
+                return jsonify({"error": "One or more users not found"}), 404
+
+            for user in users:
+                if user[1]:  # is_admin is True
+                    conn.close()
+                    return (
+                        jsonify({"error": "Cannot assign admin users to campaigns"}),
+                        400,
+                    )
+
+            # Insert assignments
+            for user_id in user_ids:
+                try:
+                    # Generate a UUID using Python's uuid module
+                    assignment_id = str(uuid.uuid4())
+                    cursor.execute(
+                        """
+                        INSERT INTO campaign_assignments (id, campaign_id, user_id, created_by)
+                        VALUES (?, ?, ?, ?)
+                    """,
+                        (assignment_id, campaign_id, user_id, current_user_id),
+                    )
+                except sqlite3.IntegrityError:
+                    # Skip if assignment already exists
+                    continue
+
+            conn.commit()
             conn.close()
-        return jsonify({"error": str(e)}), 500
-
-
-@api_bp.route("/assigned_campaigns", methods=["GET"])
-def get_assigned_campaigns():
-    """Get campaigns assigned to a user."""
-    try:
-        # Get user_id from query parameters
-        user_id = request.args.get("user_id")
-        if not user_id:
-            return jsonify({"error": "user_id parameter is required"}), 400
-
-        conn = get_db_connection()
-        cursor = conn.cursor()
-
-        # Get campaigns assigned to the user
-        cursor.execute(
-            """
-            SELECT c.* 
-            FROM campaigns c
-            JOIN campaign_assignments ca ON c.id = ca.campaign_id
-            WHERE ca.user_id = ?
-        """,
-            (user_id,),
-        )
-
-        campaigns = cursor.fetchall()
-        columns = [
-            "id",
-            "title",
-            "max_user_submissions",
-            "max_points",
-            "is_public",
-            "campaign_context",
-            "job_description",
-            "created_by",
-            "created_at",
-            "updated_at",
-        ]
-        result = [map_row_to_dict(campaign, columns) for campaign in campaigns]
-        conn.close()
-        return jsonify(result)
-    except Exception as e:
-        if conn:
-            conn.close()
-        return jsonify({"error": str(e)}), 500
+            return jsonify({"message": "Candidates assigned successfully"})
+        except Exception as e:
+            if conn:
+                conn.rollback()
+                conn.close()
+            return jsonify({"error": str(e)}), 500
