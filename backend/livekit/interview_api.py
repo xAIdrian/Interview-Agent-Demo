@@ -26,8 +26,18 @@ class InterviewError(Exception):
         self.status_code = status_code
 
 
+class InterviewStage(enum.Enum):
+    """Enum for different stages of the interview."""
+
+    Introduction = "introduction"
+    Questions = "questions"
+    Closing = "closing"
+
+
 @dataclass
 class Question:
+    """Data class for interview questions."""
+
     id: str
     title: str
     body: str
@@ -38,6 +48,8 @@ class Question:
 
 @dataclass
 class Campaign:
+    """Data class for campaign data."""
+
     id: str
     title: str
     max_user_submissions: int
@@ -48,13 +60,7 @@ class Campaign:
     questions: List[Question]
 
 
-class InterviewStage(enum.Enum):
-    Introduction = "introduction"
-    Questions = "questions"
-    Closing = "closing"
-
-
-class AssistantFnc(llm.FunctionContext):
+class AssistantFnc(llm.ChatContext):
     def __init__(self):
         super().__init__()
         self._campaign_data = None
