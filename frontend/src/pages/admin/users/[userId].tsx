@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { PageTemplate } from '../../../components/PageTemplate';
 import { AuthLogger } from '../../../utils/logging';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5001';
+
 interface User {
   id: string;
   email: string;
@@ -26,7 +28,7 @@ const UserDetailPage = () => {
       
       try {
         setIsLoading(true);
-        const response = await axios.get(`https://main-service-48k0.onrender.com/api/users/${userId}`);
+        const response = await axios.get(`${API_URL}/api/users/${userId}`);
         setUser(response.data);
         AuthLogger.info(`Loaded user #${userId} successfully`);
       } catch (err) {
@@ -50,7 +52,7 @@ const UserDetailPage = () => {
     if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) return;
     
     try {
-      await axios.delete(`https://main-service-48k0.onrender.com/api/users/${userId}`);
+      await axios.delete(`${API_URL}/api/users/${userId}`);
       AuthLogger.info(`User ${userId} deleted successfully`);
       router.push('/admin/users');
     } catch (err) {

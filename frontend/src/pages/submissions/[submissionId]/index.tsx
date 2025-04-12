@@ -218,7 +218,10 @@ const SubmissionDetailsPage = () => {
 
   // Delete submission
   const deleteSubmission = async () => {
-    if (!submission) return;
+    if (!submissionId) {
+      setError('No submission ID provided');
+      return;
+    }
     
     // Confirm deletion
     if (!window.confirm('Are you sure you want to delete this submission? This action cannot be undone.')) {
@@ -226,12 +229,17 @@ const SubmissionDetailsPage = () => {
     }
     
     try {
-      await axios.delete(`${API_BASE_URL}/api/submissions/${submission.id}`);
+      await axios.delete(`${API_BASE_URL}/api/submissions/${submissionId}`);
       
-      AuthLogger.info(`Deleted submission ${submission.id}`);
+      AuthLogger.info(`Deleted submission ${submissionId}`);
       
       // Redirect back to submissions list
-      router.push(`/campaigns/${submission.campaign_id}/submissions`);
+      // If we have a valid campaign_id, use it, otherwise go to the main submissions page
+      if (submission?.campaign_id && submission.campaign_id !== 'undefined') {
+        router.push(`/campaigns/${submission.campaign_id}/submissions`);
+      } else {
+        router.push('/submissions');
+      }
     } catch (err) {
       console.error('Error deleting submission:', err);
       
@@ -286,7 +294,7 @@ const SubmissionDetailsPage = () => {
           <div className="flex justify-between mb-6">
             <div className="flex space-x-3">
               <Link 
-                href={`/campaigns/${submission.campaign_id}/submissions`}
+                href={`/submissions`}
                 className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-700"
               >
                 Back to Submissions
@@ -317,38 +325,19 @@ const SubmissionDetailsPage = () => {
           )}
           
           {/* Submission details */}
-          <div className="bg-gray-50 p-4 rounded-md mb-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              <div>
-                <h2 className="text-lg font-semibold mb-2">Submission Information</h2>
-                <p><span className="font-medium">ID:</span> {submission.id}</p>
-                <p><span className="font-medium">Created:</span> {formatDate(submission.created_at)}</p>
-                <p><span className="font-medium">Updated:</span> {formatDate(submission.updated_at)}</p>
-                <p><span className="font-medium">Completed:</span> {formatDate(submission.completed_at)}</p>
-                <p>
-                  <span className="font-medium">Status:</span> 
-                  <span className={`ml-2 px-2 py-1 rounded text-sm ${submission.is_complete ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                    {submission.is_complete ? 'Completed' : 'In Progress'}
-                  </span>
-                </p>
-                <p className="mt-2"><span className="font-medium">Total Score:</span> {submission.total_points ?? 'Not scored'}</p>
-              </div>
-              
-              {submission.user && (
-                <div>
-                  <h2 className="text-lg font-semibold mb-2">Candidate Information</h2>
-                  <p><span className="font-medium">Name:</span> {submission.user.name || 'N/A'}</p>
-                  <p><span className="font-medium">Email:</span> {submission.user.email}</p>
-                  <Link 
-                    href={`/admin/users/${submission.user_id}`}
-                    className="inline-block mt-2 px-3 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
-                  >
-                    View User Profile
-                  </Link>
-                </div>
-              )}
+          {submission.user && (
+            <div>
+              <h2 className="text-lg font-semibold mb-2">Candidate Information</h2>
+              <p><span className="font-medium">Name:</span> {submission.user.name || 'N/A'}</p>
+              <p><span className="font-medium">Email:</span> {submission.user.email}</p>
+              <Link 
+                href={`/admin/users/${submission.user_id}`}
+                className="inline-block mt-2 px-3 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+              >
+                View User Profile
+              </Link>
             </div>
-          </div>
+          )}
           
           {/* Answers and scoring */}
           <h2 className="text-xl font-bold mb-4">Questions & Answers</h2>

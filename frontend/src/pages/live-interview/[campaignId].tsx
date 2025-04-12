@@ -3,9 +3,12 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import axios from 'axios';
 import LiveKitInterviewComponent from '@/components/livekit/LiveKitInterviewComponent';
-import { useLiveKitInterview } from '@/components/livekit/LiveKitInterviewForm';
+import { useLiveKitInterview } from '@/components/livekit/useLiveKitInterview';
 import Link from 'next/link';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
+import { useAuth } from '@/app/components/AuthProvider';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5001';
 
 interface Campaign {
   id: string;
@@ -46,7 +49,7 @@ const LiveKitInterviewPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [submissionId, setSubmissionId] = useState<string | null>(null);
   const { handleStartInterview, loading: interviewLoading, error: interviewError } = useLiveKitInterview();
-  
+  const { user } = useAuth();
   useEffect(() => {
     if (campaignId) {
       const fetchCampaignData = async () => {
@@ -74,20 +77,20 @@ const LiveKitInterviewPage: React.FC = () => {
   }, [campaignId, router]);
 
   const createSubmission = async (campaignId: string) => {
-    // try {
-    //   const response = await axios.post(
-    //     `https://main-service-48k0.onrender.com/api/submissions`,
-    //     {
-    //       campaign_id: campaignId,
-    //       is_complete: false,
-    //       user_id: "00000000-0000-0000-0000-000000000000",
-    //     }
-    //   );
-    //   return response.data;
-    // } catch (err) {
-    //   console.error('Error creating submission:', err);
-    //   throw new Error('Failed to create submission');
-    // }
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/api/submissions`,
+        {
+          campaign_id: campaignId,
+          is_complete: false,
+          user_id: user?.id,
+        }
+      );
+      return response.data;
+    } catch (err) {
+      console.error('Error creating submission:', err);
+      throw new Error('Failed to create submission');
+    }
   };
   
   const onFormSubmit = async (token: string, room: string) => {
@@ -203,8 +206,8 @@ const LiveKitInterviewPage: React.FC = () => {
                 if (!campaignId) return;
                 try {
                   // First create a submission
-                  // const newSubmission = await createSubmission(campaignId as string);
-                  // setSubmissionId(newSubmission.id);
+                  const newSubmission = await createSubmission(campaignId as string);
+                  setSubmissionId(newSubmission.id);
                   
                   // Then start the interview with the submission ID
                   const { token, room } = await handleStartInterview(campaignId as string);

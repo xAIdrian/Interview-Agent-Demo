@@ -11,6 +11,8 @@ import {
   ShieldCheckIcon
 } from '@heroicons/react/24/outline';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5001';
+
 const CreateUserPage = () => {
   const router = useRouter();
   const [formData, setFormData] = useState({
@@ -39,7 +41,7 @@ const CreateUserPage = () => {
       setError('');
       
       // Submit the data to create user API endpoint
-      const response = await axios.post('https://main-service-48k0.onrender.com/api/users', formData);
+      const response = await axios.post(`${API_URL}/api/users`, formData);
       
       setSuccessMessage('User created successfully!');
       AuthLogger.info('User created:', response.data);

@@ -4,6 +4,7 @@ import axios from 'axios';
 import { PageTemplate } from '../../../components/PageTemplate';
 import Link from 'next/link';
 import { AuthLogger } from '../../../utils/logging';
+import { useAuth } from '@/app/components/AuthProvider';
 
 // Define API base URL for consistent usage
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://main-service-48k0.onrender.com';
@@ -27,10 +28,17 @@ interface Question {
   max_points: number;
 }
 
+interface SubmissionStatus {
+  total_submissions: number;
+  completed_submissions: number;
+  max_submissions: number;
+  can_submit: boolean;
+  has_completed_submission: boolean;
+}
+
 const CampaignDetailsPage = () => {
   const router = useRouter();
   const { campaignId } = router.query;
-  
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -39,6 +47,14 @@ const CampaignDetailsPage = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [submissionId, setSubmissionId] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const { user } = useAuth();
+  const [submissionStatus, setSubmissionStatus] = useState<SubmissionStatus>({
+    total_submissions: 0,
+    completed_submissions: 0,
+    max_submissions: 0,
+    can_submit: true,
+    has_completed_submission: false,
+  });
 
   // Setup auth on component mount
   useEffect(() => {
@@ -46,71 +62,147 @@ const CampaignDetailsPage = () => {
     setIsAdmin(isAdminUser);
   }, []);
 
-  // Fetch campaign data
+  // Fetch campaign data and submission status
   useEffect(() => {
-    const fetchCampaignData = async () => {
+    const fetchData = async () => {
       if (!campaignId) return;
 
       try {
         setIsLoading(true);
-        const response = await axios.get(`/api/campaigns/${campaignId}`);
+        const response = await axios.get(`${API_BASE_URL}/api/campaigns/${campaignId}`);
         setCampaign(response.data);
         
         // Fetch questions for this campaign
-        const questionsResponse = await axios.get(`/api/campaigns/${campaignId}`);
+        const questionsResponse = await axios.get(`${API_BASE_URL}/api/campaigns/${campaignId}`);
         setQuestions(questionsResponse.data);
         
         // If admin, fetch submission count
         if (isAdmin) {
-          const submissionsResponse = await axios.get(`/api/submissions?campaign_id=${campaignId}`);
+          const submissionsResponse = await axios.get(`${API_BASE_URL}/api/submissions?campaign_id=${campaignId}`);
           setSubmissionCount(submissionsResponse.data.length);
+        }
+
+        // Fetch submission status for non-admin users
+        if (!isAdmin && user?.id) {
+          const submissionsResponse = await axios.get(`${API_BASE_URL}/api/submissions`, {
+            params: {
+              campaign_id: campaignId,
+              user_id: user.id
+            }
+          });
+
+          const submissions = submissionsResponse.data;
+          const completedSubmissions = submissions.filter((sub: any) => sub.is_complete).length;
+          
+          setSubmissionStatus({
+            total_submissions: submissions.length,
+            completed_submissions: completedSubmissions,
+            max_submissions: response.data.max_user_submissions,
+            can_submit: submissions.length < response.data.max_user_submissions && 
+                       completedSubmissions < response.data.max_user_submissions,
+            has_completed_submission: completedSubmissions > 0
+          });
         }
         
         AuthLogger.info(`Loaded campaign #${campaignId} successfully`);
       } catch (err) {
-        console.error('Error fetching campaign data:', err);
+        console.error('Error fetching data:', err);
         if (axios.isAxiosError(err)) {
           if (err.response?.status === 404) {
             setError('Campaign not found');
             AuthLogger.error('Campaign not found', err.response?.status);
           } else if (err.response?.data?.error) {
             setError(err.response.data.error);
-            AuthLogger.error('API error fetching campaign', err.response?.status, err.response?.data);
+            AuthLogger.error('API error fetching data', err.response?.status, err.response?.data);
           } else {
-            setError('Failed to load campaign data');
-            AuthLogger.error('Unknown error fetching campaign', err.response?.status);
+            setError('Failed to load data');
+            AuthLogger.error('Unknown error fetching data', err.response?.status);
           }
         } else {
           setError('An unexpected error occurred');
-          AuthLogger.error('Unexpected error fetching campaign data', err);
+          AuthLogger.error('Unexpected error fetching data', err);
         }
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchCampaignData();
-  }, [campaignId, isAdmin]);
+    fetchData();
+  }, [campaignId, isAdmin, user?.id]);
 
   const handleStartInterview = async () => {
     try {
       setIsLoading(true);
-      
-      // Create a submission for this campaign
-      // const response = await axios.post(`/api/submissions`, {
-      //   campaign_id: String(campaignId)
-      // });
-      
-      // // Ensure the submission ID is a string
-      // const newSubmissionId = String(response.data.id);
-      
-      // Navigate to the interview page with the submission ID
       router.push(`/live-interview/${campaignId}`);
     } catch (error) {
       console.error('Error creating submission:', error);
       setErrorMessage('Failed to start interview. Please try again.');
       setIsLoading(false);
     }
+  };
+
+  const renderStartInterviewButton = () => {
+    if (isLoading) {
+      return (
+        <button
+          className="bg-gray-400 text-white px-4 py-2 rounded cursor-not-allowed"
+          disabled
+        >
+          Loading...
+        </button>
+      );
+    }
+
+    if (!submissionStatus.can_submit) {
+      return (
+        <div className="flex items-start space-x-2">
+          <div className="flex flex-col items-center">
+            <button
+              className="bg-gray-400 text-white px-4 py-2 rounded cursor-not-allowed"
+              disabled
+            >
+              Interview Not Available
+            </button>
+            <p className="text-sm text-red-600 mt-1">
+              {submissionStatus.has_completed_submission 
+                ? "You have already completed this interview"
+                : `Maximum attempts reached (${submissionStatus.max_submissions})`}
+            </p>
+          </div>
+          <Link 
+            href="/campaigns"
+            className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-700 mt-0"
+          >
+            Back to Positions
+          </Link>
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex items-center space-x-2">
+        <button
+          onClick={handleStartInterview}
+          className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-700"
+          disabled={isLoading}
+        >
+          {isLoading ? 'Starting...' : 'Start Interview'}
+        </button>
+        <Link 
+          href="/campaigns"
+          className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-700"
+        >
+          Back to Positions
+        </Link>
+      </div>
+    );
+  };
+
+  // Update submission status to ensure numbers don't exceed max
+  const safeSubmissionStatus = {
+    ...submissionStatus,
+    total_submissions: Math.min(submissionStatus.total_submissions, submissionStatus.max_submissions),
+    completed_submissions: Math.min(submissionStatus.completed_submissions, submissionStatus.max_submissions)
   };
 
   return (
@@ -133,21 +225,15 @@ const CampaignDetailsPage = () => {
               </Link>
             </>
           )}
-          {!isAdmin && (
-            <button
-              onClick={handleStartInterview}
-              className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-700"
-              disabled={isLoading}
+          {!isAdmin && renderStartInterviewButton()}
+          {isAdmin && (
+            <Link 
+              href="/campaigns"
+              className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-700"
             >
-              {isLoading ? 'Starting...' : 'Start Interview'}
-            </button>
+              Back to Campaigns
+            </Link>
           )}
-          <Link 
-            href="/campaigns"
-            className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-700"
-          >
-            Back to {isAdmin ? 'Campaigns' : 'Positions'}
-          </Link>
         </div>
       </div>
       
@@ -169,6 +255,38 @@ const CampaignDetailsPage = () => {
         </div>
       ) : campaign ? (
         <>
+          {!isAdmin && (
+            <div className="bg-white shadow overflow-hidden sm:rounded-lg mb-6">
+              <div className="px-4 py-5 sm:px-6">
+                <h2 className="text-lg leading-6 font-medium text-gray-900">Your Application Status</h2>
+              </div>
+              <div className="border-t border-gray-200">
+                <dl>
+                  <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                    <dt className="text-sm font-medium text-gray-500">Attempts Used</dt>
+                    <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                      {safeSubmissionStatus.total_submissions} of {safeSubmissionStatus.max_submissions}
+                    </dd>
+                  </div>
+                  <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                    <dt className="text-sm font-medium text-gray-500">Completed Interviews</dt>
+                    <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                      {safeSubmissionStatus.completed_submissions}
+                    </dd>
+                  </div>
+                  {safeSubmissionStatus.has_completed_submission && (
+                    <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                      <dt className="text-sm font-medium text-gray-500">Status</dt>
+                      <dd className="mt-1 text-sm text-green-600 sm:mt-0 sm:col-span-2">
+                        Interview Completed
+                      </dd>
+                    </div>
+                  )}
+                </dl>
+              </div>
+            </div>
+          )}
+
           <div className="bg-white shadow overflow-hidden sm:rounded-lg mb-6">
             <div className="px-4 py-5 sm:px-6">
               <h2 className="text-lg leading-6 font-medium text-gray-900">Position Information</h2>
@@ -207,12 +325,10 @@ const CampaignDetailsPage = () => {
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="text-sm font-medium text-gray-900">Question {index + 1}</p>
-                          <p className="mt-1 text-sm text-gray-500">{question.body}</p>
+                          <p className="text-sm text-gray-500">{question.body}</p>
                         </div>
-                        <div className="ml-4">
-                          <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
-                            {question.max_points} points
-                          </span>
+                        <div className="text-sm text-gray-500">
+                          Max Points: {question.max_points}
                         </div>
                       </div>
                     </li>
@@ -222,11 +338,7 @@ const CampaignDetailsPage = () => {
             </div>
           )}
         </>
-      ) : (
-        <div className="text-center py-8 text-gray-500">
-          Campaign not found.
-        </div>
-      )}
+      ) : null}
     </PageTemplate>
   );
 };
