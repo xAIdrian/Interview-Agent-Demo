@@ -34,17 +34,23 @@ def get_db_connection():
     return sqlite3.connect(db_path)
 
 
-def build_filter_query(table_name, filters):
-    query = f"SELECT * FROM {table_name} WHERE "
-    params = []
+def build_filter_query(filters):
+    """Build a WHERE clause for SQL queries with proper parameter handling."""
+    if not filters:
+        return "", {}
+
     conditions = []
+    params = {}
 
     for key, value in filters.items():
-        conditions.append(f"{key} = :{key}")
-        params[key] = value
+        if value is not None:  # Only add conditions for non-null values
+            conditions.append(f"{key} = ?")
+            params[key] = value
 
-    query += " AND ".join(conditions)
-    return query, params
+    if not conditions:
+        return "", {}
+
+    return "WHERE " + " AND ".join(conditions), params
 
 
 def create_users_table():
@@ -179,12 +185,38 @@ def create_submission_answers_table():
         session.close()
 
 
+def create_campaign_assignments_table():
+    session = get_db_session()
+    try:
+        session.execute(
+            text(
+                """
+            CREATE TABLE IF NOT EXISTS campaign_assignments (
+                id BIGINT PRIMARY KEY,
+                campaign_id BIGINT NOT NULL,
+                user_id BIGINT NOT NULL,
+                created_by BIGINT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (campaign_id) REFERENCES campaigns(id),
+                FOREIGN KEY (user_id) REFERENCES users(id),
+                FOREIGN KEY (created_by) REFERENCES users(id),
+                UNIQUE (campaign_id, user_id)
+            )
+        """
+            )
+        )
+        session.commit()
+    finally:
+        session.close()
+
+
 def create_tables():
     create_users_table()
     create_campaigns_table()
     create_questions_table()
     create_submissions_table()
     create_submission_answers_table()
+    create_campaign_assignments_table()
 
 
 def migrate_submissions_table_add_resume_columns():

@@ -3,6 +3,10 @@ import axios from 'axios';
 import { useRouter } from 'next/router';
 import { PrimaryButton } from '../../../components/Button';
 import { PageTemplate } from '../../../components/PageTemplate';
+import { Spinner } from '../../../components/ui/Spinner';
+import { UserGroupIcon } from '@heroicons/react/24/outline';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5001';
 
 // Define interface for Question object
 interface Question {
@@ -23,6 +27,14 @@ interface Campaign {
   max_user_submissions: number;
   is_public: boolean;
   questions: Question[];
+}
+
+// Add interface for User
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  is_admin: boolean;
 }
 
 const EditCampaignPage = () => {
@@ -48,10 +60,52 @@ const EditCampaignPage = () => {
   const [optimizedPrompts, setOptimizedPrompts] = useState<{[key: number]: string}>({});
   const [showOptimized, setShowOptimized] = useState<{[key: number]: boolean}>({});
   
+  // Candidate states
+  const [candidates, setCandidates] = useState<User[]>([]);
+  const [selectedCandidates, setSelectedCandidates] = useState<string[]>([]);
+  const [isLoadingCandidates, setIsLoadingCandidates] = useState(false);
+  
   // Use client-side only rendering
   useEffect(() => {
     setIsClient(true);
   }, []);
+  
+  // Add useEffect to fetch candidates
+  useEffect(() => {
+    const fetchCandidates = async () => {
+      setIsLoadingCandidates(true);
+      try {
+        const response = await axios.get('/api/users');
+        const nonAdminUsers = response.data.filter((user: User) => !user.is_admin);
+        setCandidates(nonAdminUsers);
+      } catch (error) {
+        console.error('Error fetching candidates:', error);
+        setError('Failed to load candidates');
+      } finally {
+        setIsLoadingCandidates(false);
+      }
+    };
+
+    fetchCandidates();
+  }, []);
+  
+  // Add useEffect to fetch current assignments
+  useEffect(() => {
+    const fetchCurrentAssignments = async () => {
+      if (!campaignId) return;
+      
+      try {
+        const response = await axios.get(`${API_URL}/api/campaigns/${campaignId}/assignments`);
+        const currentAssignments = response.data;
+        setSelectedCandidates(currentAssignments.map((assignment: any) => assignment.user_id));
+      } catch (error) {
+        console.error('Error fetching current assignments:', error);
+        // Don't show error to user as this is not critical
+      }
+    };
+
+    fetchCurrentAssignments();
+  }, [campaignId]);
   
   // Use useCallback to prevent dependency cycle
   const fetchCampaign = useCallback(async () => {
@@ -68,27 +122,36 @@ const EditCampaignPage = () => {
       
       // Fetch campaign details
       const campaignResponse = await axios.get(
-        `https://main-service-48k0.onrender.com/api/campaigns/${campaignId}`
+        `${API_URL}/api/campaigns/${campaignId}`
       );
       
       // Fetch questions for this campaign
       const questionsResponse = await axios.get(
-        `https://main-service-48k0.onrender.com/api/questions?campaign_id=${campaignId}`
+        `${API_URL}/api/questions?campaign_id=${campaignId}`
+      );
+      
+      // Fetch current assignments
+      const assignmentsResponse = await axios.get(
+        `${API_URL}/api/campaigns/${campaignId}/assignments`
       );
       
       const campaignData = campaignResponse.data;
       const questionsData = questionsResponse.data;
+      const currentAssignments = assignmentsResponse.data;
+      
+      // Set selected candidates
+      setSelectedCandidates(currentAssignments.map((assignment: any) => assignment.user_id));
       
       // Combine data into campaign state
       setCampaign({
-        id: campaignData.id.toString(), // Ensure ID is a string
+        id: campaignData.id.toString(),
         title: campaignData.title,
         campaign_context: campaignData.campaign_context || '',
         job_description: campaignData.job_description || '',
         max_user_submissions: parseInt(campaignData.max_user_submissions),
         is_public: Boolean(campaignData.is_public),
         questions: questionsData.map((q: any) => ({
-          id: q.id.toString(), // Ensure ID is a string
+          id: q.id.toString(),
           title: q.title,
           body: q.body || '',
           scoring_prompt: q.scoring_prompt || '',
@@ -208,7 +271,7 @@ const EditCampaignPage = () => {
     
     try {
       const response = await axios.post(
-        'https://main-service-48k0.onrender.com/api/optimize_prompt',
+        `${API_URL}/api/optimize_prompt`,
         {
           campaign_name: campaignTitle,
           campaign_context,
@@ -271,7 +334,18 @@ const EditCampaignPage = () => {
     });
   };
   
-  // Submit the form
+  // Add handler for candidate selection
+  const handleCandidateSelection = (userId: string) => {
+    setSelectedCandidates(prev => {
+      if (prev.includes(userId)) {
+        return prev.filter(id => id !== userId);
+      } else {
+        return [...prev, userId];
+      }
+    });
+  };
+  
+  // Update handleSubmit to include candidate assignment
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -310,29 +384,32 @@ const EditCampaignPage = () => {
       }
     }
     
-    // Prepare data for API
-    const formData = {
-      ...campaign,
-      questions: campaign.questions.map(q => ({
-        ...q,
-        body: q.body || q.title, // Use body if available, otherwise use title as body
-        // Ensure max_points is a number
-        max_points: parseInt(String(q.max_points)) || 10
-      }))
-    };
-    
     try {
-      // Ensure campaignId is available
-      if (!campaignId) {
-        throw new Error('Campaign ID is missing');
-      }
-      
+      // First update the campaign
       const response = await axios.post(
-        `https://main-service-48k0.onrender.com/api/campaigns/${campaignId}/update`,
-        formData
+        `${API_URL}/api/campaigns/${campaignId}/update`,
+        {
+          ...campaign,
+          questions: campaign.questions.map(q => ({
+            ...q,
+            body: q.body || q.title
+          }))
+        }
       );
-      
+
       if (response.status === 200) {
+        // If candidates were selected, assign them to the campaign
+        if (selectedCandidates.length > 0) {
+          try {
+            await axios.post(`${API_URL}/api/campaigns/${campaignId}/assignments`, {
+              user_ids: selectedCandidates
+            });
+          } catch (error) {
+            console.error('Error assigning candidates:', error);
+            // Continue with redirect even if assignment fails
+          }
+        }
+        
         // Redirect to campaigns list
         router.push('/campaigns');
       } else {
@@ -340,9 +417,7 @@ const EditCampaignPage = () => {
       }
     } catch (error: any) {
       console.error('Error updating campaign:', error);
-      // More detailed error message that includes the server response if available
-      const errorMessage = error.response?.data?.error || 'Failed to update campaign. Please try again.';
-      setError(errorMessage);
+      setError(error.response?.data?.error || 'Failed to update campaign. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -448,6 +523,49 @@ const EditCampaignPage = () => {
               <label htmlFor="is_public" className="ml-2 block text-sm text-gray-700">
                 Publish Campaign
               </label>
+            </div>
+          </div>
+          
+          {/* Add Candidate Selection Section */}
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-semibold">Candidate Assignment</h2>
+              <UserGroupIcon className="h-6 w-6 text-gray-500" />
+            </div>
+            
+            <div className="border rounded-lg p-4 space-y-4">
+              <p className="text-sm text-gray-600">
+                Select candidates to assign to this campaign. You can also assign candidates later.
+              </p>
+              
+              {isLoadingCandidates ? (
+                <div className="flex justify-center">
+                  <Spinner size="small" />
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {candidates.map((candidate) => (
+                    <div
+                      key={candidate.id}
+                      className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                        selectedCandidates.includes(candidate.id)
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                      onClick={() => handleCandidateSelection(candidate.id)}
+                    >
+                      <div className="font-medium">{candidate.name}</div>
+                      <div className="text-sm text-gray-600">{candidate.email}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              {candidates.length === 0 && !isLoadingCandidates && (
+                <div className="text-center text-gray-500 py-4">
+                  No candidates available to assign.
+                </div>
+              )}
             </div>
           </div>
           

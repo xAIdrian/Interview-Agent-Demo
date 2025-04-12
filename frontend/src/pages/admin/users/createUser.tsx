@@ -5,6 +5,8 @@ import { PrimaryButton } from '../../../components/Button';
 import { PageTemplate } from '../../../components/PageTemplate';
 import { INTERNAL_API_TOKEN } from '../../../utils/internalApiToken';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5001';
+
 // This is the user creation page component
 const CreateUserPage = () => {
   const [email, setEmail] = useState('');
@@ -30,7 +32,7 @@ const CreateUserPage = () => {
     setError('');
     
     try {
-      const response = await axios.post('https://main-service-48k0.onrender.com/api/users/create', 
+      const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/users/create`, 
         { 
           email, 
           name, 

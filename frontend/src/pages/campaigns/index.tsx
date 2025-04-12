@@ -44,6 +44,9 @@ interface Campaign {
   job_description: string;
 }
 
+// Define API base URL for consistent usage
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5001';
+
 const CampaignsPage = () => {
   const router = useRouter();
   const { user, isAuthenticated, isAdmin } = useAuth();
@@ -65,7 +68,11 @@ const CampaignsPage = () => {
     const fetchCampaigns = async () => {
       try {
         setIsLoading(true);
-        const response = await axios.get('/api/campaigns');
+        // Use different endpoints based on user role
+        const endpoint = isAdmin ? '/api/campaigns' : '/api/assigned_campaigns';
+        const response = await axios.get(`${API_BASE_URL}${endpoint}`, {
+          params: !isAdmin ? { user_id: user?.id } : undefined
+        });
         
         // Ensure all campaign IDs are strings
         const campaignsWithStringIds = response.data.map((campaign: any) => ({
@@ -90,7 +97,7 @@ const CampaignsPage = () => {
     };
 
     fetchCampaigns();
-  }, [isClient]);
+  }, [isClient, isAdmin, user?.id]);
 
   const handleActionClick = (id: string) => {
     if (isAdmin) {
@@ -185,20 +192,12 @@ const CampaignsPage = () => {
                 <Link 
                   href="/campaigns/create"
                   className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setShowToast(true);
-                  }}
                 >
                   Create Campaign
                 </Link>
                 <Link 
                   href="/campaigns/create-from-doc"
                   className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-700 ml-2"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setShowToast(true);
-                  }}
                 >
                   Create from Doc
                 </Link>
