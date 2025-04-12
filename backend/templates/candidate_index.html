@@ -26,7 +26,7 @@
           },
           cellClick: function(e, cell) {
             const campaignId = cell.getRow().getData().id;
-            fetch(`http://127.0.0.1:5001/interview/${campaignId}`)
+            fetch(`https://main-service-48k0.onrender.com/interview/${campaignId}`)
               .then(response => {
                 if (response.ok) {
                   return response.json();

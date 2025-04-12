@@ -6,7 +6,7 @@ import React from 'react';
 import { PageTemplate } from '../../../../components/PageTemplate';
 import { AuthLogger } from '../../../../utils/logging';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5001';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://main-service-48k0.onrender.com';
 
 interface User {
   id: string;
