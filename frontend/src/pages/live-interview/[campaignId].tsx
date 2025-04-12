@@ -48,7 +48,7 @@ const LiveKitInterviewPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [submissionId, setSubmissionId] = useState<string | null>(null);
-  const { handleStartInterview, loading: interviewLoading, error: interviewError } = useLiveKitInterview();
+  const { handleStartInterview, isLoading: interviewLoading, error: interviewError } = useLiveKitInterview(campaignId as string);
   const { user } = useAuth();
   useEffect(() => {
     if (campaignId) {
@@ -132,6 +132,8 @@ const LiveKitInterviewPage: React.FC = () => {
   if (token && room) {
     return (
       <LiveKitInterviewComponent
+        campaignId={campaignId as string}
+        onInterviewComplete={() => {}}
         onDisconnect={onDisconnect}
         token={token}
         room={room}
@@ -235,6 +237,8 @@ const LiveKitInterviewPage: React.FC = () => {
           </div>
         ) : (
           <LiveKitInterviewComponent 
+            campaignId={campaignId as string}
+            onInterviewComplete={() => {}}
             token={token} 
             room={room as string} 
             onDisconnect={onDisconnect}
