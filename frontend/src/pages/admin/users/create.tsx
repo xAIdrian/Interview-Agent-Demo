@@ -11,7 +11,7 @@ import {
   ShieldCheckIcon
 } from '@heroicons/react/24/outline';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5001';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://main-service-48k0.onrender.com';
 
 const CreateUserPage = () => {
   const router = useRouter();

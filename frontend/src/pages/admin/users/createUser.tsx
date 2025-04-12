@@ -5,7 +5,7 @@ import { PrimaryButton } from '../../../components/Button';
 import { PageTemplate } from '../../../components/PageTemplate';
 import { INTERNAL_API_TOKEN } from '../../../utils/internalApiToken';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5001';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://main-service-48k0.onrender.com';
 
 // This is the user creation page component
 const CreateUserPage = () => {
