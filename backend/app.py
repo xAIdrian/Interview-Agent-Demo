@@ -26,6 +26,28 @@ import tempfile
 import uuid
 import sqlite3
 
+# Password security constants and utilities
+PASSWORD_HASH_METHOD = "pbkdf2:sha256"
+
+
+def hash_password(password: str) -> str:
+    """
+    Consistently hash passwords using the same method across the application.
+    """
+    return generate_password_hash(password, method=PASSWORD_HASH_METHOD)
+
+
+def verify_password(password_hash: str, password: str) -> bool:
+    """
+    Verify a password against a hash.
+    """
+    try:
+        return check_password_hash(password_hash, password)
+    except Exception as e:
+        print(f"Error verifying password: {e}")
+        return False
+
+
 # import whisper
 from fpdf import FPDF
 
@@ -156,7 +178,8 @@ def register():
             400,
         )
 
-    hashed_password = generate_password_hash(password, method="pbkdf2:sha256")
+    # Use the utility function for password hashing
+    hashed_password = hash_password(password)
 
     conn = get_db_connection()
     try:
@@ -187,7 +210,13 @@ def register():
 
     except sqlite3.Error as e:
         conn.rollback()
-        return jsonify({"success": False, "message": f"Error: {str(e)}"}), 400
+        print(f"Database error during registration: {e}")
+        return (
+            jsonify(
+                {"success": False, "message": "An error occurred during registration"}
+            ),
+            400,
+        )
     finally:
         conn.close()
 
@@ -219,13 +248,30 @@ def login():
         cursor.execute("SELECT * FROM users WHERE email = ?", (email,))
         user = cursor.fetchone()
 
-        if not user or not check_password_hash(user["password_hash"], password):
+        # First check if user exists
+        if not user:
             return (
                 jsonify({"success": False, "message": "Invalid email or password"}),
                 401,
             )
 
-        # Create session
+        # Then safely check password
+        try:
+            password_hash = user["password_hash"]
+            if not password_hash or not verify_password(password_hash, password):
+                return (
+                    jsonify({"success": False, "message": "Invalid email or password"}),
+                    401,
+                )
+        except (KeyError, TypeError) as e:
+            # Log the error internally but don't expose it to the user
+            print(f"Error: Invalid password_hash format for user {email}: {e}")
+            return (
+                jsonify({"success": False, "message": "Invalid email or password"}),
+                401,
+            )
+
+        # If we get here, both user exists and password is correct
         session["user_id"] = user["id"]
         session["is_admin"] = user["is_admin"]
 
@@ -247,7 +293,11 @@ def login():
         )
 
     except sqlite3.Error as e:
-        return jsonify({"success": False, "message": f"Error: {str(e)}"}), 500
+        print(f"Database error during login: {e}")
+        return (
+            jsonify({"success": False, "message": "An error occurred during login"}),
+            500,
+        )
     finally:
         conn.close()
 
@@ -334,7 +384,7 @@ def admin_create_user():
 
         # Generate a random password
         password = "".join(random.choices(string.ascii_letters + string.digits, k=12))
-        hashed_password = generate_password_hash(password, method="pbkdf2:sha256")
+        hashed_password = hash_password(password)
 
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -1057,7 +1107,7 @@ def admin_edit_user(user_id):
             password = "".join(
                 random.choices(string.ascii_letters + string.digits, k=12)
             )
-            hashed_password = generate_password_hash(password, method="pbkdf2:sha256")
+            hashed_password = hash_password(password)
             update_sql = "UPDATE users SET email = ?, name = ?, is_admin = ?, password_hash = ? WHERE id = ?"
             update_values = [email, name, is_admin, hashed_password, user_id]
             flash(
@@ -1103,7 +1153,7 @@ def edit_profile():
         new_password = request.form.get("new_password")
         confirm_password = request.form.get("confirm_password")
 
-        if not check_password_hash(user["password_hash"], current_password):
+        if not verify_password(user["password_hash"], current_password):
             flash("Incorrect current password", "danger")
             return render_template("edit_profile.html", user=user)
 
@@ -1115,9 +1165,7 @@ def edit_profile():
         update_values = [name, email, session["user_id"]]
 
         if new_password:
-            hashed_password = generate_password_hash(
-                new_password, method="pbkdf2:sha256"
-            )
+            hashed_password = hash_password(new_password)
             update_sql = (
                 "UPDATE users SET name = ?, email = ?, password_hash = ? WHERE id = ?"
             )
