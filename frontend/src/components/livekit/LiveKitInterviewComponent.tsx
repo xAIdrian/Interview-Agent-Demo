@@ -223,6 +223,7 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
   }, [campaignId, user?.id]);
 
   const handleTranscriptUpdate = async (submitInterview: boolean = false, newTranscript: any[]) => {
+    
     if (!user?.id || !submissionId) return;
 
     try {
@@ -239,6 +240,7 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
         if (response.data.success) {
           console.log('✅ Interview submitted successfully');
           onInterviewComplete(submissionId);
+          router.push('/campaigns');
         } else {
           throw new Error(response.data.error || 'Failed to submit interview');
         }
