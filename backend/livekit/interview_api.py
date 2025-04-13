@@ -1,4 +1,4 @@
-from livekit.agents import llm
+from livekit.agents import llm, JobContext
 import enum
 from typing import List
 import logging
@@ -26,18 +26,8 @@ class InterviewError(Exception):
         self.status_code = status_code
 
 
-class InterviewStage(enum.Enum):
-    """Enum for different stages of the interview."""
-
-    Introduction = "introduction"
-    Questions = "questions"
-    Closing = "closing"
-
-
 @dataclass
 class Question:
-    """Data class for interview questions."""
-
     id: str
     title: str
     body: str
@@ -48,8 +38,6 @@ class Question:
 
 @dataclass
 class Campaign:
-    """Data class for campaign data."""
-
     id: str
     title: str
     max_user_submissions: int
@@ -60,7 +48,13 @@ class Campaign:
     questions: List[Question]
 
 
-class AssistantFnc(llm.ChatContext):
+class InterviewStage(enum.Enum):
+    Introduction = "introduction"
+    Questions = "questions"
+    Closing = "closing"
+
+
+class AssistantFnc(JobContext):
     def __init__(self):
         super().__init__()
         self._campaign_data = None
@@ -128,8 +122,8 @@ Max Points: {self._campaign_data.max_points}
                 status_code=500,
             )
 
-    @llm.ai_callable(description="get the details of the current campaign")
     def get_campaign_details(self):
+        """Get the details of the current campaign"""
         try:
             logger.info("get campaign details")
             return f"The campaign details are:\n{self.get_campaign_str()}"
@@ -142,8 +136,8 @@ Max Points: {self._campaign_data.max_points}
                 status_code=500,
             )
 
-    @llm.ai_callable(description="get the next interview question")
     def get_next_question(self):
+        """Get the next interview question"""
         try:
             if not self._campaign_data:
                 return "Please set campaign data first"
