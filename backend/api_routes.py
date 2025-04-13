@@ -357,7 +357,7 @@ def get_submissions():
         print("With parameters:", params)
 
         # Execute query with parameters as a list
-        cursor.execute(query, list(params.values()) if params else [])
+        cursor.execute(query, list(params) if params else [])
 
         rows = cursor.fetchall()
         print("Raw database rows:", rows)

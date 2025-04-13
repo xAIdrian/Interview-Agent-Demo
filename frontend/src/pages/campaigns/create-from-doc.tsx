@@ -87,7 +87,8 @@ const CreateCampaignFromDocPage = () => {
     const fetchCandidates = async () => {
       setIsLoadingCandidates(true);
       try {
-        const response = await axios.get('/api/users');
+        const response = await axios.get(`${API_URL}/api/users`);
+        console.log('🚀 ~ fetchCandidates ~ response:', response);
         const nonAdminUsers = response.data.filter((user: User) => !user.is_admin);
         setCandidates(nonAdminUsers);
       } catch (error) {
