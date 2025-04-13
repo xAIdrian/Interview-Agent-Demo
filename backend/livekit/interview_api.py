@@ -54,12 +54,12 @@ class InterviewStage(enum.Enum):
     Closing = "closing"
 
 
-class AssistantFnc(JobContext):
+class AssistantFnc:
     def __init__(self):
-        super().__init__()
         self._campaign_data = None
         self._current_stage = InterviewStage.Introduction
         self._question_index = 0
+        self.ai_functions = {}  # Required by MultimodalAgent
 
     def get_campaign_str(self):
         if not self._campaign_data:
