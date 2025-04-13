@@ -32,7 +32,7 @@ const CreateUserPage = () => {
     setError('');
     
     try {
-      const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/users/create`, 
+      const response = await axios.post(`https://main-service-48k0.onrender.com/api/users/create`, 
         { 
           email, 
           name, 
