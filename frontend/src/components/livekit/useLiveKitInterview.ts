@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '@/app/components/AuthProvider';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://main-service-48k0.onrender.com';
+
 interface SubmissionStatus {
   total_submissions: number;
   completed_submissions: number;
@@ -31,7 +33,7 @@ export const useLiveKitInterview = (campaignId: string) => {
       const roomName = `interview-${Date.now()}-${Math.random().toString(36).substring(7)}`;
       
       // Get token from the backend
-      const response = await axios.get(`https://main-service-48k0.onrender.com/api/livekit/token`, {
+      const response = await axios.get(`${API_URL}/api/livekit/token`, {
         params: {
           room: roomName,
           campaignId
@@ -57,7 +59,7 @@ export const useLiveKitInterview = (campaignId: string) => {
 
       try {
         setIsLoading(true);
-        const response = await axios.get(`https://main-service-48k0.onrender.com/api/submissions`, {
+        const response = await axios.get(`${API_URL}/api/submissions`, {
           params: {
             campaign_id: campaignId,
             user_id: user.id
@@ -78,14 +80,14 @@ export const useLiveKitInterview = (campaignId: string) => {
 
         // Generate a new submission ID and token if user can submit
         if (submissions.length < (response.data.max_user_submissions || 1)) {
-          const submissionResponse = await axios.post(`https://main-service-48k0.onrender.com/api/submissions`, {
+          const submissionResponse = await axios.post(`${API_URL}/api/submissions`, {
             campaign_id: campaignId,
             user_id: user.id
           });
           
           setSubmissionId(submissionResponse.data.submission_id);
           
-          const tokenResponse = await axios.post(`https://main-service-48k0.onrender.com/api/generate_token`, {
+          const tokenResponse = await axios.post(`${API_URL}/api/generate_token`, {
             room_name: `interview-${submissionResponse.data.submission_id}`,
             participant_name: user.name || 'Candidate'
           });

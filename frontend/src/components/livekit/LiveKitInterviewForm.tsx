@@ -3,6 +3,8 @@ import { useRouter } from 'next/router';
 import axios from 'axios';
 import { useAuth } from '@/app/components/AuthProvider';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://main-service-48k0.onrender.com';
+
 interface SubmissionStatus {
   total_submissions: number;
   completed_submissions: number;
@@ -34,7 +36,7 @@ const LiveKitInterviewForm = ({ campaignId, onStartInterview }: LiveKitInterview
 
       try {
         setIsLoading(true);
-        const response = await axios.get(`https://main-service-48k0.onrender.com/api/submissions`, {
+        const response = await axios.get(`${API_URL}/api/submissions`, {
           params: {
             campaign_id: campaignId,
             user_id: user.id
