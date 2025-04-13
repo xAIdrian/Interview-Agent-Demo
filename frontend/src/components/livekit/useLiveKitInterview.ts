@@ -87,9 +87,12 @@ export const useLiveKitInterview = (campaignId: string) => {
           
           setSubmissionId(submissionResponse.data.submission_id);
           
-          const tokenResponse = await axios.post(`${API_URL}/api/generate_token`, {
-            room_name: `interview-${submissionResponse.data.submission_id}`,
-            participant_name: user.name || 'Candidate'
+          // Get token from the backend using the correct endpoint
+          const tokenResponse = await axios.get(`${API_URL}/api/livekit/token`, {
+            params: {
+              campaignId: campaignId,
+              room: `interview-${submissionResponse.data.submission_id}`
+            }
           });
           
           setToken(tokenResponse.data.token);
