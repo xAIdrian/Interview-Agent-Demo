@@ -34,7 +34,7 @@ const LiveKitInterviewForm = ({ campaignId, onStartInterview }: LiveKitInterview
 
       try {
         setIsLoading(true);
-        const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/submissions`, {
+        const response = await axios.get(`https://main-service-48k0.onrender.com/api/submissions`, {
           params: {
             campaign_id: campaignId,
             user_id: user.id
