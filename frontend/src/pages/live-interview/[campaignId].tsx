@@ -50,6 +50,7 @@ const LiveKitInterviewPage: React.FC = () => {
   const [submissionId, setSubmissionId] = useState<string | null>(null);
   const { handleStartInterview, isLoading: interviewLoading, error: interviewError } = useLiveKitInterview(campaignId as string);
   const { user } = useAuth();
+
   useEffect(() => {
     if (campaignId) {
       const fetchCampaignData = async () => {
@@ -238,7 +239,10 @@ const LiveKitInterviewPage: React.FC = () => {
         ) : (
           <LiveKitInterviewComponent 
             campaignId={campaignId as string}
-            onInterviewComplete={() => {}}
+            onInterviewComplete={() => {
+              console.log('Interview completed');
+              router.push('/campaigns');
+            }}
             token={token} 
             room={room as string} 
             onDisconnect={onDisconnect}
