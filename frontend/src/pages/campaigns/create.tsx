@@ -389,7 +389,7 @@ const CreateCampaignPage = () => {
           </div>
 
           {/* Add Candidate Selection Section */}
-          <div className="space-y-4">
+          {/* <div className="space-y-4">
             <div className="flex justify-between items-center">
               <h2 className="text-xl font-semibold">Candidate Assignment</h2>
               <UserGroupIcon className="h-6 w-6 text-gray-500" />
@@ -429,7 +429,7 @@ const CreateCampaignPage = () => {
                 </div>
               )}
             </div>
-          </div>
+          </div> */}
 
           {/* Questions Section */}
           <div className="space-y-4">

@@ -419,19 +419,19 @@ const CreateCampaignFromDocPage = () => {
         formData
       );
       
-      if (response.status === 201) {
-        // After successful campaign creation, assign selected candidates
-        if (selectedCandidates.length > 0) {
-          await axios.post(`${API_URL}/api/campaigns/assign-candidates`, {
-            campaignId: response.data.id,
-            candidateIds: selectedCandidates
-          });
-        }
+      // if (response.status === 201) {
+      //   // After successful campaign creation, assign selected candidates
+      //   if (selectedCandidates.length > 0) {
+      //     await axios.post(`${API_URL}/api/campaigns/assign-candidates`, {
+      //       campaignId: response.data.id,
+      //       candidateIds: selectedCandidates
+      //     });
+      //   }
 
-        router.push('/campaigns');
-      } else {
-        setError('Failed to create campaign');
-      }
+      // } else {
+      //   setError('Failed to create campaign');
+      // }
+      router.push('/campaigns');
     } catch (error) {
       console.error('Error creating campaign:', error);
       setError('Failed to create campaign. Please try again.');
@@ -739,7 +739,7 @@ const CreateCampaignFromDocPage = () => {
             </div>
             
             {/* Add Candidate Selection Section */}
-            <div className="bg-white shadow sm:rounded-lg">
+            {/* <div className="bg-white shadow sm:rounded-lg">
               <div className="px-4 py-5 sm:p-6">
                 <h3 className="text-lg font-medium leading-6 text-gray-900">Assign Candidates</h3>
                 <div className="mt-2 max-w-xl text-sm text-gray-500">
@@ -786,7 +786,7 @@ const CreateCampaignFromDocPage = () => {
                   )}
                 </div>
               </div>
-            </div>
+            </div> */}
             
             {/* Submit button */}
             <div className="pt-4">
