@@ -68,11 +68,8 @@ const CampaignsPage = () => {
     const fetchCampaigns = async () => {
       try {
         setIsLoading(true);
-        // Use different endpoints based on user role
-        const endpoint = isAdmin ? '/api/campaigns' : '/api/assigned_campaigns';
-        const response = await axios.get(`${API_BASE_URL}${endpoint}`, {
-          params: !isAdmin ? { user_id: user?.id } : undefined
-        });
+        // Always use the /api/campaigns endpoint
+        const response = await axios.get(`${API_BASE_URL}/api/campaigns`);
         
         // Ensure all campaign IDs are strings
         const campaignsWithStringIds = response.data.map((campaign: any) => ({
@@ -97,7 +94,7 @@ const CampaignsPage = () => {
     };
 
     fetchCampaigns();
-  }, [isClient, isAdmin, user?.id]);
+  }, [isClient]);
 
   const handleActionClick = (id: string) => {
     if (isAdmin) {
