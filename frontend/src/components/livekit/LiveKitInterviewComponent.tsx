@@ -68,14 +68,23 @@ const SimpleVoiceAssistant: React.FC<{ onTranscriptUpdate: (transcript: any[]) =
 
   const [messages, setMessages] = React.useState<Array<{ id?: string; type: 'agent' | 'user'; text: string }>>([]);
 
+  // Memoize the transcript update to prevent unnecessary re-renders
+  const handleTranscriptUpdate = React.useCallback((newMessages: any[]) => {
+    onTranscriptUpdate(newMessages);
+  }, [onTranscriptUpdate]);
+
   React.useEffect(() => {
     const allMessages = [
       ...(agentTranscriptions?.map((t) => ({ ...t, type: 'agent' as const })) ?? []),
       ...(userTranscriptions?.map((t) => ({ ...t, type: 'user' as const })) ?? []),
     ].sort((a, b) => a.firstReceivedTime - b.firstReceivedTime);
-    setMessages(allMessages);
-    onTranscriptUpdate(allMessages);
-  }, [agentTranscriptions, userTranscriptions, onTranscriptUpdate]);
+
+    // Only update if messages have actually changed
+    if (JSON.stringify(allMessages) !== JSON.stringify(messages)) {
+      setMessages(allMessages);
+      handleTranscriptUpdate(allMessages);
+    }
+  }, [agentTranscriptions, userTranscriptions, messages, handleTranscriptUpdate]);
 
   return (
     <div className="voice-assistant-container">
@@ -163,8 +172,7 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
   const livekitUrl = 'wss://default-test-oyjqa9xh.livekit.cloud';
   const [showOnboarding, setShowOnboarding] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
-  const [scoringResult, setScoringResult] = useState<any>(null);
+  const [transcript, setTranscript] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [submissionStatus, setSubmissionStatus] = useState<SubmissionStatus>({
@@ -219,6 +227,7 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
 
     try {
       if (submitInterview) {
+        console.log('🚀 Submitting interview transcript:', newTranscript);
         setIsSubmitting(true);
         const response = await axios.post(`${API_URL}/api/submit_interview`, {
           campaign_id: campaignId,
@@ -228,14 +237,16 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
         });
 
         if (response.data.success) {
+          console.log('✅ Interview submitted successfully');
           onInterviewComplete(submissionId);
         } else {
           throw new Error(response.data.error || 'Failed to submit interview');
         }
-    }
-
+      } else {
+        setTranscript(newTranscript);
+      }
     } catch (err) {
-      console.error('Error submitting interview:', err);
+      console.error('❌ Error submitting interview:', err);
       setError('Failed to submit interview. Please try again.');
     } finally {
       setIsSubmitting(false);
@@ -269,7 +280,7 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-bold">Interview Session: {user?.name}</h2>
             <button 
-              onClick={onDisconnect}
+              onClick={() => handleTranscriptUpdate(true, transcript)}
               className="px-3 py-1 bg-white text-blue-600 rounded hover:bg-blue-50 transition-colors"
             >
               End Interview
@@ -284,7 +295,10 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
             connect={true}
             video={false}
             audio={true}
-            onDisconnected={() => handleTranscriptUpdate(true, [])}
+            onDisconnected={() => {
+              console.log('🔌 LiveKit disconnected, submitting transcript...');
+              handleTranscriptUpdate(true, transcript);
+            }}
           >
             <RoomAudioRenderer />
             <SimpleVoiceAssistant onTranscriptUpdate={(transcript) => handleTranscriptUpdate(false, transcript)} />
