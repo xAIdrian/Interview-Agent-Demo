@@ -239,7 +239,7 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
 
         if (response.data.success) {
           console.log('✅ Interview submitted successfully');
-          onInterviewComplete(submissionId);
+          // onInterviewComplete(submissionId);
           router.push('/campaigns');
         } else {
           throw new Error(response.data.error || 'Failed to submit interview');
