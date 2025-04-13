@@ -73,16 +73,15 @@ const EditCampaignPage = () => {
   // Add useEffect to fetch candidates
   useEffect(() => {
     const fetchCandidates = async () => {
-      setIsLoadingCandidates(true);
       try {
-        const response = await axios.get('/api/users');
-        const nonAdminUsers = response.data.filter((user: User) => !user.is_admin);
+        const response = await axios.get(`${API_URL}/api/users`);
+        // Ensure response.data is an array before filtering
+        const users = Array.isArray(response.data) ? response.data : [];
+        const nonAdminUsers = users.filter((user: User) => !user.is_admin);
         setCandidates(nonAdminUsers);
       } catch (error) {
         console.error('Error fetching candidates:', error);
-        setError('Failed to load candidates');
-      } finally {
-        setIsLoadingCandidates(false);
+        setError('Failed to fetch candidates');
       }
     };
 

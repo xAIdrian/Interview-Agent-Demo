@@ -214,23 +214,26 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
     fetchSubmissionStatus();
   }, [campaignId, user?.id]);
 
-  const handleTranscriptUpdate = async (newTranscript: any[]) => {
+  const handleTranscriptUpdate = async (submitInterview: boolean = false, newTranscript: any[]) => {
     if (!user?.id || !submissionId) return;
 
     try {
-      setIsSubmitting(true);
-      const response = await axios.post(`${API_URL}/api/submit_interview`, {
-        campaign_id: campaignId,
-        user_id: user.id,
-        submission_id: submissionId,
-        transcript: newTranscript
-      });
+      if (submitInterview) {
+        setIsSubmitting(true);
+        const response = await axios.post(`${API_URL}/api/submit_interview`, {
+          campaign_id: campaignId,
+          user_id: user.id,
+          submission_id: submissionId,
+          transcript: newTranscript
+        });
 
-      if (response.data.success) {
-        onInterviewComplete(submissionId);
-      } else {
-        throw new Error(response.data.error || 'Failed to submit interview');
-      }
+        if (response.data.success) {
+          onInterviewComplete(submissionId);
+        } else {
+          throw new Error(response.data.error || 'Failed to submit interview');
+        }
+    }
+
     } catch (err) {
       console.error('Error submitting interview:', err);
       setError('Failed to submit interview. Please try again.');
@@ -256,103 +259,38 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
     );
   }
 
-  if (!submissionStatus.can_submit) {
-    return (
-      <div className="bg-white shadow-md rounded-lg p-6">
-        <h2 className="text-2xl font-bold mb-4">Interview Not Available</h2>
-        <p className="text-gray-600 mb-4">
-          {submissionStatus.has_completed_submission 
-            ? "You have already completed this interview"
-            : `Maximum attempts reached (${submissionStatus.max_submissions})`}
-        </p>
-        <button
-          onClick={() => router.push('/campaigns')}
-          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-        >
-          Return to Campaigns
-        </button>
-      </div>
-    );
-  }
-
-  if (showOnboarding) {
-    return (
-      <div className="bg-white shadow-md rounded-lg p-6">
-        <h2 className="text-2xl font-bold mb-4">Interview Instructions</h2>
-        <div className="space-y-4">
-          <p className="text-gray-600">
-            Welcome to your interview! Please review the following instructions before starting:
-          </p>
-          <ul className="list-disc list-inside space-y-2 text-gray-600">
-            <li>Ensure your microphone and camera are working properly</li>
-            <li>Find a quiet, well-lit environment</li>
-            <li>Have your resume and any relevant materials ready</li>
-            <li>Be prepared to answer questions about your experience and skills</li>
-          </ul>
-          <button
-            onClick={() => setShowOnboarding(false)}
-            className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-          >
-            Start Interview
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="bg-white shadow-md rounded-lg p-6">
-      <h2 className="text-2xl font-bold mb-4">Live Interview</h2>
-      
-      <div className="mb-6">
-        <h3 className="text-lg font-semibold mb-2">Your Application Status</h3>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="bg-gray-50 p-4 rounded">
-            <p className="text-sm text-gray-500">Attempts Used</p>
-            <p className="text-lg font-semibold">
-              {submissionStatus.total_submissions} of {submissionStatus.max_submissions}
-            </p>
+    <div className="livekit-interview">
+      {showOnboarding && (
+        <OnboardingModal onClose={() => setShowOnboarding(false)} />
+      )}
+      <div className="bg-white rounded-lg overflow-hidden shadow-lg">
+        <div className="p-4 bg-blue-600 text-white">
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl font-bold">Interview Session: {user?.name}</h2>
+            <button 
+              onClick={onDisconnect}
+              className="px-3 py-1 bg-white text-blue-600 rounded hover:bg-blue-50 transition-colors"
+            >
+              End Interview
+            </button>
           </div>
-          <div className="bg-gray-50 p-4 rounded">
-            <p className="text-sm text-gray-500">Completed Interviews</p>
-            <p className="text-lg font-semibold">{submissionStatus.completed_submissions}</p>
-          </div>
+        </div>
+        
+        <div className="p-6">
+          <LiveKitRoom
+            serverUrl={livekitUrl}
+            token={token}
+            connect={true}
+            video={false}
+            audio={true}
+            onDisconnected={() => handleTranscriptUpdate(true, [])}
+          >
+            <RoomAudioRenderer />
+            <SimpleVoiceAssistant onTranscriptUpdate={(transcript) => handleTranscriptUpdate(false, transcript)} />
+          </LiveKitRoom>
         </div>
       </div>
-
-      {token && submissionId && (
-        <LiveKitRoom
-          token={token}
-          serverUrl={livekitUrl}
-          connect={true}
-          onDisconnected={() => handleTranscriptUpdate([])}
-        >
-          <RoomAudioRenderer />
-          <VideoConference />
-          <ControlBar />
-        </LiveKitRoom>
-      )}
-      
-      <Dialog
-        open={isSubmitting}
-        onClose={() => {}}
-        className="fixed inset-0 z-10 overflow-y-auto"
-      >
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="fixed inset-0 bg-black opacity-30" />
-          <div className="relative bg-white rounded-lg p-8 max-w-md w-full mx-4">
-            <Dialog.Title className="text-lg font-medium mb-4">
-              Processing Your Interview
-            </Dialog.Title>
-            <div className="flex items-center justify-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-700"></div>
-            </div>
-            <p className="mt-4 text-center text-gray-600">
-              Please wait while we process your interview responses...
-            </p>
-          </div>
-        </div>
-      </Dialog>
     </div>
   );
 };

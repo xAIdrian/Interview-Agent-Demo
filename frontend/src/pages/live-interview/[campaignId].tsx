@@ -54,7 +54,7 @@ const LiveKitInterviewPage: React.FC = () => {
     if (campaignId) {
       const fetchCampaignData = async () => {
         try {
-          const response = await fetch(`/api/campaigns/${campaignId}`);
+          const response = await fetch(`${API_BASE_URL}/api/campaigns/${campaignId}`);
           if (!response.ok) {
             if (response.status === 401) {
               router.push('/login');
