@@ -50,3 +50,4 @@ node_modules/*
 **/.env.staging
 NoorIA.pem
 backend/interview_agent.db
+backend/interview_agent.db
