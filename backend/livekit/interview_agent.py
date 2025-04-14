@@ -5,6 +5,11 @@ from livekit.plugins import openai
 from dotenv import load_dotenv
 import sys
 import os
+import requests
+from typing import Dict, Any
+
+API_BASE_URL = "https://main-service-48k0.onrender.com"
+# API_BASE_URL = "http://127.0.0.1:5001"
 
 # Add the backend directory to the Python path
 backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -25,7 +30,7 @@ logger.setLevel(logging.INFO)
 
 async def entrypoint(ctx: JobContext):
     print("\n" + "=" * 50)
-    print("🚀 Starting Interview Session")
+    print(" Starting interview agent...")
     print("=" * 50 + "\n")
 
     await ctx.connect(auto_subscribe=AutoSubscribe.SUBSCRIBE_ALL)
@@ -38,37 +43,31 @@ async def entrypoint(ctx: JobContext):
 
     # Fetch campaign data from database
     try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
+        # conn = get_db_connection()
+        # cursor = conn.cursor()
 
         # Get campaign details
-        cursor.execute("SELECT * FROM campaigns WHERE id = ?", (campaign_id,))
-        campaign = cursor.fetchone()
+        campaign_url = f"{API_BASE_URL}/api/campaigns/{campaign_id}"
+        campaign_response = requests.get(campaign_url)
 
-        if not campaign:
+        if not campaign_response.ok:
+            print(f"❌ Failed to fetch campaign: {campaign_response.status_code}")
+            raise ValueError(f"Failed to fetch campaign: {campaign_response.text}")
+
+        campaign_data = campaign_response.json()
+        print("🚀 ~ campaign_data:", campaign_data)
+        if not campaign_data:
             print(f"❌ No campaign found for ID: {campaign_id}")
             raise ValueError(f"Campaign not found for ID: {campaign_id}")
 
-        # Get campaign columns
-        cursor.execute("PRAGMA table_info(campaigns)")
-        columns = [row[1] for row in cursor.fetchall()]
-        campaign_data = map_row_to_dict(campaign, columns)
+        # Get campaign questions
+        questions_url = f"{API_BASE_URL}/interview/campaigns/{campaign_id}/questions"
+        questions_response = requests.get(questions_url)
+        if questions_response.status_code != 200:
+            logger.error(f"Failed to fetch questions: {questions_response.text}")
+            return None
 
-        # Get questions for this campaign
-        cursor.execute(
-            "SELECT * FROM questions WHERE campaign_id = ? ORDER BY order_index",
-            (campaign_id,),
-        )
-        questions = cursor.fetchall()
-
-        if questions:
-            cursor.execute("PRAGMA table_info(questions)")
-            question_columns = [row[1] for row in cursor.fetchall()]
-            campaign_data["questions"] = [
-                map_row_to_dict(q, question_columns) for q in questions
-            ]
-        else:
-            campaign_data["questions"] = []
+        campaign_data["questions"] = questions_response.json()
 
         print(f"\n✅ Campaign data:")
         print(f"  Title: {campaign_data['title']}")
@@ -144,8 +143,8 @@ async def entrypoint(ctx: JobContext):
     except Exception as e:
         print(f"❌ Error in interview setup: {e}")
         raise
-    finally:
-        conn.close()
+    # finally:
+    # conn.close()
 
     print("\n" + "=" * 50)
     print("🏁 Interview Session Ready")
