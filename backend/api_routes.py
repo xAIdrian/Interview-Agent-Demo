@@ -1893,7 +1893,7 @@ def health_check():
 
 @api_bp.route("/upload_resume", methods=["POST"])
 def upload_resume():
-    """Upload a resume to S3, extract text, and update the submission"""
+    """Extract text from resume and update the submission"""
     if "resume" not in request.files:
         return jsonify({"error": "No resume file provided"}), 400
 
@@ -1921,35 +1921,26 @@ def upload_resume():
         # Save the uploaded file to our temporary path
         resume_file.save(temp_path)
 
-        # Upload to S3
-        s3_path = f"resumes/{unique_filename}"
-        s3_client.upload_file(
-            temp_path,
-            S3_BUCKET,
-            s3_path,
-            ExtraArgs={"ContentType": resume_file.content_type},
-        )
-
         # Extract text from the resume
         resume_text = extract_text_from_document(temp_path)
 
-        # Update the submission with the resume path and text
+        # Update the submission with the resume text
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute(
             """
             UPDATE submissions 
-            SET resume_path = ?, resume_text = ? 
+            SET resume_text = ? 
             WHERE id = ?
         """,
-            (s3_path, resume_text, submission_id),
+            (resume_text, submission_id),
         )
         conn.commit()
         conn.close()
 
         return (
             jsonify(
-                {"message": "Resume uploaded successfully", "resume_path": s3_path}
+                {"message": "Resume processed successfully", "resume_text": resume_text}
             ),
             200,
         )

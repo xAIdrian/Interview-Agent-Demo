@@ -7,6 +7,7 @@ import { useLiveKitInterview } from '@/components/livekit/useLiveKitInterview';
 import Link from 'next/link';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/app/components/AuthProvider';
+import ResumeUpload from '@/components/ResumeUpload';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://main-service-48k0.onrender.com';
 
@@ -47,8 +48,8 @@ const LiveKitInterviewPage: React.FC = () => {
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [submissionId, setSubmissionId] = useState<string | null>(null);
-  const { handleStartInterview, isLoading: interviewLoading, error: interviewError } = useLiveKitInterview(campaignId as string);
+  const [resumeFile, setResumeFile] = useState<File | null>(null);
+  const { handleStartInterview: startInterview, isLoading: interviewLoading, error: interviewError, isUploadingResume } = useLiveKitInterview(campaignId as string);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -65,7 +66,6 @@ const LiveKitInterviewPage: React.FC = () => {
           }
           const data = await response.json();
           setCampaign(data);
-          setSubmissionId(data.submissionId || null);
         } catch (err) {
           setError(err instanceof Error ? err.message : 'An error occurred');
         } finally {
@@ -104,6 +104,17 @@ const LiveKitInterviewPage: React.FC = () => {
     setToken(null);
     setRoom(null);
   };
+
+  const onStartInterview = async () => {
+    if (!campaignId) return;
+    try {
+      const { token, room } = await startInterview(campaignId as string, resumeFile || undefined);
+      onFormSubmit(token, room);
+    } catch (err) {
+      console.error('Error starting interview:', err);
+      setError(err instanceof Error ? err.message : 'Failed to start interview');
+    }
+  };
   
   if (loading) {
     return (
@@ -134,11 +145,14 @@ const LiveKitInterviewPage: React.FC = () => {
     return (
       <LiveKitInterviewComponent
         campaignId={campaignId as string}
-        onInterviewComplete={() => {}}
-        onDisconnect={onDisconnect}
+        onInterviewComplete={() => {
+          console.log('Interview completed');
+          router.push('/campaigns');
+        }}
         token={token}
         room={room}
-        submissionId={submissionId || ''}
+        onDisconnect={onDisconnect}
+        submissionId={resumeFile ? '' : campaign.submissionId || ''}
       />
     );
   }
@@ -199,55 +213,85 @@ const LiveKitInterviewPage: React.FC = () => {
                 </div>
               </div>
             </div>
-          </div>
-        )}
-        
-        {!token ? (
-          <div className="max-w-4xl mx-auto bg-white p-8 rounded-lg shadow-md">
-            <button
-              onClick={async () => {
-                if (!campaignId) return;
-                try {
-                  // First create a submission
-                  const newSubmission = await createSubmission(campaignId as string);
-                  setSubmissionId(newSubmission.id);
-                  
-                  // Then start the interview with the submission ID
-                  const { token, room } = await handleStartInterview(campaignId as string);
-                  onFormSubmit(token, room);
-                } catch (err) {
-                  console.error('Error starting interview:', err);
-                  setError(err instanceof Error ? err.message : 'Failed to start interview');
-                }
-              }}
-              disabled={interviewLoading || !campaignId}
-              className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {interviewLoading ? (
-                <div className="flex items-center justify-center">
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                  Starting Interview...
+
+            {/* Resume Upload Section */}
+            <div className="bg-white shadow rounded-lg p-6 mb-6">
+              <div className="px-4 py-5 sm:px-6">
+                <h2 className="text-lg leading-6 font-medium text-gray-900">Upload Your Resume</h2>
+              </div>
+              <div className="border-t border-gray-200 px-4 py-5 sm:px-6">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-center w-full">
+                    <label
+                      htmlFor="resume-upload"
+                      className="flex flex-col items-center justify-center w-full h-64 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100"
+                    >
+                      <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                        <svg
+                          className="w-8 h-8 mb-4 text-gray-500"
+                          aria-hidden="true"
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 20 16"
+                        >
+                          <path
+                            stroke="currentColor"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="2"
+                            d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2"
+                          />
+                        </svg>
+                        <p className="mb-2 text-sm text-gray-500">
+                          <span className="font-semibold">Click to upload</span> or drag and drop
+                        </p>
+                        <p className="text-xs text-gray-500">PDF, DOC, or DOCX (MAX. 5MB)</p>
+                      </div>
+                      <input
+                        id="resume-upload"
+                        type="file"
+                        className="hidden"
+                        accept=".pdf,.doc,.docx"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            setResumeFile(file);
+                          }
+                        }}
+                      />
+                    </label>
+                  </div>
+                  {resumeFile && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-600">{resumeFile.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => setResumeFile(null)}
+                        className="text-red-600 hover:text-red-500"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  )}
                 </div>
-              ) : (
-                'Start Interview'
-              )}
-            </button>
-            {interviewError && (
-              <div className="mt-4 text-red-600 text-center">{interviewError}</div>
-            )}
+              </div>
+            </div>
+
+            {/* Start Interview Button */}
+            <div className="mt-6">
+              <button
+                onClick={onStartInterview}
+                disabled={interviewLoading || isUploadingResume}
+                className={`w-full py-3 px-4 rounded-md text-white ${
+                  interviewLoading || isUploadingResume
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-blue-500 hover:bg-blue-600'
+                }`}
+              >
+                {interviewLoading || isUploadingResume ? 'Starting Interview...' : 'Start Interview'}
+              </button>
+            </div>
           </div>
-        ) : (
-          <LiveKitInterviewComponent 
-            campaignId={campaignId as string}
-            onInterviewComplete={() => {
-              console.log('Interview completed');
-              router.push('/campaigns');
-            }}
-            token={token} 
-            room={room as string} 
-            onDisconnect={onDisconnect}
-            submissionId={submissionId || ''}
-          />
         )}
       </div>
     </>
