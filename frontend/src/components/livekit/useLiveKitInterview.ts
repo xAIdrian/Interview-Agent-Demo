@@ -12,11 +12,17 @@ interface SubmissionStatus {
   has_completed_submission: boolean;
 }
 
+interface ResumeUploadResponse {
+  success: boolean;
+  message: string;
+}
+
 export const useLiveKitInterview = (campaignId: string) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [submissionId, setSubmissionId] = useState<string>('');
   const [token, setToken] = useState<string>('');
+  const [isUploadingResume, setIsUploadingResume] = useState(false);
   const { user } = useAuth();
   const [submissionStatus, setSubmissionStatus] = useState<SubmissionStatus>({
     total_submissions: 0,
@@ -26,11 +32,59 @@ export const useLiveKitInterview = (campaignId: string) => {
     has_completed_submission: false,
   });
 
-  const handleStartInterview = async (campaignId: string) => {
+  const uploadResume = async (file: File, submissionId: string): Promise<ResumeUploadResponse> => {
+    try {
+      setIsUploadingResume(true);
+      const formData = new FormData();
+      formData.append('resume', file);
+      formData.append('user_id', user?.id || '');
+      formData.append('submission_id', submissionId);
+      formData.append('position_id', campaignId);
+
+      const response = await axios.post(`${API_URL}/api/upload_resume`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      return {
+        success: true,
+        message: 'Resume uploaded successfully'
+      };
+    } catch (err) {
+      console.error('Error uploading resume:', err);
+      return {
+        success: false,
+        message: err instanceof Error ? err.message : 'Failed to upload resume'
+      };
+    } finally {
+      setIsUploadingResume(false);
+    }
+  };
+
+  const handleStartInterview = async (campaignId: string, resumeFile?: File) => {
     try {
       setIsLoading(true);
-      // Generate a room name based on timestamp and random string
-      const roomName = `interview-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+      
+      // Create submission first
+      const submissionResponse = await axios.post(`${API_URL}/api/submissions`, {
+        campaign_id: campaignId,
+        user_id: user?.id
+      });
+      
+      const newSubmissionId = submissionResponse.data.id;
+      setSubmissionId(newSubmissionId);
+
+      // Upload resume if provided
+      if (resumeFile) {
+        const uploadResult = await uploadResume(resumeFile, newSubmissionId);
+        if (!uploadResult.success) {
+          throw new Error(uploadResult.message);
+        }
+      }
+
+      // Generate a room name based on submission ID
+      const roomName = `interview-${newSubmissionId}`;
       
       // Get token from the backend
       const response = await axios.get(`${API_URL}/api/livekit/token`, {
@@ -115,6 +169,8 @@ export const useLiveKitInterview = (campaignId: string) => {
     token,
     submissionStatus,
     setError,
-    handleStartInterview
+    handleStartInterview,
+    isUploadingResume,
+    uploadResume
   };
 }; 
