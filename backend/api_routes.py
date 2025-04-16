@@ -19,7 +19,11 @@ from functools import wraps
 import boto3
 import uuid
 from config import Config
-from scoring_agent import optimize_with_ai, generate_submission_scoring
+from scoring_agent import (
+    optimize_with_ai,
+    generate_submission_scoring,
+    analyze_strengths_weaknesses,
+)
 import tempfile
 import os
 from werkzeug.utils import secure_filename
@@ -41,6 +45,11 @@ from datetime import datetime
 import sqlite3
 import random
 import string
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Create a Blueprint for the API routes
 api_bp = Blueprint("api", __name__)
@@ -2038,130 +2047,171 @@ def complete_submission(id):
 
 @api_bp.route("/submit_interview", methods=["POST"])
 def submit_interview():
-    from scoring_agent import generate_submission_scoring
-
     try:
-        data = request.json
-        transcript = data.get("transcript")
-        submission_id = data.get("submission_id")
+        data = request.get_json()
+        logger.info(f"Received interview submission request: {data}")
 
-        # Get submission details including campaign_id
+        # Validate required fields
+        if not data.get("transcript"):
+            return jsonify({"error": "Transcript is required"}), 400
+
+        if not data.get("submission_id"):
+            return jsonify({"error": "Submission ID is required"}), 400
+
+        # Check if transcript is empty
+        if not data["transcript"] or len(data["transcript"]) == 0:
+            return (
+                jsonify({"error": "Cannot submit interview: transcript is empty"}),
+                400,
+            )
+
+        # Get submission
         conn = get_db_connection()
         cursor = conn.cursor()
 
         cursor.execute(
-            "SELECT campaign_id FROM submissions WHERE id = ?", (submission_id,)
+            """
+            SELECT s.*, c.title, c.campaign_context, c.job_description 
+            FROM submissions s
+            JOIN campaigns c ON s.campaign_id = c.id
+            WHERE s.id = ?
+        """,
+            (data["submission_id"],),
         )
-        submission = cursor.fetchone()
 
-        if not submission:
+        submission_row = cursor.fetchone()
+        if not submission_row:
             conn.close()
             return jsonify({"error": "Submission not found"}), 404
 
-        campaign_id = submission[0]
+        # Map the row to a dictionary
+        submission = map_row_to_dict(
+            submission_row,
+            [
+                "id",
+                "campaign_id",
+                "user_id",
+                "created_at",
+                "updated_at",
+                "is_complete",
+                "total_points",
+                "resume_text",
+                "title",
+                "campaign_context",
+                "job_description",
+            ],
+        )
 
         # Get campaign details
-        cursor.execute(
-            "SELECT title, campaign_context, job_description FROM campaigns WHERE id = ?",
-            (campaign_id,),
-        )
-        campaign_row = cursor.fetchone()
-
-        if not campaign_row:
-            conn.close()
-            return jsonify({"error": "Campaign not found"}), 404
-
         campaign = {
-            "title": campaign_row[0],
-            "campaign_context": campaign_row[1],
-            "job_description": campaign_row[2],
+            "title": submission["title"],
+            "campaign_context": submission["campaign_context"],
+            "job_description": submission["job_description"],
         }
 
         # Get questions for this campaign
         cursor.execute(
-            "SELECT id, body, scoring_prompt, max_points FROM questions WHERE campaign_id = ?",
-            (campaign_id,),
+            """
+            SELECT id, body, scoring_prompt, max_points 
+            FROM questions 
+            WHERE campaign_id = ?
+        """,
+            (submission["campaign_id"],),
         )
+
+        questions_rows = cursor.fetchall()
         questions = [
-            {
-                "id": row[0],
-                "body": row[1],
-                "scoring_prompt": row[2],
-                "max_points": row[3],
-            }
-            for row in cursor.fetchall()
+            map_row_to_dict(row, ["id", "body", "scoring_prompt", "max_points"])
+            for row in questions_rows
         ]
 
-        conn.close()
+        # Generate interview scores
+        interview_scores = generate_submission_scoring(
+            campaign, questions, data["transcript"]
+        )
 
-        # Generate scores
-        scores = generate_submission_scoring(campaign, questions, transcript)
-        print(scores)
+        # Analyze resume if available
+        resume_analysis = None
+        if submission["resume_text"]:
+            resume_analysis = analyze_strengths_weaknesses(
+                campaign, submission["resume_text"]
+            )
 
-        # Get new connection since we closed the previous one
-        conn = get_db_connection()
-        cursor = conn.cursor()
-
-        try:
-            # Calculate total score
-            total_score = sum(score["score"] for score in scores)
-
-            # Update each answer in submission_answers
-            for score in scores:
-                # Generate a UUID for the answer
-                answer_id = str(uuid.uuid4())
-                cursor.execute(
-                    """
-                    INSERT INTO submission_answers 
-                    (id, submission_id, question_id, transcript, score, score_rationale)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                """,
-                    (
-                        answer_id,
-                        submission_id,
-                        score["question_id"],
-                        score["response"],
-                        score["score"],
-                        score["rationale"],
-                    ),
-                )
-
-            # Mark submission as complete and update total score
+            # Store resume analysis in the new table
+            analysis_id = str(uuid.uuid4())
             cursor.execute(
                 """
-                UPDATE submissions
-                SET is_complete = 1,
-                    total_points = ?
-                WHERE id = ?
+                INSERT INTO resume_analysis (
+                    id, submission_id, strengths, weaknesses, 
+                    overall_fit, percent_match, percent_match_reason
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-                (total_score, submission_id),
-            )
-
-            conn.commit()
-
-            # Return detailed response
-            return (
-                jsonify(
-                    {
-                        "success": True,
-                        "message": "Interview scored successfully",
-                        "submission_id": submission_id,
-                        "total_score": total_score,
-                        "max_possible_score": sum(q["max_points"] for q in questions),
-                        "scores": scores,
-                        "timestamp": datetime.now().isoformat(),
-                    }
+                (
+                    analysis_id,
+                    data["submission_id"],
+                    json.dumps(resume_analysis.get("strengths", [])),
+                    json.dumps(resume_analysis.get("weaknesses", [])),
+                    resume_analysis.get("overall_fit", ""),
+                    resume_analysis.get("percent_match", 0),
+                    resume_analysis.get("percent_match_reason", ""),
                 ),
-                200,
             )
 
-        except Exception as e:
-            conn.rollback()
-            raise e
-        finally:
-            conn.close()
+        # Calculate total score
+        total_score = sum(score["score"] for score in interview_scores)
+
+        # Update each answer in submission_answers
+        for score in interview_scores:
+            answer_id = str(uuid.uuid4())
+            cursor.execute(
+                """
+                INSERT INTO submission_answers 
+                (id, submission_id, question_id, transcript, score, score_rationale)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """,
+                (
+                    answer_id,
+                    data["submission_id"],
+                    score["question_id"],
+                    score["response"],
+                    score["score"],
+                    score["rationale"],
+                ),
+            )
+
+        # Mark submission as complete and update total score
+        cursor.execute(
+            """
+            UPDATE submissions
+            SET is_complete = 1, total_points = ?
+            WHERE id = ?
+        """,
+            (total_score, data["submission_id"]),
+        )
+
+        conn.commit()
+        conn.close()
+
+        return (
+            jsonify(
+                {
+                    "success": True,
+                    "message": "Interview scored successfully",
+                    "submission_id": data["submission_id"],
+                    "total_score": total_score,
+                    "max_possible_score": sum(q["max_points"] for q in questions),
+                    "interview_scores": interview_scores,
+                    "resume_analysis": resume_analysis,
+                }
+            ),
+            200,
+        )
 
     except Exception as e:
+        if "conn" in locals():
+            conn.rollback()
+            conn.close()
+        logger.error(f"Error in submit_interview: {str(e)}")
         return (
             jsonify(
                 {"error": str(e), "message": "Failed to process interview scoring"}
