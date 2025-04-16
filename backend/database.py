@@ -210,6 +210,40 @@ def create_campaign_assignments_table():
         session.close()
 
 
+def create_resume_analysis_table():
+    session = get_db_session()
+    try:
+        session.execute(
+            text(
+                """
+            CREATE TABLE IF NOT EXISTS resume_analysis (
+                id BIGINT PRIMARY KEY,
+                submission_id BIGINT NOT NULL,
+                strengths TEXT,
+                weaknesses TEXT,
+                overall_fit TEXT,
+                percent_match FLOAT,
+                percent_match_reason TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (submission_id) REFERENCES submissions(id) ON DELETE CASCADE
+            )
+        """
+            )
+        )
+        session.execute(
+            text(
+                """
+            CREATE INDEX IF NOT EXISTS idx_resume_analysis_submission_id 
+            ON resume_analysis(submission_id)
+        """
+            )
+        )
+        session.commit()
+    finally:
+        session.close()
+
+
 def create_tables():
     create_users_table()
     create_campaigns_table()
@@ -217,6 +251,7 @@ def create_tables():
     create_submissions_table()
     create_submission_answers_table()
     create_campaign_assignments_table()
+    create_resume_analysis_table()
 
 
 def migrate_submissions_table_add_resume_columns():
