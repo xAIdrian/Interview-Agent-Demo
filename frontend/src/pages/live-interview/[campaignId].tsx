@@ -49,7 +49,7 @@ const LiveKitInterviewPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [resumeFile, setResumeFile] = useState<File | null>(null);
-  const { handleStartInterview: startInterview, isLoading: interviewLoading, error: interviewError, isUploadingResume } = useLiveKitInterview(campaignId as string);
+  const { handleStartInterview: startInterview, isLoading: interviewLoading, error: interviewError, isUploadingResume, submissionId } = useLiveKitInterview(campaignId as string);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -152,7 +152,7 @@ const LiveKitInterviewPage: React.FC = () => {
         token={token}
         room={room}
         onDisconnect={onDisconnect}
-        submissionId={resumeFile ? '' : campaign.submissionId || ''}
+        submissionId={submissionId}
       />
     );
   }

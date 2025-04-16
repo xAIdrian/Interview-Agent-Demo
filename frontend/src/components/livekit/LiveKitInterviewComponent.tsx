@@ -224,17 +224,34 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
   }, [campaignId, user?.id]);
 
   const handleTranscriptUpdate = async (submitInterview: boolean = false, newTranscript: any[]) => {
-    if (!user?.id || !submissionId) return;
+    if (!user?.id || !submissionId) {
+      console.error('Missing required data:', { user_id: user?.id, submissionId });
+      return;
+    }
 
     try {
       if (submitInterview) {
-        console.log('🚀 Submitting interview transcript:', newTranscript);
+        // Ensure transcript is an array and not empty
+        const formattedTranscript = Array.isArray(newTranscript) ? newTranscript : [];
+        if (formattedTranscript.length === 0) {
+          console.error('Cannot submit interview: transcript is empty');
+          setError('Cannot submit interview: no conversation recorded');
+          return;
+        }
+
+        console.log('🚀 Submitting interview transcript:', {
+          transcript: formattedTranscript,
+          submissionId,
+          campaignId,
+          userId: user.id
+        });
+        
         setIsProcessingSubmission(true);
         const response = await axios.post(`${API_URL}/api/submit_interview`, {
           campaign_id: campaignId,
           user_id: user.id,
           submission_id: submissionId,
-          transcript: newTranscript
+          transcript: formattedTranscript
         });
 
         if (response.data.success) {
@@ -256,6 +273,11 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
 
   const handleDisconnect = async () => {
     try {
+      if (!submissionId) {
+        console.error('No submissionId available for submission');
+        return;
+      }
+
       setIsProcessingSubmission(true);
       await handleTranscriptUpdate(true, transcript);
       onDisconnect();
