@@ -2137,25 +2137,32 @@ def submit_interview():
                 campaign, submission["resume_text"]
             )
 
-            # Store resume analysis in the new table
-            analysis_id = str(uuid.uuid4())
-            cursor.execute(
-                """
-                INSERT INTO resume_analysis (
-                    id, submission_id, strengths, weaknesses, 
-                    overall_fit, percent_match, percent_match_reason
-                ) VALUES (?, ?, ?, ?, ?, ?, ?)
-            """,
-                (
-                    analysis_id,
-                    data["submission_id"],
-                    json.dumps(resume_analysis.get("strengths", [])),
-                    json.dumps(resume_analysis.get("weaknesses", [])),
-                    resume_analysis.get("overall_fit", ""),
-                    resume_analysis.get("percent_match", 0),
-                    resume_analysis.get("percent_match_reason", ""),
-                ),
-            )
+            # Ensure resume_analysis has the expected structure
+            if isinstance(resume_analysis, dict):
+                # Store resume analysis in the new table
+                analysis_id = str(uuid.uuid4())
+                cursor.execute(
+                    """
+                    INSERT INTO resume_analysis (
+                        id, submission_id, strengths, weaknesses, 
+                        overall_fit, percent_match, percent_match_reason
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                    (
+                        analysis_id,
+                        data["submission_id"],
+                        json.dumps(resume_analysis.get("strengths", [])),
+                        json.dumps(resume_analysis.get("weaknesses", [])),
+                        resume_analysis.get("overall_fit", ""),
+                        int(resume_analysis.get("percent_match", 0)),
+                        resume_analysis.get("percent_match_reason", ""),
+                    ),
+                )
+                logger.info(
+                    f"Stored resume analysis for submission {data['submission_id']}"
+                )
+            else:
+                logger.error(f"Invalid resume analysis structure: {resume_analysis}")
 
         # Calculate total score
         total_score = sum(score["score"] for score in interview_scores)
@@ -2192,6 +2199,17 @@ def submit_interview():
         conn.commit()
         conn.close()
 
+        # Format resume analysis similar to interview scores
+        formatted_resume_analysis = None
+        if resume_analysis and isinstance(resume_analysis, dict):
+            formatted_resume_analysis = {
+                "strengths": resume_analysis.get("strengths", []),
+                "weaknesses": resume_analysis.get("weaknesses", []),
+                "overall_fit": resume_analysis.get("overall_fit", ""),
+                "percent_match": resume_analysis.get("percent_match", 0),
+                "percent_match_reason": resume_analysis.get("percent_match_reason", ""),
+            }
+
         return (
             jsonify(
                 {
@@ -2201,7 +2219,7 @@ def submit_interview():
                     "total_score": total_score,
                     "max_possible_score": sum(q["max_points"] for q in questions),
                     "interview_scores": interview_scores,
-                    "resume_analysis": resume_analysis,
+                    "resume_analysis": formatted_resume_analysis,
                 }
             ),
             200,
