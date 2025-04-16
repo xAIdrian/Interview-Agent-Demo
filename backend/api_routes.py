@@ -2079,7 +2079,7 @@ def submit_interview():
             FROM submissions s
             JOIN campaigns c ON s.campaign_id = c.id
             WHERE s.id = ?
-        """,
+            """,
             (data["submission_id"],),
         )
 
@@ -2119,7 +2119,7 @@ def submit_interview():
             SELECT id, body, scoring_prompt, max_points 
             FROM questions 
             WHERE campaign_id = ?
-        """,
+            """,
             (submission["campaign_id"],),
         )
 
@@ -2170,7 +2170,7 @@ def submit_interview():
                         id, submission_id, strengths, weaknesses, 
                         overall_fit, percent_match, percent_match_reason
                     ) VALUES (?, ?, ?, ?, ?, ?, ?)
-                """,
+                    """,
                     (
                         str(uuid.uuid4()),
                         data["submission_id"],
@@ -2208,7 +2208,7 @@ def submit_interview():
                 INSERT INTO submission_answers 
                 (id, submission_id, question_id, transcript, score, score_rationale)
                 VALUES (?, ?, ?, ?, ?, ?)
-            """,
+                """,
                 (
                     answer_id,
                     data["submission_id"],
@@ -2222,10 +2222,10 @@ def submit_interview():
         # Mark submission as complete and update total score
         cursor.execute(
             """
-            UPDATE submissions
+            UPDATE submissions 
             SET is_complete = 1, total_points = ?
             WHERE id = ?
-        """,
+            """,
             (total_score, data["submission_id"]),
         )
 
@@ -2243,20 +2243,20 @@ def submit_interview():
                 "percent_match_reason": resume_analysis.get("percent_match_reason", ""),
             }
 
-        return (
-            jsonify(
-                {
-                    "success": True,
-                    "message": "Interview scored successfully",
-                    "submission_id": data["submission_id"],
-                    "total_score": total_score,
-                    "max_possible_score": sum(q["max_points"] for q in questions),
-                    "interview_scores": interview_scores,
-                    "resume_analysis": formatted_resume_analysis,
-                }
-            ),
-            200,
-        )
+            return (
+                jsonify(
+                    {
+                        "success": True,
+                        "message": "Interview scored successfully",
+                        "submission_id": data["submission_id"],
+                        "total_score": total_score,
+                        "max_possible_score": sum(q["max_points"] for q in questions),
+                        "interview_scores": interview_scores,
+                        "resume_analysis": formatted_resume_analysis,
+                    }
+                ),
+                200,
+            )
 
     except Exception as e:
         if "conn" in locals():

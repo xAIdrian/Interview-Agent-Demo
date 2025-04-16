@@ -66,7 +66,7 @@ const LiveKitInterviewPage: React.FC = () => {
       fetchCampaignData();
     }
   }, [campaignId, router]);
-
+  
   const onFormSubmit = async (token: string, room: string) => {
     setToken(token);
     setRoom(room);
@@ -184,8 +184,8 @@ const LiveKitInterviewPage: React.FC = () => {
                   </p>
                 </div>
               </div>
-            </div>
-
+                </div>
+                
             {/* Resume Upload Section */}
             <div className="bg-white shadow rounded-lg p-6 mb-6">
               <div className="px-4 py-5 sm:px-6">
@@ -266,13 +266,13 @@ const LiveKitInterviewPage: React.FC = () => {
               <div className="mb-6">
                 <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative">
                   {error}
-                </div>
-              </div>
-            )}
-
+            </div>
+          </div>
+        )}
+        
             {/* Start Interview Button */}
             <div className="mt-6">
-              <button
+            <button
                 onClick={onStartInterview}
                 disabled={interviewLoading || isUploadingResume || !resumeFile}
                 className={`w-full py-3 px-4 rounded-md text-white 
@@ -287,7 +287,7 @@ const LiveKitInterviewPage: React.FC = () => {
                     ? 'Upload Resume to Start'
                     : 'Start Interview'}
               </button>
-            </div>
+                </div>
           </div>
         )}
       </div>
