@@ -697,8 +697,14 @@ def interview_room(campaign_id):
 # Configure your S3 bucket name (already created)
 S3_BUCKET = "gulpin-interviews"
 
-# Initialize S3 client
-s3_client = boto3.client("s3")
+# Initialize S3 client with proper credentials
+s3_client = boto3.client(
+    "s3",
+    aws_access_key_id=Config.AWS_ACCESS_KEY_ID,
+    aws_secret_access_key=Config.AWS_SECRET_ACCESS_KEY,
+    aws_session_token=Config.AWS_SESSION_TOKEN,
+    region_name=Config.S3_REGION,
+)
 
 
 @app.route("/submit_answer", methods=["POST"])

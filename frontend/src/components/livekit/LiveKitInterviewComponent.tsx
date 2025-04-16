@@ -172,6 +172,7 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
   const livekitUrl = 'wss://default-test-oyjqa9xh.livekit.cloud';
   const [showOnboarding, setShowOnboarding] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isProcessingSubmission, setIsProcessingSubmission] = useState(false);
   const [transcript, setTranscript] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
@@ -223,23 +224,38 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
   }, [campaignId, user?.id]);
 
   const handleTranscriptUpdate = async (submitInterview: boolean = false, newTranscript: any[]) => {
-    
-    if (!user?.id || !submissionId) return;
+    if (!user?.id || !submissionId) {
+      console.error('Missing required data:', { user_id: user?.id, submissionId });
+      return;
+    }
 
     try {
       if (submitInterview) {
-        console.log('🚀 Submitting interview transcript:', newTranscript);
-        setIsSubmitting(true);
+        // Ensure transcript is an array and not empty
+        const formattedTranscript = Array.isArray(newTranscript) ? newTranscript : [];
+        if (formattedTranscript.length === 0) {
+          console.error('Cannot submit interview: transcript is empty');
+          setError('Cannot submit interview: no conversation recorded');
+          return;
+        }
+
+        console.log('🚀 Submitting interview transcript:', {
+          transcript: formattedTranscript,
+          submissionId,
+          campaignId,
+          userId: user.id
+        });
+        
+        setIsProcessingSubmission(true);
         const response = await axios.post(`${API_URL}/api/submit_interview`, {
           campaign_id: campaignId,
           user_id: user.id,
           submission_id: submissionId,
-          transcript: newTranscript
+          transcript: formattedTranscript
         });
 
         if (response.data.success) {
           console.log('✅ Interview submitted successfully');
-          // onInterviewComplete(submissionId);
           router.push('/campaigns');
         } else {
           throw new Error(response.data.error || 'Failed to submit interview');
@@ -248,10 +264,29 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
         setTranscript(newTranscript);
       }
     } catch (err) {
-      console.error('❌ Error submitting interview:', err);
+      console.error('Error submitting interview:', err);
       setError('Failed to submit interview. Please try again.');
     } finally {
-      setIsSubmitting(false);
+      setIsProcessingSubmission(false);
+    }
+  };
+
+  const handleDisconnect = async () => {
+    try {
+      if (!submissionId) {
+        console.error('No submissionId available for submission');
+        return;
+      }
+
+      setIsProcessingSubmission(true);
+      await handleTranscriptUpdate(true, transcript);
+      onDisconnect();
+      router.push('/campaigns');
+    } catch (err) {
+      console.error('Error during disconnect:', err);
+      setError('Failed to properly disconnect. Please try again.');
+    } finally {
+      setIsProcessingSubmission(false);
     }
   };
 
@@ -282,7 +317,7 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-bold">Interview Session: {user?.name}</h2>
             <button 
-              onClick={() => handleTranscriptUpdate(true, transcript)}
+              onClick={handleDisconnect}
               className="px-3 py-1 bg-white text-blue-600 rounded hover:bg-blue-50 transition-colors"
             >
               End Interview
@@ -299,7 +334,7 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
             audio={true}
             onDisconnected={() => {
               console.log('🔌 LiveKit disconnected, submitting transcript...');
-              handleTranscriptUpdate(true, transcript);
+              handleDisconnect();
             }}
           >
             <RoomAudioRenderer />
@@ -307,6 +342,19 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
           </LiveKitRoom>
         </div>
       </div>
+
+      {/* Processing Modal */}
+      <Modal 
+        isOpen={isProcessingSubmission}
+        title="Processing Interview"
+      >
+        <div className="flex flex-col items-center space-y-4">
+          <Spinner size="large" />
+          <p className="text-gray-600 text-center">
+            Please wait while we process your interview responses and calculate scores...
+          </p>
+        </div>
+      </Modal>
     </div>
   );
 };

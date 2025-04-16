@@ -30,15 +30,6 @@ interface Campaign {
   submissionId?: string;
 }
 
-interface Submission {
-  id: string;
-  campaign_id: string;
-  user_id: string;
-  is_complete: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
 const LiveKitInterviewPage: React.FC = () => {
   const router = useRouter();
   const { campaignId } = router.query;
@@ -47,8 +38,8 @@ const LiveKitInterviewPage: React.FC = () => {
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [submissionId, setSubmissionId] = useState<string | null>(null);
-  const { handleStartInterview, isLoading: interviewLoading, error: interviewError } = useLiveKitInterview(campaignId as string);
+  const [resumeFile, setResumeFile] = useState<File | null>(null);
+  const { handleStartInterview: startInterview, isLoading: interviewLoading, error: interviewError, isUploadingResume, submissionId } = useLiveKitInterview(campaignId as string);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -65,7 +56,6 @@ const LiveKitInterviewPage: React.FC = () => {
           }
           const data = await response.json();
           setCampaign(data);
-          setSubmissionId(data.submissionId || null);
         } catch (err) {
           setError(err instanceof Error ? err.message : 'An error occurred');
         } finally {
@@ -76,23 +66,6 @@ const LiveKitInterviewPage: React.FC = () => {
       fetchCampaignData();
     }
   }, [campaignId, router]);
-
-  const createSubmission = async (campaignId: string) => {
-    try {
-      const response = await axios.post(
-        `${API_BASE_URL}/api/submissions`,
-        {
-          campaign_id: campaignId,
-          is_complete: false,
-          user_id: user?.id,
-        }
-      );
-      return response.data;
-    } catch (err) {
-      console.error('Error creating submission:', err);
-      throw new Error('Failed to create submission');
-    }
-  };
   
   const onFormSubmit = async (token: string, room: string) => {
     setToken(token);
@@ -103,6 +76,29 @@ const LiveKitInterviewPage: React.FC = () => {
     console.log('Interview disconnected, resetting state');
     setToken(null);
     setRoom(null);
+  };
+
+  const onStartInterview = async () => {
+    if (!campaignId) return;
+    
+    // Validate resume file
+    if (!resumeFile) {
+      setError('Please upload your resume before starting the interview');
+      return;
+    }
+
+    try {
+      setError(null); // Clear any previous errors
+      
+      // Start interview with resume file
+      const { token, room } = await startInterview(campaignId as string, resumeFile);
+      
+      // If successful, proceed with the interview
+      onFormSubmit(token, room);
+    } catch (err) {
+      console.error('Error starting interview:', err);
+      setError(err instanceof Error ? err.message : 'Failed to start interview');
+    }
   };
   
   if (loading) {
@@ -134,11 +130,14 @@ const LiveKitInterviewPage: React.FC = () => {
     return (
       <LiveKitInterviewComponent
         campaignId={campaignId as string}
-        onInterviewComplete={() => {}}
-        onDisconnect={onDisconnect}
+        onInterviewComplete={() => {
+          console.log('Interview completed');
+          router.push('/campaigns');
+        }}
         token={token}
         room={room}
-        submissionId={submissionId || ''}
+        onDisconnect={onDisconnect}
+        submissionId={submissionId}
       />
     );
   }
@@ -183,71 +182,113 @@ const LiveKitInterviewPage: React.FC = () => {
                   <p className="text-gray-700">
                     Maximum Submissions: {campaign.max_user_submissions}
                   </p>
-                  <p className="text-gray-700">
-                    Maximum Points: {campaign.max_points}
-                  </p>
-                </div>
-                
-                <div>
-                  <h2 className="text-xl font-semibold mb-2">Timeline</h2>
-                  <p className="text-gray-700">
-                    Created: {new Date(campaign.created_at).toLocaleDateString()}
-                  </p>
-                  <p className="text-gray-700">
-                    Last Updated: {new Date(campaign.updated_at).toLocaleDateString()}
-                  </p>
                 </div>
               </div>
+                </div>
+                
+            {/* Resume Upload Section */}
+            <div className="bg-white shadow rounded-lg p-6 mb-6">
+              <div className="px-4 py-5 sm:px-6">
+                <h2 className="text-lg leading-6 font-medium text-gray-900">Upload Your Resume</h2>
+                <p className="mt-1 text-sm text-gray-500">
+                  Please upload your resume before starting the interview.
+                </p>
+              </div>
+              <div className="border-t border-gray-200 px-4 py-5 sm:px-6">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-center w-full">
+                    <label
+                      htmlFor="resume-upload"
+                      className={`flex flex-col items-center justify-center w-full h-64 border-2 
+                        ${resumeFile ? 'border-green-300 bg-green-50' : 'border-gray-300 border-dashed'} 
+                        rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100`}
+                    >
+                      <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                        {resumeFile ? (
+                          <>
+                            <svg className="w-10 h-10 mb-3 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                            </svg>
+                            <p className="mb-2 text-sm text-green-600">
+                              Resume uploaded: {resumeFile.name}
+                            </p>
+                            <p className="text-xs text-green-500">
+                              Click to change file
+                            </p>
+                          </>
+                        ) : (
+                          <>
+                            <svg
+                              className="w-8 h-8 mb-4 text-gray-500"
+                              aria-hidden="true"
+                              xmlns="http://www.w3.org/2000/svg"
+                              fill="none"
+                              viewBox="0 0 20 16"
+                            >
+                              <path
+                                stroke="currentColor"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth="2"
+                                d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2"
+                              />
+                            </svg>
+                            <p className="mb-2 text-sm text-gray-500">
+                              <span className="font-semibold">Click to upload</span> or drag and drop
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              PDF, DOC, or DOCX (MAX. 5MB)
+                            </p>
+                          </>
+                        )}
+                      </div>
+                      <input
+                        id="resume-upload"
+                        type="file"
+                        className="hidden"
+                        accept=".pdf,.doc,.docx"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            setResumeFile(file);
+                            setError(null); // Clear any previous errors
+                          }
+                        }}
+                      />
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Error Display */}
+            {error && (
+              <div className="mb-6">
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative">
+                  {error}
             </div>
           </div>
         )}
         
-        {!token ? (
-          <div className="max-w-4xl mx-auto bg-white p-8 rounded-lg shadow-md">
+            {/* Start Interview Button */}
+            <div className="mt-6">
             <button
-              onClick={async () => {
-                if (!campaignId) return;
-                try {
-                  // First create a submission
-                  const newSubmission = await createSubmission(campaignId as string);
-                  setSubmissionId(newSubmission.id);
-                  
-                  // Then start the interview with the submission ID
-                  const { token, room } = await handleStartInterview(campaignId as string);
-                  onFormSubmit(token, room);
-                } catch (err) {
-                  console.error('Error starting interview:', err);
-                  setError(err instanceof Error ? err.message : 'Failed to start interview');
-                }
-              }}
-              disabled={interviewLoading || !campaignId}
-              className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {interviewLoading ? (
-                <div className="flex items-center justify-center">
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                  Starting Interview...
+                onClick={onStartInterview}
+                disabled={interviewLoading || isUploadingResume || !resumeFile}
+                className={`w-full py-3 px-4 rounded-md text-white 
+                  ${interviewLoading || isUploadingResume || !resumeFile
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-blue-500 hover:bg-blue-600'
+                  }`}
+              >
+                {interviewLoading || isUploadingResume 
+                  ? 'Starting Interview...' 
+                  : !resumeFile 
+                    ? 'Upload Resume to Start'
+                    : 'Start Interview'}
+              </button>
                 </div>
-              ) : (
-                'Start Interview'
-              )}
-            </button>
-            {interviewError && (
-              <div className="mt-4 text-red-600 text-center">{interviewError}</div>
-            )}
           </div>
-        ) : (
-          <LiveKitInterviewComponent 
-            campaignId={campaignId as string}
-            onInterviewComplete={() => {
-              console.log('Interview completed');
-              router.push('/campaigns');
-            }}
-            token={token} 
-            room={room as string} 
-            onDisconnect={onDisconnect}
-            submissionId={submissionId || ''}
-          />
         )}
       </div>
     </>
