@@ -158,11 +158,24 @@ def analyze_strengths_weaknesses(campaign, resume_text):
     Returns:
         Dictionary containing strengths, weaknesses, and overall fit assessment
     """
-    campaign_title = campaign["title"]
-    campaign_context = campaign["campaign_context"]
-    job_description = campaign["job_description"]
+    try:
+        logger.info("Starting resume analysis")
+        if not resume_text or not isinstance(resume_text, str):
+            raise ValueError("Invalid resume text provided")
 
-    system_prompt = f"""# CONTEXT
+        if not campaign or not isinstance(campaign, dict):
+            raise ValueError("Invalid campaign data provided")
+
+        required_campaign_fields = ["title", "campaign_context", "job_description"]
+        for field in required_campaign_fields:
+            if field not in campaign:
+                raise ValueError(f"Missing required campaign field: {field}")
+
+        campaign_title = campaign["title"]
+        campaign_context = campaign["campaign_context"]
+        job_description = campaign["job_description"]
+
+        system_prompt = f"""# CONTEXT
 You are an expert resume analyzer and career advisor.
 
 The company is hiring for a {campaign_title} position.
@@ -188,7 +201,8 @@ Format your response as a JSON object with the following structure:
     "strengths": ["list of key strengths"],
     "weaknesses": ["list of potential gaps or weaknesses"],
     "overall_fit": "brief assessment of overall fit (1-2 sentences)",
-    "fit_score": number between 0 and 100
+    "fit_score": number between 0 and 100,
+    "fit_reason": "brief explanation of the fit score"
 }}
 
 # RESUME
@@ -196,8 +210,20 @@ Format your response as a JSON object with the following structure:
 
 \n\n"""
 
-    user_prompt = "Analyze this resume against the job requirements and provide strengths, weaknesses, and overall fit assessment."
+        user_prompt = "Analyze this resume against the job requirements and provide strengths, weaknesses, and overall fit assessment."
 
-    analysis = openai_response(system_prompt, user_prompt)
-    analysis_json = json.loads(analysis)
-    return analysis_json
+        analysis = openai_response(system_prompt, user_prompt)
+        logger.info(f"Received analysis from OpenAI: {analysis}")
+
+        try:
+            analysis_json = json.loads(analysis)
+            logger.info("Successfully parsed analysis JSON")
+            return analysis_json
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse analysis JSON: {e}")
+            logger.error(f"Raw analysis: {analysis}")
+            raise ValueError("Invalid JSON response from analysis")
+
+    except Exception as e:
+        logger.error(f"Error in analyze_strengths_weaknesses: {str(e)}")
+        raise
