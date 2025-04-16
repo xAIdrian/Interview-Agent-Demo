@@ -117,7 +117,12 @@ const SubmissionDetailsPage = () => {
             };
           }
         } catch (resumeError) {
-          console.error('Error fetching resume analysis:', resumeError);
+          if (axios.isAxiosError(resumeError) && resumeError.response?.status === 404) {
+            // 404 is expected when no resume analysis exists
+            console.log('No resume analysis found for this submission');
+          } else {
+            console.error('Error fetching resume analysis:', resumeError);
+          }
           // Don't set error state here, just log it as resume analysis is optional
         }
         
@@ -369,31 +374,11 @@ const SubmissionDetailsPage = () => {
           {submission.resume_analysis && (
             <div className="mb-6">
               <h2 className="text-xl font-bold mb-4">Resume Analysis</h2>
-              <div className="bg-gray-50 rounded-lg p-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <h3 className="text-lg font-semibold mb-2">Strengths</h3>
-                    <ul className="list-disc pl-5 space-y-1">
-                      {submission.resume_analysis.strengths.map((strength, index) => (
-                        <li key={index} className="text-green-600">{strength}</li>
-                      ))}
-                    </ul>
-                  </div>
-                  
-                  <div>
-                    <h3 className="text-lg font-semibold mb-2">Areas for Improvement</h3>
-                    <ul className="list-disc pl-5 space-y-1">
-                      {submission.resume_analysis.weaknesses.map((weakness, index) => (
-                        <li key={index} className="text-red-600">{weakness}</li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-                
                 <div className="mt-6">
                   <h3 className="text-lg font-semibold mb-2">Overall Fit</h3>
                   <p className="text-gray-700 mb-4">{submission.resume_analysis.overall_fit}</p>
                   
+                  <p className="text-gray-600 mt-2 text-sm">{submission.resume_analysis.percent_match_reason}</p>
                   <div className="flex items-center space-x-4">
                     <div className="flex-1">
                       <div className="h-4 bg-gray-200 rounded-full overflow-hidden">
@@ -405,9 +390,29 @@ const SubmissionDetailsPage = () => {
                     </div>
                     <span className="text-lg font-semibold">{submission.resume_analysis.percent_match}% Match</span>
                   </div>
-                  
-                  <p className="text-gray-600 mt-2 text-sm">{submission.resume_analysis.percent_match_reason}</p>
                 </div>
+              <div className="bg-gray-50 rounded-lg p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <h3 className="text-lg font-semibold mb-2">Strengths</h3>
+                    <ul className="list-disc pl-5 space-y-1">
+                      {submission.resume_analysis.strengths.map((strength, index) => (
+                        <li key={index} className="text-green-600">{strength}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  
+
+                  <div>
+                    <h3 className="text-lg font-semibold mb-2">Weaknesses</h3>
+                    <ul className="list-disc pl-5 space-y-1">
+                      {submission.resume_analysis.weaknesses.map((weakness, index) => (
+                        <li key={index} className="text-red-600">{weakness}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+                
               </div>
             </div>
           )}
