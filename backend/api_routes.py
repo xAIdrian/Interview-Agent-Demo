@@ -2548,6 +2548,19 @@ def get_resume_analysis(submission_id):
         conn = get_db_connection()
         cursor = conn.cursor()
 
+        # First check if the submission exists
+        cursor.execute("SELECT id FROM submissions WHERE id = ?", (submission_id,))
+        if not cursor.fetchone():
+            return (
+                jsonify(
+                    {
+                        "error": "Submission not found",
+                        "message": "The requested submission does not exist",
+                    }
+                ),
+                404,
+            )
+
         # Fetch resume analysis data
         cursor.execute(
             """
@@ -2562,7 +2575,13 @@ def get_resume_analysis(submission_id):
 
         if not result:
             return (
-                jsonify({"error": "No resume analysis found for this submission"}),
+                jsonify(
+                    {
+                        "error": "No resume analysis found",
+                        "message": "This submission has not been analyzed yet",
+                        "status": "pending",
+                    }
+                ),
                 404,
             )
 
@@ -2579,7 +2598,16 @@ def get_resume_analysis(submission_id):
 
     except Exception as e:
         print(f"Error fetching resume analysis: {str(e)}")
-        return jsonify({"error": "Failed to fetch resume analysis"}), 500
+        return (
+            jsonify(
+                {
+                    "error": "Failed to fetch resume analysis",
+                    "message": "An unexpected error occurred while fetching the resume analysis",
+                    "details": str(e),
+                }
+            ),
+            500,
+        )
     finally:
         if "conn" in locals():
             conn.close()
