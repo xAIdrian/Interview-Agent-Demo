@@ -1,7 +1,9 @@
 from openai import OpenAI
 import json
+import logging
 
 client = OpenAI()
+logger = logging.getLogger(__name__)
 
 
 def format_questions(questions):
@@ -32,6 +34,36 @@ def generate_submission_scoring(campaign, questions, transcript):
     campaign_context = campaign["campaign_context"]
     job_description = campaign["job_description"]
 
+    # Process transcript to extract candidate responses
+    candidate_responses = {}
+    current_question = None
+    current_response = []
+
+    # Process each line of the transcript
+    for entry in transcript:
+        if not isinstance(entry, dict):
+            continue
+
+        text = entry.get("text", "").strip()
+        entry_type = entry.get("type", "")
+
+        if not text:
+            continue
+
+        # Check if this is a question (from agent)
+        if entry_type == "agent" and "?" in text:
+            if current_question and current_response:
+                candidate_responses[current_question] = "\n".join(current_response)
+            current_question = text
+            current_response = []
+        # Check if this is a candidate response
+        elif entry_type == "user":
+            current_response.append(text)
+
+    # Add the last response if exists
+    if current_question and current_response:
+        candidate_responses[current_question] = "\n".join(current_response)
+
     system_prompt = f"""# CONTEXT
 
 You are an interview scoring agent.
@@ -47,7 +79,7 @@ Job Description: {job_description}
 # TASK/OVERVIEW
 A candidate has submitted a video interview answering a series of questions.
 
-For each question, you will be given a scoring criteria, maximum number of points, and response.
+For each question, you will be given a scoring criteria, maximum number of points, and the candidate's response.
 
 You will create a JSON array containing a dictionary representing each of your answers. Within each dictionary, include the following keys in this order:
 - question: Repeat the original question prompt.
@@ -60,15 +92,25 @@ Your rationale should take into consideration the requirements of the {campaign_
 
 Provide only the JSON array in plaintext. Do not use any markdown functionality.
 
-# INTERVIEW TRANSCRIPT
-{transcript}
+# CANDIDATE RESPONSES
+{json.dumps(candidate_responses, indent=2)}
 
 \n\n"""
 
     user_prompt = format_questions(questions)
     scores = openai_response(system_prompt, user_prompt)
-    scores_json = json.loads(scores)
-    return scores_json
+
+    # Ensure scores is a valid JSON string before parsing
+    if not isinstance(scores, str):
+        scores = str(scores)
+
+    try:
+        scores_json = json.loads(scores)
+        return scores_json
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse scoring response: {e}")
+        logger.error(f"Raw response: {scores}")
+        raise ValueError("Invalid scoring response format")
 
 
 scoring_prompt_optimization_system = """Optimize this scoring prompt created by an admin to score a candidate's response.
