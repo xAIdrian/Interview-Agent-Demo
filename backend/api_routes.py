@@ -19,7 +19,11 @@ from functools import wraps
 import boto3
 import uuid
 from config import Config
-from scoring_agent import optimize_with_ai, generate_submission_scoring
+from scoring_agent import (
+    optimize_with_ai,
+    generate_submission_scoring,
+    analyze_strengths_weaknesses,
+)
 import tempfile
 import os
 from werkzeug.utils import secure_filename
@@ -41,6 +45,11 @@ from datetime import datetime
 import sqlite3
 import random
 import string
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Create a Blueprint for the API routes
 api_bp = Blueprint("api", __name__)
@@ -853,8 +862,13 @@ def create_submission():
 
         # Create submission with UUID, campaign_id, and user_id
         cursor.execute(
-            "INSERT INTO submissions (id, campaign_id, user_id) VALUES (?, ?, ?) RETURNING *",
-            (submission_id, campaign_id, user_id),
+            """
+            INSERT INTO submissions 
+            (id, campaign_id, user_id, resume_text) 
+            VALUES (?, ?, ?, ?) 
+            RETURNING *
+            """,
+            (submission_id, campaign_id, user_id, data.get("resume_text", "")),
         )
         submission = cursor.fetchone()
         conn.commit()
@@ -1893,7 +1907,7 @@ def health_check():
 
 @api_bp.route("/upload_resume", methods=["POST"])
 def upload_resume():
-    """Upload a resume to S3, extract text, and update the submission"""
+    """Extract text from resume and update the submission"""
     if "resume" not in request.files:
         return jsonify({"error": "No resume file provided"}), 400
 
@@ -1908,7 +1922,7 @@ def upload_resume():
     # Ensure the filename is secure
     filename = secure_filename(resume_file.filename)
 
-    # Generate a unique filename to prevent overwrites
+    # Generate a unique filename
     file_extension = os.path.splitext(filename)[1]
     unique_filename = f"{user_id}_{submission_id}_{uuid.uuid4()}{file_extension}"
 
@@ -1921,51 +1935,38 @@ def upload_resume():
         # Save the uploaded file to our temporary path
         resume_file.save(temp_path)
 
-        # Upload to S3
-        s3_path = f"resumes/{unique_filename}"
-        s3_client.upload_file(
-            temp_path,
-            S3_BUCKET,
-            s3_path,
-            ExtraArgs={"ContentType": resume_file.content_type},
-        )
-
         # Extract text from the resume
         resume_text = extract_text_from_document(temp_path)
 
-        # Update the submission with the resume path and text
+        # Update the submission with the resume text
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute(
             """
             UPDATE submissions 
-            SET resume_path = ?, resume_text = ? 
+            SET resume_text = ? 
             WHERE id = ?
         """,
-            (s3_path, resume_text, submission_id),
+            (resume_text, submission_id),
         )
         conn.commit()
         conn.close()
 
         return (
             jsonify(
-                {"message": "Resume uploaded successfully", "resume_path": s3_path}
+                {"message": "Resume processed successfully", "resume_text": resume_text}
             ),
             200,
         )
 
     except Exception as e:
         # Log the error
-        print(f"Error processing resume: {str(e)}")
+        logger.error(f"Error processing resume: {str(e)}")
         return jsonify({"error": f"Error processing resume: {str(e)}"}), 500
     finally:
         # Clean up the temporary file if it exists
         if temp_path and os.path.exists(temp_path):
-            try:
-                os.remove(temp_path)
-            except Exception as cleanup_error:
-                # Just log cleanup errors, don't fail the request
-                print(f"Warning: Could not remove temporary file: {str(cleanup_error)}")
+            os.remove(temp_path)
 
 
 @api_bp.route("/submissions/<string:id>/complete", methods=["POST"])
@@ -2047,130 +2048,221 @@ def complete_submission(id):
 
 @api_bp.route("/submit_interview", methods=["POST"])
 def submit_interview():
-    from scoring_agent import generate_submission_scoring
-
     try:
-        data = request.json
-        transcript = data.get("transcript")
-        submission_id = data.get("submission_id")
+        data = request.get_json()
+        logger.info(f"Received interview submission request: {data}")
 
-        # Get submission details including campaign_id
+        # Validate required fields
+        if not data.get("transcript"):
+            return jsonify({"error": "Transcript is required"}), 400
+
+        if not data.get("submission_id"):
+            return jsonify({"error": "Submission ID is required"}), 400
+
+        # Check if transcript is empty
+        if not data["transcript"] or len(data["transcript"]) == 0:
+            return (
+                jsonify({"error": "Cannot submit interview: transcript is empty"}),
+                400,
+            )
+
+        # Get submission
         conn = get_db_connection()
         cursor = conn.cursor()
 
         cursor.execute(
-            "SELECT campaign_id FROM submissions WHERE id = ?", (submission_id,)
+            """
+            SELECT 
+                s.id, s.campaign_id, s.user_id, s.created_at, s.updated_at, 
+                s.is_complete, s.total_points, s.resume_text,
+                c.title, c.campaign_context, c.job_description 
+            FROM submissions s
+            JOIN campaigns c ON s.campaign_id = c.id
+            WHERE s.id = ?
+            """,
+            (data["submission_id"],),
         )
-        submission = cursor.fetchone()
 
-        if not submission:
+        submission_row = cursor.fetchone()
+        if not submission_row:
             conn.close()
             return jsonify({"error": "Submission not found"}), 404
 
-        campaign_id = submission[0]
+        # Map the row to a dictionary
+        submission = map_row_to_dict(
+            submission_row,
+            [
+                "id",
+                "campaign_id",
+                "user_id",
+                "created_at",
+                "updated_at",
+                "is_complete",
+                "total_points",
+                "resume_text",
+                "title",
+                "campaign_context",
+                "job_description",
+            ],
+        )
 
         # Get campaign details
-        cursor.execute(
-            "SELECT title, campaign_context, job_description FROM campaigns WHERE id = ?",
-            (campaign_id,),
-        )
-        campaign_row = cursor.fetchone()
-
-        if not campaign_row:
-            conn.close()
-            return jsonify({"error": "Campaign not found"}), 404
-
         campaign = {
-            "title": campaign_row[0],
-            "campaign_context": campaign_row[1],
-            "job_description": campaign_row[2],
+            "title": submission["title"],
+            "campaign_context": submission["campaign_context"],
+            "job_description": submission["job_description"],
         }
 
         # Get questions for this campaign
         cursor.execute(
-            "SELECT id, body, scoring_prompt, max_points FROM questions WHERE campaign_id = ?",
-            (campaign_id,),
+            """
+            SELECT id, body, scoring_prompt, max_points 
+            FROM questions 
+            WHERE campaign_id = ?
+            """,
+            (submission["campaign_id"],),
         )
+
+        questions_rows = cursor.fetchall()
         questions = [
-            {
-                "id": row[0],
-                "body": row[1],
-                "scoring_prompt": row[2],
-                "max_points": row[3],
-            }
-            for row in cursor.fetchall()
+            map_row_to_dict(row, ["id", "body", "scoring_prompt", "max_points"])
+            for row in questions_rows
         ]
 
-        conn.close()
+        # Generate interview scores
+        interview_scores = generate_submission_scoring(
+            campaign, questions, data["transcript"]
+        )
 
-        # Generate scores
-        scores = generate_submission_scoring(campaign, questions, transcript)
-        print(scores)
+        print(f"🚀 ~ submission.get('resume_text'): {submission.get('resume_text')}")
 
-        # Get new connection since we closed the previous one
-        conn = get_db_connection()
-        cursor = conn.cursor()
+        # Analyze resume if available
+        if submission.get("resume_text"):
+            try:
+                logger.info(
+                    f"Starting resume analysis for submission {data['submission_id']}"
+                )
+                resume_analysis = analyze_strengths_weaknesses(
+                    campaign, submission["resume_text"]
+                )
+                logger.info(f"Resume analysis completed: {resume_analysis}")
 
-        try:
-            # Calculate total score
-            total_score = sum(score["score"] for score in scores)
+                # Validate resume analysis structure
+                if not isinstance(resume_analysis, dict):
+                    raise ValueError("Resume analysis result is not a dictionary")
 
-            # Update each answer in submission_answers
-            for score in scores:
-                # Generate a UUID for the answer
-                answer_id = str(uuid.uuid4())
+                required_fields = [
+                    "strengths",
+                    "weaknesses",
+                    "overall_fit",
+                    "fit_score",
+                ]
+                for field in required_fields:
+                    if field not in resume_analysis:
+                        raise ValueError(
+                            f"Missing required field in resume analysis: {field}"
+                        )
+
+                # Store resume analysis
                 cursor.execute(
                     """
-                    INSERT INTO submission_answers 
-                    (id, submission_id, question_id, transcript, score, score_rationale)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                """,
+                    INSERT INTO resume_analysis (
+                        id, submission_id, strengths, weaknesses, 
+                        overall_fit, percent_match, percent_match_reason
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
                     (
-                        answer_id,
-                        submission_id,
-                        score["question_id"],
-                        score["response"],
-                        score["score"],
-                        score["rationale"],
+                        str(uuid.uuid4()),
+                        data["submission_id"],
+                        json.dumps(resume_analysis.get("strengths", [])),
+                        json.dumps(resume_analysis.get("weaknesses", [])),
+                        resume_analysis.get("overall_fit", ""),
+                        resume_analysis.get("fit_score", 0),
+                        resume_analysis.get("fit_reason", ""),
                     ),
                 )
+                logger.info(
+                    f"Successfully stored resume analysis for submission {data['submission_id']}"
+                )
+            except Exception as e:
+                logger.error(f"Failed to process resume analysis: {str(e)}")
+                logger.error(
+                    f"Resume text length: {len(submission['resume_text']) if submission['resume_text'] else 0}"
+                )
+                # Continue with interview scoring even if resume analysis fails
+                resume_analysis = None
+        else:
+            logger.info(
+                f"No resume text available for submission {data['submission_id']}"
+            )
+            resume_analysis = None
 
-            # Mark submission as complete and update total score
+        # Calculate total score
+        total_score = sum(score["score"] for score in interview_scores)
+
+        # Update each answer in submission_answers
+        for score in interview_scores:
+            answer_id = str(uuid.uuid4())
             cursor.execute(
                 """
-                UPDATE submissions
-                SET is_complete = 1,
-                    total_points = ?
-                WHERE id = ?
-            """,
-                (total_score, submission_id),
+                INSERT INTO submission_answers 
+                (id, submission_id, question_id, transcript, score, score_rationale)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    answer_id,
+                    data["submission_id"],
+                    score["question_id"],
+                    score["response"],
+                    score["score"],
+                    score["rationale"],
+                ),
             )
 
-            conn.commit()
+        # Mark submission as complete and update total score
+        cursor.execute(
+            """
+            UPDATE submissions 
+            SET is_complete = 1, total_points = ?
+            WHERE id = ?
+            """,
+            (total_score, data["submission_id"]),
+        )
 
-            # Return detailed response
+        conn.commit()
+        conn.close()
+
+        # Format resume analysis similar to interview scores
+        formatted_resume_analysis = None
+        if resume_analysis and isinstance(resume_analysis, dict):
+            formatted_resume_analysis = {
+                "strengths": resume_analysis.get("strengths", []),
+                "weaknesses": resume_analysis.get("weaknesses", []),
+                "overall_fit": resume_analysis.get("overall_fit", ""),
+                "percent_match": resume_analysis.get("percent_match", 0),
+                "percent_match_reason": resume_analysis.get("percent_match_reason", ""),
+            }
+
             return (
                 jsonify(
                     {
                         "success": True,
                         "message": "Interview scored successfully",
-                        "submission_id": submission_id,
+                        "submission_id": data["submission_id"],
                         "total_score": total_score,
                         "max_possible_score": sum(q["max_points"] for q in questions),
-                        "scores": scores,
-                        "timestamp": datetime.now().isoformat(),
+                        "interview_scores": interview_scores,
+                        "resume_analysis": formatted_resume_analysis,
                     }
                 ),
                 200,
             )
 
-        except Exception as e:
-            conn.rollback()
-            raise e
-        finally:
-            conn.close()
-
     except Exception as e:
+        if "conn" in locals():
+            conn.rollback()
+            conn.close()
+        logger.error(f"Error in submit_interview: {str(e)}")
         return (
             jsonify(
                 {"error": str(e), "message": "Failed to process interview scoring"}
@@ -2447,3 +2539,75 @@ def handle_campaign_assignments(campaign_id):
                 conn.rollback()
                 conn.close()
             return jsonify({"error": str(e)}), 500
+
+
+@api_bp.route("/resume_analysis/<submission_id>", methods=["GET"])
+def get_resume_analysis(submission_id):
+    """Get resume analysis for a specific submission."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # First check if the submission exists
+        cursor.execute("SELECT id FROM submissions WHERE id = ?", (submission_id,))
+        if not cursor.fetchone():
+            return (
+                jsonify(
+                    {
+                        "error": "Submission not found",
+                        "message": "The requested submission does not exist",
+                    }
+                ),
+                404,
+            )
+
+        # Fetch resume analysis data
+        cursor.execute(
+            """
+            SELECT strengths, weaknesses, overall_fit, percent_match, percent_match_reason
+            FROM resume_analysis
+            WHERE submission_id = ?
+        """,
+            (submission_id,),
+        )
+
+        result = cursor.fetchone()
+
+        if not result:
+            return (
+                jsonify(
+                    {
+                        "error": "No resume analysis found",
+                        "message": "This submission has not been analyzed yet",
+                        "status": "pending",
+                    }
+                ),
+                404,
+            )
+
+        # Format the response
+        resume_analysis = {
+            "strengths": json.loads(result[0]) if result[0] else [],
+            "weaknesses": json.loads(result[1]) if result[1] else [],
+            "overall_fit": result[2] if result[2] else "",
+            "percent_match": float(result[3]) if result[3] is not None else 0,
+            "percent_match_reason": result[4] if result[4] else "",
+        }
+
+        return jsonify(resume_analysis)
+
+    except Exception as e:
+        print(f"Error fetching resume analysis: {str(e)}")
+        return (
+            jsonify(
+                {
+                    "error": "Failed to fetch resume analysis",
+                    "message": "An unexpected error occurred while fetching the resume analysis",
+                    "details": str(e),
+                }
+            ),
+            500,
+        )
+    finally:
+        if "conn" in locals():
+            conn.close()

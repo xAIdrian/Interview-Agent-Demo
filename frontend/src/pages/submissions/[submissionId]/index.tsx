@@ -39,6 +39,14 @@ interface Answer {
   question?: Question;
 }
 
+interface ResumeAnalysis {
+  strengths: string[];
+  weaknesses: string[];
+  overall_fit: string;
+  percent_match: number;
+  percent_match_reason: string;
+}
+
 interface Submission {
   id: string;
   campaign_id: string;
@@ -54,6 +62,7 @@ interface Submission {
   submission?: {
     is_complete: boolean;
   };
+  resume_analysis?: ResumeAnalysis;
 }
 
 const SubmissionDetailsPage = () => {
@@ -93,6 +102,28 @@ const SubmissionDetailsPage = () => {
         
         if (submissionWithStringIds.campaign) {
           submissionWithStringIds.campaign.id = String(submissionWithStringIds.campaign.id);
+        }
+        
+        // Fetch resume analysis data
+        try {
+          const resumeAnalysisResponse = await axios.get(`${API_BASE_URL}/api/resume_analysis/${submissionId}`);
+          if (resumeAnalysisResponse.data) {
+            submissionWithStringIds.resume_analysis = {
+              strengths: resumeAnalysisResponse.data.strengths || [],
+              weaknesses: resumeAnalysisResponse.data.weaknesses || [],
+              overall_fit: resumeAnalysisResponse.data.overall_fit || '',
+              percent_match: resumeAnalysisResponse.data.percent_match || 0,
+              percent_match_reason: resumeAnalysisResponse.data.percent_match_reason || ''
+            };
+          }
+        } catch (resumeError) {
+          if (axios.isAxiosError(resumeError) && resumeError.response?.status === 404) {
+            // 404 is expected when no resume analysis exists
+            console.log('No resume analysis found for this submission');
+          } else {
+            console.error('Error fetching resume analysis:', resumeError);
+          }
+          // Don't set error state here, just log it as resume analysis is optional
         }
         
         // Process answers
@@ -326,7 +357,7 @@ const SubmissionDetailsPage = () => {
           
           {/* Submission details */}
           {submission.user && (
-            <div>
+            <div className="mb-6">
               <h2 className="text-lg font-semibold mb-2">Candidate Information</h2>
               <p><span className="font-medium">Name:</span> {submission.user.name || 'N/A'}</p>
               <p><span className="font-medium">Email:</span> {submission.user.email}</p>
@@ -336,6 +367,53 @@ const SubmissionDetailsPage = () => {
               >
                 View User Profile
               </Link>
+            </div>
+          )}
+          
+          {/* Resume Analysis Section */}
+          {submission.resume_analysis && (
+            <div className="mb-6">
+              <h2 className="text-xl font-bold mb-4">Resume Analysis</h2>
+                <div className="mt-6">
+                  <h3 className="text-lg font-semibold mb-2">Overall Fit</h3>
+                  <p className="text-gray-700 mb-4">{submission.resume_analysis.overall_fit}</p>
+                  
+                  <p className="text-gray-600 mt-2 text-sm">{submission.resume_analysis.percent_match_reason}</p>
+                  <div className="flex items-center space-x-4">
+                    <div className="flex-1">
+                      <div className="h-4 bg-gray-200 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-blue-500 rounded-full" 
+                          style={{ width: `${submission.resume_analysis.percent_match}%` }}
+                        />
+                      </div>
+                    </div>
+                    <span className="text-lg font-semibold">{submission.resume_analysis.percent_match}% Match</span>
+                  </div>
+                </div>
+              <div className="bg-gray-50 rounded-lg p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <h3 className="text-lg font-semibold mb-2">Strengths</h3>
+                    <ul className="list-disc pl-5 space-y-1">
+                      {submission.resume_analysis.strengths.map((strength, index) => (
+                        <li key={index} className="text-green-600">{strength}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  
+
+                  <div>
+                    <h3 className="text-lg font-semibold mb-2">Weaknesses</h3>
+                    <ul className="list-disc pl-5 space-y-1">
+                      {submission.resume_analysis.weaknesses.map((weakness, index) => (
+                        <li key={index} className="text-red-600">{weakness}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+                
+              </div>
             </div>
           )}
           
