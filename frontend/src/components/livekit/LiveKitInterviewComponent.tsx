@@ -231,6 +231,7 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
 
     try {
       if (submitInterview) {
+        
         // Ensure transcript is an array and not empty
         const formattedTranscript = Array.isArray(newTranscript) ? newTranscript : [];
         if (formattedTranscript.length === 0) {

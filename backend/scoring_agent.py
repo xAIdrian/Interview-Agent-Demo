@@ -216,7 +216,15 @@ Format your response as a JSON object with the following structure:
         logger.info(f"Received analysis from OpenAI: {analysis}")
 
         try:
-            analysis_json = json.loads(analysis)
+            # Clean the response by removing markdown code block markers
+            cleaned_analysis = analysis.strip()
+            if cleaned_analysis.startswith("```json"):
+                cleaned_analysis = cleaned_analysis[7:]  # Remove ```json
+            if cleaned_analysis.endswith("```"):
+                cleaned_analysis = cleaned_analysis[:-3]  # Remove ```
+            cleaned_analysis = cleaned_analysis.strip()
+
+            analysis_json = json.loads(cleaned_analysis)
             logger.info("Successfully parsed analysis JSON")
             return analysis_json
         except json.JSONDecodeError as e:

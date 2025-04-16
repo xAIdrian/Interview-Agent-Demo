@@ -2239,24 +2239,28 @@ def submit_interview():
                 "strengths": resume_analysis.get("strengths", []),
                 "weaknesses": resume_analysis.get("weaknesses", []),
                 "overall_fit": resume_analysis.get("overall_fit", ""),
-                "percent_match": resume_analysis.get("percent_match", 0),
-                "percent_match_reason": resume_analysis.get("percent_match_reason", ""),
+                "percent_match": resume_analysis.get(
+                    "fit_score", 0
+                ),  # Changed from percent_match to fit_score
+                "percent_match_reason": resume_analysis.get(
+                    "fit_reason", ""
+                ),  # Changed from percent_match_reason to fit_reason
             }
 
-            return (
-                jsonify(
-                    {
-                        "success": True,
-                        "message": "Interview scored successfully",
-                        "submission_id": data["submission_id"],
-                        "total_score": total_score,
-                        "max_possible_score": sum(q["max_points"] for q in questions),
-                        "interview_scores": interview_scores,
-                        "resume_analysis": formatted_resume_analysis,
-                    }
-                ),
-                200,
-            )
+        return (
+            jsonify(
+                {
+                    "success": True,
+                    "message": "Interview scored successfully",
+                    "submission_id": data["submission_id"],
+                    "total_score": total_score,
+                    "max_possible_score": sum(q["max_points"] for q in questions),
+                    "interview_scores": interview_scores,
+                    "resume_analysis": formatted_resume_analysis,
+                }
+            ),
+            200,
+        )
 
     except Exception as e:
         if "conn" in locals():
