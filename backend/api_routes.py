@@ -2539,3 +2539,47 @@ def handle_campaign_assignments(campaign_id):
                 conn.rollback()
                 conn.close()
             return jsonify({"error": str(e)}), 500
+
+
+@api_bp.route("/resume_analysis/<submission_id>", methods=["GET"])
+def get_resume_analysis(submission_id):
+    """Get resume analysis for a specific submission."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Fetch resume analysis data
+        cursor.execute(
+            """
+            SELECT strengths, weaknesses, overall_fit, percent_match, percent_match_reason
+            FROM resume_analysis
+            WHERE submission_id = ?
+        """,
+            (submission_id,),
+        )
+
+        result = cursor.fetchone()
+
+        if not result:
+            return (
+                jsonify({"error": "No resume analysis found for this submission"}),
+                404,
+            )
+
+        # Format the response
+        resume_analysis = {
+            "strengths": json.loads(result[0]) if result[0] else [],
+            "weaknesses": json.loads(result[1]) if result[1] else [],
+            "overall_fit": result[2] if result[2] else "",
+            "percent_match": float(result[3]) if result[3] is not None else 0,
+            "percent_match_reason": result[4] if result[4] else "",
+        }
+
+        return jsonify(resume_analysis)
+
+    except Exception as e:
+        print(f"Error fetching resume analysis: {str(e)}")
+        return jsonify({"error": "Failed to fetch resume analysis"}), 500
+    finally:
+        if "conn" in locals():
+            conn.close()
