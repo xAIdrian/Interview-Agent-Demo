@@ -862,8 +862,13 @@ def create_submission():
 
         # Create submission with UUID, campaign_id, and user_id
         cursor.execute(
-            "INSERT INTO submissions (id, campaign_id, user_id) VALUES (?, ?, ?) RETURNING *",
-            (submission_id, campaign_id, user_id),
+            """
+            INSERT INTO submissions 
+            (id, campaign_id, user_id, resume_text) 
+            VALUES (?, ?, ?, ?) 
+            RETURNING *
+            """,
+            (submission_id, campaign_id, user_id, data.get("resume_text", "")),
         )
         submission = cursor.fetchone()
         conn.commit()
@@ -1917,7 +1922,7 @@ def upload_resume():
     # Ensure the filename is secure
     filename = secure_filename(resume_file.filename)
 
-    # Generate a unique filename to prevent overwrites
+    # Generate a unique filename
     file_extension = os.path.splitext(filename)[1]
     unique_filename = f"{user_id}_{submission_id}_{uuid.uuid4()}{file_extension}"
 
@@ -1956,16 +1961,12 @@ def upload_resume():
 
     except Exception as e:
         # Log the error
-        print(f"Error processing resume: {str(e)}")
+        logger.error(f"Error processing resume: {str(e)}")
         return jsonify({"error": f"Error processing resume: {str(e)}"}), 500
     finally:
         # Clean up the temporary file if it exists
         if temp_path and os.path.exists(temp_path):
-            try:
-                os.remove(temp_path)
-            except Exception as cleanup_error:
-                # Just log cleanup errors, don't fail the request
-                print(f"Warning: Could not remove temporary file: {str(cleanup_error)}")
+            os.remove(temp_path)
 
 
 @api_bp.route("/submissions/<string:id>/complete", methods=["POST"])
@@ -2071,7 +2072,10 @@ def submit_interview():
 
         cursor.execute(
             """
-            SELECT s.*, c.title, c.campaign_context, c.job_description 
+            SELECT 
+                s.id, s.campaign_id, s.user_id, s.created_at, s.updated_at, 
+                s.is_complete, s.total_points, s.resume_text,
+                c.title, c.campaign_context, c.job_description 
             FROM submissions s
             JOIN campaigns c ON s.campaign_id = c.id
             WHERE s.id = ?
@@ -2130,17 +2134,36 @@ def submit_interview():
             campaign, questions, data["transcript"]
         )
 
-        # Analyze resume if available
-        resume_analysis = None
-        if submission["resume_text"]:
-            resume_analysis = analyze_strengths_weaknesses(
-                campaign, submission["resume_text"]
-            )
+        print(f"🚀 ~ submission.get('resume_text'): {submission.get('resume_text')}")
 
-            # Ensure resume_analysis has the expected structure
-            if isinstance(resume_analysis, dict):
-                # Store resume analysis in the new table
-                analysis_id = str(uuid.uuid4())
+        # Analyze resume if available
+        if submission.get("resume_text"):
+            try:
+                logger.info(
+                    f"Starting resume analysis for submission {data['submission_id']}"
+                )
+                resume_analysis = analyze_strengths_weaknesses(
+                    campaign, submission["resume_text"]
+                )
+                logger.info(f"Resume analysis completed: {resume_analysis}")
+
+                # Validate resume analysis structure
+                if not isinstance(resume_analysis, dict):
+                    raise ValueError("Resume analysis result is not a dictionary")
+
+                required_fields = [
+                    "strengths",
+                    "weaknesses",
+                    "overall_fit",
+                    "fit_score",
+                ]
+                for field in required_fields:
+                    if field not in resume_analysis:
+                        raise ValueError(
+                            f"Missing required field in resume analysis: {field}"
+                        )
+
+                # Store resume analysis
                 cursor.execute(
                     """
                     INSERT INTO resume_analysis (
@@ -2149,20 +2172,30 @@ def submit_interview():
                     ) VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
                     (
-                        analysis_id,
+                        str(uuid.uuid4()),
                         data["submission_id"],
                         json.dumps(resume_analysis.get("strengths", [])),
                         json.dumps(resume_analysis.get("weaknesses", [])),
                         resume_analysis.get("overall_fit", ""),
-                        int(resume_analysis.get("percent_match", 0)),
-                        resume_analysis.get("percent_match_reason", ""),
+                        resume_analysis.get("fit_score", 0),
+                        resume_analysis.get("fit_reason", ""),
                     ),
                 )
                 logger.info(
-                    f"Stored resume analysis for submission {data['submission_id']}"
+                    f"Successfully stored resume analysis for submission {data['submission_id']}"
                 )
-            else:
-                logger.error(f"Invalid resume analysis structure: {resume_analysis}")
+            except Exception as e:
+                logger.error(f"Failed to process resume analysis: {str(e)}")
+                logger.error(
+                    f"Resume text length: {len(submission['resume_text']) if submission['resume_text'] else 0}"
+                )
+                # Continue with interview scoring even if resume analysis fails
+                resume_analysis = None
+        else:
+            logger.info(
+                f"No resume text available for submission {data['submission_id']}"
+            )
+            resume_analysis = None
 
         # Calculate total score
         total_score = sum(score["score"] for score in interview_scores)
