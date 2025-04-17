@@ -257,6 +257,7 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
 
         if (response.data.success) {
           console.log('✅ Interview submitted successfully');
+          setIsProcessingSubmission(false);
           router.push('/campaigns');
         } else {
           throw new Error(response.data.error || 'Failed to submit interview');
@@ -267,9 +268,7 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
     } catch (err) {
       console.error('Error submitting interview:', err);
       setError('Failed to submit interview. Please try again.');
-    } finally {
-      setIsProcessingSubmission(false);
-    }
+    } 
   };
 
   const handleDisconnect = async () => {
@@ -281,14 +280,10 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
 
       setIsProcessingSubmission(true);
       await handleTranscriptUpdate(true, transcript);
-      onDisconnect();
-      router.push('/campaigns');
     } catch (err) {
       console.error('Error during disconnect:', err);
       setError('Failed to properly disconnect. Please try again.');
-    } finally {
-      setIsProcessingSubmission(false);
-    }
+    } 
   };
 
   if (isLoading) {
@@ -318,7 +313,10 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-bold">Interview Session: {user?.name}</h2>
             <button 
-              onClick={handleDisconnect}
+              onClick={() => {
+                console.log('🔌 LiveKit disconnected, submitting transcript...');
+                handleDisconnect();
+              }}
               className="px-3 py-1 bg-white text-blue-600 rounded hover:bg-blue-50 transition-colors"
             >
               End Interview
