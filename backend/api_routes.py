@@ -2440,6 +2440,7 @@ def test_create_campaign():
 @api_bp.route("/campaigns/<string:campaign_id>/assignments", methods=["GET", "POST"])
 def handle_campaign_assignments(campaign_id):
     """Handle campaign assignments (GET and POST)."""
+    assigned_candidates = []
     if request.method == "GET":
         try:
             conn = get_db_connection()
@@ -2481,7 +2482,6 @@ def handle_campaign_assignments(campaign_id):
         try:
             data = request.json
             user_ids = data.get("user_ids", [])
-            current_user_id = session.get("user_id")
 
             if not user_ids:
                 return jsonify({"error": "No user IDs provided"}), 400
@@ -2526,18 +2526,23 @@ def handle_campaign_assignments(campaign_id):
                     assignment_id = str(uuid.uuid4())
                     cursor.execute(
                         """
-                        INSERT INTO campaign_assignments (id, campaign_id, user_id, created_by)
-                        VALUES (?, ?, ?, ?)
+                        INSERT INTO campaign_assignments (id, campaign_id, user_id)
+                        VALUES (?, ?, ?)
                     """,
-                        (assignment_id, campaign_id, user_id, current_user_id),
+                        (assignment_id, campaign_id, user_id),
                     )
+                    print(f"🚀 ~ assignment_id: {assignment_id}")
+                    assigned_candidates.append(assignment_id)
                 except sqlite3.IntegrityError:
                     # Skip if assignment already exists
                     continue
 
             conn.commit()
             conn.close()
-            return jsonify({"message": "Candidates assigned successfully"})
+            if len(assigned_candidates) > 0:
+                return jsonify({"message": "Candidates assigned successfully"}), 200
+            else:
+                return jsonify({"message": "No candidates assigned"}), 200
         except Exception as e:
             if conn:
                 conn.rollback()

@@ -5,6 +5,7 @@ import { PageTemplate } from '../../components/PageTemplate';
 import axios from '../../utils/axios';
 import { useAuth } from '../../app/components/AuthProvider';
 import { Spinner } from '../../components/ui/Spinner';
+import { Modal } from '../../components/ui/Modal';
 import { 
   PlusCircleIcon, 
   TrashIcon, 
@@ -14,6 +15,8 @@ import {
   XCircleIcon,
   UserGroupIcon
 } from '@heroicons/react/24/outline';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://main-service-48k0.onrender.com';
 
 // Define interface for Question object
 interface Question {
@@ -48,6 +51,7 @@ const CreateCampaignPage = () => {
   const [isClient, setIsClient] = useState(false);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
   
   // Campaign state
   const [campaign, setCampaign] = useState<Campaign>({
@@ -281,7 +285,7 @@ const CreateCampaignPage = () => {
       }));
 
       // First create the campaign
-      const response = await axios.post('/api/test-campaigns', {
+      const response = await axios.post(`${API_BASE_URL}/api/test-campaigns`, {
         ...campaign,
         questions: questionsData
       }, {
@@ -296,16 +300,24 @@ const CreateCampaignPage = () => {
         // If candidates were selected, assign them to the campaign
         if (selectedCandidates.length > 0) {
           try {
-            await axios.post(`/api/campaigns/${campaignId}/assignments`, {
+            const response = await axios.post(`${API_BASE_URL}/api/campaigns/${campaignId}/assignments`, {
               user_ids: selectedCandidates
             });
+            console.log(response.data);
+
+            if (response.data.message === "Candidates assigned successfully") {
+              setShowSuccessModal(true);
+            } else {
+              setError(response.data.message || 'Failed to assign candidates');
+            }
           } catch (error) {
             console.error('Error assigning candidates:', error);
-            // Continue with redirect even if assignment fails
+            // Continue with success modal even if assignment fails
+            setShowSuccessModal(true);
           }
+        } else {
+          setShowSuccessModal(true);
         }
-        
-        router.push('/campaigns');
       } else {
         setError(response.data.message || 'Failed to create campaign');
       }
@@ -315,6 +327,11 @@ const CreateCampaignPage = () => {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleSuccessModalClose = () => {
+    setShowSuccessModal(false);
+    router.push('/campaigns');
   };
   
   return (
@@ -389,7 +406,7 @@ const CreateCampaignPage = () => {
           </div>
 
           {/* Add Candidate Selection Section */}
-          {/* <div className="space-y-4">
+          <div className="space-y-4">
             <div className="flex justify-between items-center">
               <h2 className="text-xl font-semibold">Candidate Assignment</h2>
               <UserGroupIcon className="h-6 w-6 text-gray-500" />
@@ -429,7 +446,7 @@ const CreateCampaignPage = () => {
                 </div>
               )}
             </div>
-          </div> */}
+          </div>
 
           {/* Questions Section */}
           <div className="space-y-4">
@@ -562,6 +579,38 @@ const CreateCampaignPage = () => {
           </div>
         </form>
       </div>
+
+      {/* Loading Modal */}
+      <Modal 
+        isOpen={isSubmitting}
+        title="Creating Campaign"
+      >
+        <div className="flex flex-col items-center space-y-4">
+          <Spinner size="large" />
+          <p className="text-gray-600 text-center">
+            Please wait while we create your campaign and assign candidates...
+          </p>
+        </div>
+      </Modal>
+
+      {/* Success Modal */}
+      <Modal 
+        isOpen={showSuccessModal}
+        title="Campaign Created Successfully"
+      >
+        <div className="flex flex-col items-center space-y-4">
+          <CheckCircleIcon className="h-12 w-12 text-green-500" />
+          <p className="text-gray-600 text-center">
+            Your campaign has been created successfully! Click the button below to return to the campaigns page.
+          </p>
+          <PrimaryButton
+            onClick={handleSuccessModalClose}
+            className="mt-4"
+          >
+            Return to Campaigns
+          </PrimaryButton>
+        </div>
+      </Modal>
     </PageTemplate>
   );
 };
