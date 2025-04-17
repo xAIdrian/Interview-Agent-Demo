@@ -87,9 +87,6 @@ const CampaignsPage = () => {
           id: String(campaign.id)
         }));
         
-        setCampaigns(campaignsWithStringIds);
-        AuthLogger.info(`Loaded ${campaignsWithStringIds.length} campaigns successfully`);
-
         // Fetch assignments for each campaign
         const assignments: Record<string, CampaignAssignment[]> = {};
         for (const campaign of campaignsWithStringIds) {
@@ -104,6 +101,15 @@ const CampaignsPage = () => {
           }
         }
         setCampaignAssignments(assignments);
+
+        // Filter campaigns to only show those assigned to the current user
+        const filteredCampaigns = campaignsWithStringIds.filter((campaign: Campaign) => {
+          const campaignAssignments = assignments[campaign.id] || [];
+          return campaignAssignments.some(assignment => assignment.email === user?.email);
+        });
+        
+        setCampaigns(filteredCampaigns);
+        AuthLogger.info(`Loaded ${filteredCampaigns.length} assigned campaigns successfully`);
         
       } catch (err) {
         console.error('Error fetching campaigns:', err);
@@ -120,7 +126,7 @@ const CampaignsPage = () => {
     };
 
     fetchCampaigns();
-  }, [isClient, isAuthenticated]);
+  }, [isClient, isAuthenticated, user?.email]);
 
   const handleActionClick = (id: string) => {
     if (isAdmin) {
@@ -139,37 +145,6 @@ const CampaignsPage = () => {
       formatter: (cell: any) => {
         const text = cell.getValue() || '';
         return text.length > 100 ? text.substring(0, 100) + '...' : text;
-      }
-    },
-    { 
-      title: "Status", 
-      field: "is_public", 
-      hozAlign: "center" as "center", 
-      widthGrow: 1,
-      formatter: (cell: any) => {
-        const isPublic = cell.getValue();
-        return isPublic ? 
-          '<div class="flex items-center justify-center text-green-600"><CheckCircleIcon class="h-5 w-5" /></div>' : 
-          '<div class="flex items-center justify-center text-red-600"><XCircleIcon class="h-5 w-5" /></div>';
-      }
-    },
-    { 
-      title: "Assigned", 
-      field: "id",
-      hozAlign: "center" as "center",
-      widthGrow: 2,
-      formatter: (cell: any) => {
-        const campaignId = String(cell.getValue());
-        const assignments = campaignAssignments[campaignId] || [];
-        
-        if (assignments.length === 0) {
-          return '<div class="flex items-center justify-center text-gray-400">None</div>';
-        }
-        
-        const userDetails = assignments.map(a => `${a.name} (${a.email})`).join('\n');
-        return `<div class="flex items-center justify-center">
-          <span class="text-gray-600">${userDetails}</span>
-        </div>`;
       }
     },
     { 
