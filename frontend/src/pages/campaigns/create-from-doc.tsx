@@ -636,20 +636,6 @@ const CreateCampaignFromDocPage = () => {
                   required
                 />
               </div>
-              
-              <div className="flex items-center">
-                <input
-                  id="is_public"
-                  name="is_public"
-                  type="checkbox"
-                  checked={campaign.is_public}
-                  onChange={handleCampaignChange}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                />
-                <label htmlFor="is_public" className="ml-2 block text-sm text-gray-700">
-                  Publish Immediately
-                </label>
-              </div>
             </div>
             
             {/* Questions */}
@@ -694,14 +680,6 @@ const CreateCampaignFromDocPage = () => {
                           className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500"
                           required
                         />
-                        <button
-                          type="button"
-                          onClick={() => optimizePrompt(index)}
-                          disabled={optimizing[index]}
-                          className="mt-2 bg-green-500 text-white px-4 py-1 rounded hover:bg-green-700 text-sm disabled:bg-green-300"
-                        >
-                          {optimizing[index] ? 'Optimizing...' : 'Optimize with AI'}
-                        </button>
                         
                         {/* Optimized prompt container */}
                         {showOptimized[index] && (
