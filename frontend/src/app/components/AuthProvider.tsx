@@ -6,6 +6,8 @@ import { isAxiosError } from 'axios';
 import axios from '../../utils/axios';
 import { AuthLogger } from '../../utils/logging';
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://main-service-48k0.onrender.com';
+
 interface User {
   id: string;
   email: string;
@@ -70,7 +72,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       AuthLogger.info('Attempting login...');
       
-      const response = await axios.post('/login', { email, password });
+      const response = await axios.post(`${API_BASE_URL}/login`, { email, password });
       
       if (response.data.user) {
         setUser(response.data.user);
