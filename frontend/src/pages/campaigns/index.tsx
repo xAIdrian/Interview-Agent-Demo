@@ -102,14 +102,16 @@ const CampaignsPage = () => {
         }
         setCampaignAssignments(assignments);
 
-        // Filter campaigns to only show those assigned to the current user
-        const filteredCampaigns = campaignsWithStringIds.filter((campaign: Campaign) => {
-          const campaignAssignments = assignments[campaign.id] || [];
-          return campaignAssignments.some(assignment => assignment.email === user?.email);
-        });
+        // Only filter campaigns for non-admin users
+        const filteredCampaigns = isAdmin 
+          ? campaignsWithStringIds  // Admins see all campaigns
+          : campaignsWithStringIds.filter((campaign: Campaign) => {
+              const campaignAssignments = assignments[campaign.id] || [];
+              return campaignAssignments.some(assignment => assignment.email === user?.email);
+            });
         
         setCampaigns(filteredCampaigns);
-        AuthLogger.info(`Loaded ${filteredCampaigns.length} assigned campaigns successfully`);
+        AuthLogger.info(`Loaded ${filteredCampaigns.length} campaigns successfully`);
         
       } catch (err) {
         console.error('Error fetching campaigns:', err);
@@ -126,7 +128,7 @@ const CampaignsPage = () => {
     };
 
     fetchCampaigns();
-  }, [isClient, isAuthenticated, user?.email]);
+  }, [isClient, isAuthenticated, user?.email, isAdmin]);
 
   const handleActionClick = (id: string) => {
     if (isAdmin) {

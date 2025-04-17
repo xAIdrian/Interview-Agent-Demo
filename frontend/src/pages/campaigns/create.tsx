@@ -444,17 +444,6 @@ const CreateCampaignPage = () => {
                   required
                 />
               </div>
-
-              <div className="flex items-center">
-                <input
-                  type="checkbox"
-                  name="is_public"
-                  checked={campaign.is_public}
-                  onChange={handleCampaignChange}
-                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                />
-                <label className="ml-2 block text-sm text-gray-900">Public Campaign</label>
-              </div>
             </div>
           </div>
 
@@ -551,18 +540,6 @@ const CreateCampaignPage = () => {
                       className="flex-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                       required
                     />
-                    <button
-                      type="button"
-                      onClick={() => optimizePrompt(index)}
-                      disabled={optimizing[index]}
-                      className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50"
-                    >
-                      {optimizing[index] ? (
-                        <ArrowPathIcon className="h-5 w-5 animate-spin" />
-                      ) : (
-                        <SparklesIcon className="h-5 w-5" />
-                      )}
-                    </button>
                   </div>
                 </div>
 

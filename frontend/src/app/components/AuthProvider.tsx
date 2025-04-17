@@ -87,7 +87,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       if (isAxiosError(err)) {
         if (err.response) {
-          setError(err.response.data.message || 'Login failed');
+          // Handle specific status codes
+          switch (err.response.status) {
+            case 401:
+              setError('Invalid email or password. Please try again.');
+              break;
+            case 403:
+              setError('Access denied. Please contact your administrator.');
+              break;
+            case 404:
+              setError('User not found. Please check your email.');
+              break;
+            case 500:
+              setError('Server error. Please try again later.');
+              break;
+            default:
+              setError(err.response.data.message || 'Login failed');
+          }
         } else if (err.request) {
           setError('No response from server. Please check your connection.');
         } else {

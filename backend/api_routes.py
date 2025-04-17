@@ -2437,34 +2437,73 @@ def test_create_campaign():
         return response, 400
 
 
-@api_bp.route("/campaigns/<string:campaign_id>/assignments", methods=["GET"])
-def get_campaign_assignments(campaign_id):
-    """Get all assignments for a specific campaign."""
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
+@api_bp.route("/campaigns/<string:campaign_id>/assignments", methods=["GET", "POST"])
+def handle_campaign_assignments(campaign_id):
+    """Handle campaign assignments - GET for retrieving assignments, POST for creating new assignments."""
+    if request.method == "GET":
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
 
-        # Get assignments for this campaign
-        cursor.execute(
-            """
-            SELECT ca.*, u.name, u.email
-            FROM campaign_assignments ca
-            JOIN users u ON ca.user_id = u.id
-            WHERE ca.campaign_id = ?
-        """,
-            (campaign_id,),
-        )
+            # Get assignments for this campaign
+            cursor.execute(
+                """
+                SELECT ca.*, u.name, u.email
+                FROM campaign_assignments ca
+                JOIN users u ON ca.user_id = u.id
+                WHERE ca.campaign_id = ?
+            """,
+                (campaign_id,),
+            )
 
-        assignments = cursor.fetchall()
-        columns = ["id", "campaign_id", "user_id", "created_at", "name", "email"]
-        result = [map_row_to_dict(assignment, columns) for assignment in assignments]
+            assignments = cursor.fetchall()
+            columns = ["id", "campaign_id", "user_id", "created_at", "name", "email"]
+            result = [
+                map_row_to_dict(assignment, columns) for assignment in assignments
+            ]
 
-        conn.close()
-        return jsonify(result), 200
-    except Exception as e:
-        if conn:
             conn.close()
-        return jsonify({"error": str(e)}), 500
+            return jsonify(result), 200
+        except Exception as e:
+            if conn:
+                conn.close()
+            return jsonify({"error": str(e)}), 500
+
+    elif request.method == "POST":
+        try:
+            data = request.get_json()
+            user_ids = data.get("user_ids", [])
+
+            if not user_ids:
+                return jsonify({"message": "No candidates assigned"}), 200
+
+            conn = get_db_connection()
+            cursor = conn.cursor()
+
+            # First, delete existing assignments for this campaign
+            cursor.execute(
+                "DELETE FROM campaign_assignments WHERE campaign_id = ?", (campaign_id,)
+            )
+
+            # Insert new assignments
+            for user_id in user_ids:
+                cursor.execute(
+                    """
+                    INSERT INTO campaign_assignments (campaign_id, user_id)
+                    VALUES (?, ?)
+                    """,
+                    (campaign_id, user_id),
+                )
+
+            conn.commit()
+            conn.close()
+            return jsonify({"message": "Candidates assigned successfully"}), 200
+
+        except Exception as e:
+            if conn:
+                conn.rollback()
+                conn.close()
+            return jsonify({"error": str(e)}), 500
 
 
 @api_bp.route("/resume_analysis/<submission_id>", methods=["GET"])
