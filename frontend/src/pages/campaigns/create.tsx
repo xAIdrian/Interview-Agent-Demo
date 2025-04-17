@@ -277,6 +277,57 @@ const CreateCampaignPage = () => {
     setIsSubmitting(true);
     setError('');
 
+    // Validate form
+    if (!campaign.title.trim()) {
+      setError('Campaign title is required');
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (!campaign.job_description.trim()) {
+      setError('Job description is required');
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (!campaign.campaign_context.trim()) {
+      setError('Campaign context is required');
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (campaign.questions.length === 0) {
+      setError('At least one question is required');
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (selectedCandidates.length === 0) {
+      setError('At least one candidate must be selected');
+      setIsSubmitting(false);
+      return;
+    }
+
+    for (const question of campaign.questions) {
+      if (!question.title.trim()) {
+        setError('All questions must have a title');
+        setIsSubmitting(false);
+        return;
+      }
+      
+      if (!question.scoring_prompt.trim()) {
+        setError('All questions must have a scoring prompt');
+        setIsSubmitting(false);
+        return;
+      }
+      
+      if (question.max_points <= 0) {
+        setError('All questions must have max points greater than 0');
+        setIsSubmitting(false);
+        return;
+      }
+    }
+
     try {
       // Prepare questions data
       const questionsData = campaign.questions.map(q => ({
@@ -300,32 +351,34 @@ const CreateCampaignPage = () => {
         // If candidates were selected, assign them to the campaign
         if (selectedCandidates.length > 0) {
           try {
-            const response = await axios.post(`${API_BASE_URL}/api/campaigns/${campaignId}/assignments`, {
+            const assignmentResponse = await axios.post(`${API_BASE_URL}/api/campaigns/${campaignId}/assignments`, {
               user_ids: selectedCandidates
             });
-            console.log(response.data);
 
-            if (response.data.message === "Candidates assigned successfully") {
+            if (assignmentResponse.data.message === "Candidates assigned successfully") {
               setShowSuccessModal(true);
             } else {
-              setError(response.data.message || 'Failed to assign candidates');
+              setError(assignmentResponse.data.message || 'Failed to assign candidates');
+              setIsSubmitting(false);
+              return;
             }
-          } catch (error) {
+          } catch (error: any) {
             console.error('Error assigning candidates:', error);
-            // Continue with success modal even if assignment fails
-            setShowSuccessModal(true);
+            setError(error.response?.data?.error || 'Failed to assign candidates');
+            setIsSubmitting(false);
+            return;
           }
-        } else {
-          setShowSuccessModal(true);
         }
       } else {
         setError(response.data.message || 'Failed to create campaign');
+        setIsSubmitting(false);
+        return;
       }
     } catch (error: any) {
       console.error('Error creating campaign:', error);
       setError(error.response?.data?.message || 'Failed to create campaign. Please try again.');
-    } finally {
       setIsSubmitting(false);
+      return;
     }
   };
 
