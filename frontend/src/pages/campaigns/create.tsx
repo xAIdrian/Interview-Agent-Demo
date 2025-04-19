@@ -5,6 +5,7 @@ import { PageTemplate } from '../../components/PageTemplate';
 import axios from '../../utils/axios';
 import { useAuth } from '../../app/components/AuthProvider';
 import { Spinner } from '../../components/ui/Spinner';
+import { Modal } from '../../components/ui/Modal';
 import { 
   PlusCircleIcon, 
   TrashIcon, 
@@ -14,6 +15,8 @@ import {
   XCircleIcon,
   UserGroupIcon
 } from '@heroicons/react/24/outline';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://main-service-48k0.onrender.com';
 
 // Define interface for Question object
 interface Question {
@@ -48,6 +51,7 @@ const CreateCampaignPage = () => {
   const [isClient, setIsClient] = useState(false);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
   
   // Campaign state
   const [campaign, setCampaign] = useState<Campaign>({
@@ -273,6 +277,57 @@ const CreateCampaignPage = () => {
     setIsSubmitting(true);
     setError('');
 
+    // Validate form
+    if (!campaign.title.trim()) {
+      setError('Campaign title is required');
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (!campaign.job_description.trim()) {
+      setError('Job description is required');
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (!campaign.campaign_context.trim()) {
+      setError('Campaign context is required');
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (campaign.questions.length === 0) {
+      setError('At least one question is required');
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (selectedCandidates.length === 0) {
+      setError('At least one candidate must be selected');
+      setIsSubmitting(false);
+      return;
+    }
+
+    for (const question of campaign.questions) {
+      if (!question.title.trim()) {
+        setError('All questions must have a title');
+        setIsSubmitting(false);
+        return;
+      }
+      
+      if (!question.scoring_prompt.trim()) {
+        setError('All questions must have a scoring prompt');
+        setIsSubmitting(false);
+        return;
+      }
+      
+      if (question.max_points <= 0) {
+        setError('All questions must have max points greater than 0');
+        setIsSubmitting(false);
+        return;
+      }
+    }
+
     try {
       // Prepare questions data
       const questionsData = campaign.questions.map(q => ({
@@ -281,7 +336,7 @@ const CreateCampaignPage = () => {
       }));
 
       // First create the campaign
-      const response = await axios.post('/api/test-campaigns', {
+      const response = await axios.post(`${API_BASE_URL}/api/test-campaigns`, {
         ...campaign,
         questions: questionsData
       }, {
@@ -296,25 +351,40 @@ const CreateCampaignPage = () => {
         // If candidates were selected, assign them to the campaign
         if (selectedCandidates.length > 0) {
           try {
-            await axios.post(`/api/campaigns/${campaignId}/assignments`, {
+            const assignmentResponse = await axios.post(`${API_BASE_URL}/api/campaigns/${campaignId}/assignments`, {
               user_ids: selectedCandidates
             });
-          } catch (error) {
+
+            if (assignmentResponse.data.message === "Candidates assigned successfully") {
+              setShowSuccessModal(true);
+            } else {
+              setError(assignmentResponse.data.message || 'Failed to assign candidates');
+              setIsSubmitting(false);
+              return;
+            }
+          } catch (error: any) {
             console.error('Error assigning candidates:', error);
-            // Continue with redirect even if assignment fails
+            setError(error.response?.data?.error || 'Failed to assign candidates');
+            setIsSubmitting(false);
+            return;
           }
         }
-        
-        router.push('/campaigns');
       } else {
         setError(response.data.message || 'Failed to create campaign');
+        setIsSubmitting(false);
+        return;
       }
     } catch (error: any) {
       console.error('Error creating campaign:', error);
       setError(error.response?.data?.message || 'Failed to create campaign. Please try again.');
-    } finally {
       setIsSubmitting(false);
+      return;
     }
+  };
+
+  const handleSuccessModalClose = () => {
+    setShowSuccessModal(false);
+    router.push('/campaigns');
   };
   
   return (
@@ -374,22 +444,11 @@ const CreateCampaignPage = () => {
                   required
                 />
               </div>
-
-              <div className="flex items-center">
-                <input
-                  type="checkbox"
-                  name="is_public"
-                  checked={campaign.is_public}
-                  onChange={handleCampaignChange}
-                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                />
-                <label className="ml-2 block text-sm text-gray-900">Public Campaign</label>
-              </div>
             </div>
           </div>
 
           {/* Add Candidate Selection Section */}
-          {/* <div className="space-y-4">
+          <div className="space-y-4">
             <div className="flex justify-between items-center">
               <h2 className="text-xl font-semibold">Candidate Assignment</h2>
               <UserGroupIcon className="h-6 w-6 text-gray-500" />
@@ -429,7 +488,7 @@ const CreateCampaignPage = () => {
                 </div>
               )}
             </div>
-          </div> */}
+          </div>
 
           {/* Questions Section */}
           <div className="space-y-4">
@@ -481,18 +540,6 @@ const CreateCampaignPage = () => {
                       className="flex-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                       required
                     />
-                    <button
-                      type="button"
-                      onClick={() => optimizePrompt(index)}
-                      disabled={optimizing[index]}
-                      className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50"
-                    >
-                      {optimizing[index] ? (
-                        <ArrowPathIcon className="h-5 w-5 animate-spin" />
-                      ) : (
-                        <SparklesIcon className="h-5 w-5" />
-                      )}
-                    </button>
                   </div>
                 </div>
 
@@ -562,6 +609,38 @@ const CreateCampaignPage = () => {
           </div>
         </form>
       </div>
+
+      {/* Loading Modal */}
+      <Modal 
+        isOpen={isSubmitting}
+        title="Creating Campaign"
+      >
+        <div className="flex flex-col items-center space-y-4">
+          <Spinner size="large" />
+          <p className="text-gray-600 text-center">
+            Please wait while we create your campaign and assign candidates...
+          </p>
+        </div>
+      </Modal>
+
+      {/* Success Modal */}
+      <Modal 
+        isOpen={showSuccessModal}
+        title="Campaign Created Successfully"
+      >
+        <div className="flex flex-col items-center space-y-4">
+          <CheckCircleIcon className="h-12 w-12 text-green-500" />
+          <p className="text-gray-600 text-center">
+            Your campaign has been created successfully! Click the button below to return to the campaigns page.
+          </p>
+          <PrimaryButton
+            onClick={handleSuccessModalClose}
+            className="mt-4"
+          >
+            Return to Campaigns
+          </PrimaryButton>
+        </div>
+      </Modal>
     </PageTemplate>
   );
 };

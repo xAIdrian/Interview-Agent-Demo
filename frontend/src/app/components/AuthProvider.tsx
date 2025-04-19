@@ -6,6 +6,8 @@ import { isAxiosError } from 'axios';
 import axios from '../../utils/axios';
 import { AuthLogger } from '../../utils/logging';
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://main-service-48k0.onrender.com';
+
 interface User {
   id: string;
   email: string;
@@ -70,7 +72,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       AuthLogger.info('Attempting login...');
       
-      const response = await axios.post('/login', { email, password });
+      const response = await axios.post(`${API_BASE_URL}/login`, { email, password });
       
       if (response.data.user) {
         setUser(response.data.user);
@@ -87,7 +89,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       if (isAxiosError(err)) {
         if (err.response) {
-          setError(err.response.data.message || 'Login failed');
+          // Handle specific status codes
+          switch (err.response.status) {
+            case 401:
+              setError('Invalid email or password. Please try again.');
+              break;
+            case 403:
+              setError('Access denied. Please contact your administrator.');
+              break;
+            case 404:
+              setError('User not found. Please check your email.');
+              break;
+            case 500:
+              setError('Server error. Please try again later.');
+              break;
+            default:
+              setError(err.response.data.message || 'Login failed');
+          }
         } else if (err.request) {
           setError('No response from server. Please check your connection.');
         } else {

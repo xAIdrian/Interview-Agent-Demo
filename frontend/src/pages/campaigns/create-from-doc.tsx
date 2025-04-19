@@ -6,6 +6,7 @@ import { PageTemplate } from '../../components/PageTemplate';
 import { Spinner } from '../../components/ui/Spinner';
 import { Modal } from '../../components/ui/Modal';
 import { UserGroupIcon } from '@heroicons/react/24/outline';
+import { CheckCircleIcon } from '@heroicons/react/24/outline';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://main-service-48k0.onrender.com';
 
@@ -45,6 +46,7 @@ const CreateCampaignFromDocPage = () => {
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState('standard');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -378,9 +380,27 @@ const CreateCampaignFromDocPage = () => {
       setIsSubmitting(false);
       return;
     }
+
+    if (!campaign.job_description.trim()) {
+      setError('Job description is required');
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (!campaign.campaign_context.trim()) {
+      setError('Campaign context is required');
+      setIsSubmitting(false);
+      return;
+    }
     
     if (campaign.questions.length === 0) {
       setError('At least one question is required');
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (selectedCandidates.length === 0) {
+      setError('At least one candidate must be selected');
       setIsSubmitting(false);
       return;
     }
@@ -405,53 +425,70 @@ const CreateCampaignFromDocPage = () => {
       }
     }
     
-    // Prepare data for API
-    const formData = {
-      ...campaign,
-      questions: campaign.questions.map(q => ({
-        ...q,
-        body: q.body || q.title // Use body if available, otherwise use title as body
-      }))
-    };
-    
     try {
-      const response = await axios.post(
-        `${API_URL}/api/test-campaigns`,
-        formData
-      );
-      
-      // if (response.status === 201) {
-      //   // After successful campaign creation, assign selected candidates
-      //   if (selectedCandidates.length > 0) {
-      //     await axios.post(`${API_URL}/api/campaigns/assign-candidates`, {
-      //       campaignId: response.data.id,
-      //       candidateIds: selectedCandidates
-      //     });
-      //   }
+      // Prepare questions data
+      const questionsData = campaign.questions.map(q => ({
+        ...q,
+        body: q.title // Set body to title when submitting
+      }));
 
-      // } else {
-      //   setError('Failed to create campaign');
-      // }
-      router.push('/campaigns');
-    } catch (error) {
+      // First create the campaign
+      const response = await axios.post(`${API_URL}/api/test-campaigns`, {
+        ...campaign,
+        questions: questionsData
+      }, {
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.data.success) {
+        const campaignId = response.data.data.id;
+        
+        // If candidates were selected, assign them to the campaign
+        if (selectedCandidates.length > 0) {
+          try {
+            const assignmentResponse = await axios.post(`${API_URL}/api/campaigns/${campaignId}/assignments`, {
+              user_ids: selectedCandidates
+            });
+
+            if (assignmentResponse.data.message === "Candidates assigned successfully") {
+              setShowSuccessModal(true);
+            } else {
+              setError(assignmentResponse.data.message || 'Failed to assign candidates');
+              setIsSubmitting(false);
+              return;
+            }
+          } catch (error: any) {
+            console.error('Error assigning candidates:', error);
+            setError(error.response?.data?.error || 'Failed to assign candidates');
+            setIsSubmitting(false);
+            return;
+          }
+        }
+      } else {
+        setError(response.data.message || 'Failed to create campaign');
+        setIsSubmitting(false);
+        return;
+      }
+    } catch (error: any) {
       console.error('Error creating campaign:', error);
-      setError('Failed to create campaign. Please try again.');
-    } finally {
+      setError(error.response?.data?.message || 'Failed to create campaign. Please try again.');
       setIsSubmitting(false);
+      return;
     }
   };
-  
+
+  const handleSuccessModalClose = () => {
+    setShowSuccessModal(false);
+    router.push('/campaigns');
+  };
+
   return (
     <PageTemplate title="Create Campaign from Document" maxWidth="lg">
       <div className="w-full bg-white shadow-md rounded-lg p-6">
         <h2 className="text-2xl font-bold mb-6">Create Campaign from Document</h2>
         
-        {/* Display any error message */}
-        {error && (
-          <div className="mb-4 p-2 bg-red-100 text-red-700 rounded">
-            {error}
-          </div>
-        )}
         
         {/* Document upload section */}
         <div className="mb-8 p-6 border border-dashed border-gray-300 rounded-md">
@@ -599,20 +636,6 @@ const CreateCampaignFromDocPage = () => {
                   required
                 />
               </div>
-              
-              <div className="flex items-center">
-                <input
-                  id="is_public"
-                  name="is_public"
-                  type="checkbox"
-                  checked={campaign.is_public}
-                  onChange={handleCampaignChange}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                />
-                <label htmlFor="is_public" className="ml-2 block text-sm text-gray-700">
-                  Publish Immediately
-                </label>
-              </div>
             </div>
             
             {/* Questions */}
@@ -657,14 +680,6 @@ const CreateCampaignFromDocPage = () => {
                           className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500"
                           required
                         />
-                        <button
-                          type="button"
-                          onClick={() => optimizePrompt(index)}
-                          disabled={optimizing[index]}
-                          className="mt-2 bg-green-500 text-white px-4 py-1 rounded hover:bg-green-700 text-sm disabled:bg-green-300"
-                        >
-                          {optimizing[index] ? 'Optimizing...' : 'Optimize with AI'}
-                        </button>
                         
                         {/* Optimized prompt container */}
                         {showOptimized[index] && (
@@ -740,7 +755,7 @@ const CreateCampaignFromDocPage = () => {
             </div>
             
             {/* Add Candidate Selection Section */}
-            {/* <div className="bg-white shadow sm:rounded-lg">
+            <div className="bg-white shadow sm:rounded-lg">
               <div className="px-4 py-5 sm:p-6">
                 <h3 className="text-lg font-medium leading-6 text-gray-900">Assign Candidates</h3>
                 <div className="mt-2 max-w-xl text-sm text-gray-500">
@@ -787,7 +802,7 @@ const CreateCampaignFromDocPage = () => {
                   )}
                 </div>
               </div>
-            </div> */}
+            </div>
             
             {/* Submit button */}
             <div className="pt-4">
@@ -795,9 +810,48 @@ const CreateCampaignFromDocPage = () => {
                 {isSubmitting ? 'Creating...' : 'Create Campaign'}
               </PrimaryButton>
             </div>
+
+            {/* Display any error message */}
+            {error && (
+              <div className="mb-4 p-2 bg-red-100 text-red-700 rounded">
+                {error}
+              </div>
+            )}
           </form>
         )}
       </div>
+
+      {/* Loading Modal */}
+      <Modal 
+        isOpen={isSubmitting}
+        title="Creating Campaign"
+      >
+        <div className="flex flex-col items-center space-y-4">
+          <Spinner size="large" />
+          <p className="text-gray-600 text-center">
+            Please wait while we create your campaign and assign candidates...
+          </p>
+        </div>
+      </Modal>
+
+      {/* Success Modal */}
+      <Modal 
+        isOpen={showSuccessModal}
+        title="Campaign Created Successfully"
+      >
+        <div className="flex flex-col items-center space-y-4">
+          <CheckCircleIcon className="h-12 w-12 text-green-500" />
+          <p className="text-gray-600 text-center">
+            Your campaign has been created successfully! Click the button below to return to the campaigns page.
+          </p>
+          <PrimaryButton
+            onClick={handleSuccessModalClose}
+            className="mt-4"
+          >
+            Return to Campaigns
+          </PrimaryButton>
+        </div>
+      </Modal>
     </PageTemplate>
   );
 };

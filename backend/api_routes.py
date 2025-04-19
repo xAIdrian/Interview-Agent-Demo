@@ -2439,7 +2439,7 @@ def test_create_campaign():
 
 @api_bp.route("/campaigns/<string:campaign_id>/assignments", methods=["GET", "POST"])
 def handle_campaign_assignments(campaign_id):
-    """Handle campaign assignments (GET and POST)."""
+    """Handle campaign assignments - GET for retrieving assignments, POST for creating new assignments."""
     if request.method == "GET":
         try:
             conn = get_db_connection()
@@ -2457,21 +2457,13 @@ def handle_campaign_assignments(campaign_id):
             )
 
             assignments = cursor.fetchall()
-            columns = [
-                "id",
-                "campaign_id",
-                "user_id",
-                "created_by",
-                "created_at",
-                "name",
-                "email",
-            ]
+            columns = ["id", "campaign_id", "user_id", "created_at", "name", "email"]
             result = [
                 map_row_to_dict(assignment, columns) for assignment in assignments
             ]
 
             conn.close()
-            return jsonify(result)
+            return jsonify(result), 200
         except Exception as e:
             if conn:
                 conn.close()
@@ -2479,65 +2471,34 @@ def handle_campaign_assignments(campaign_id):
 
     elif request.method == "POST":
         try:
-            data = request.json
+            data = request.get_json()
             user_ids = data.get("user_ids", [])
-            current_user_id = session.get("user_id")
 
             if not user_ids:
-                return jsonify({"error": "No user IDs provided"}), 400
+                return jsonify({"message": "No candidates assigned"}), 200
 
             conn = get_db_connection()
             cursor = conn.cursor()
 
-            # Verify campaign exists
-            cursor.execute("SELECT id FROM campaigns WHERE id = ?", (campaign_id,))
-            if not cursor.fetchone():
-                conn.close()
-                return jsonify({"error": "Campaign not found"}), 404
-
-            # Verify all users exist and are not admins
-            placeholders = ",".join(["?" for _ in user_ids])
+            # First, delete existing assignments for this campaign
             cursor.execute(
-                f"""
-                SELECT id, is_admin 
-                FROM users 
-                WHERE id IN ({placeholders})
-            """,
-                user_ids,
+                "DELETE FROM campaign_assignments WHERE campaign_id = ?", (campaign_id,)
             )
 
-            users = cursor.fetchall()
-            if len(users) != len(user_ids):
-                conn.close()
-                return jsonify({"error": "One or more users not found"}), 404
-
-            for user in users:
-                if user[1]:  # is_admin is True
-                    conn.close()
-                    return (
-                        jsonify({"error": "Cannot assign admin users to campaigns"}),
-                        400,
-                    )
-
-            # Insert assignments
+            # Insert new assignments
             for user_id in user_ids:
-                try:
-                    # Generate a UUID using Python's uuid module
-                    assignment_id = str(uuid.uuid4())
-                    cursor.execute(
-                        """
-                        INSERT INTO campaign_assignments (id, campaign_id, user_id, created_by)
-                        VALUES (?, ?, ?, ?)
+                cursor.execute(
+                    """
+                    INSERT INTO campaign_assignments (campaign_id, user_id)
+                    VALUES (?, ?)
                     """,
-                        (assignment_id, campaign_id, user_id, current_user_id),
-                    )
-                except sqlite3.IntegrityError:
-                    # Skip if assignment already exists
-                    continue
+                    (campaign_id, user_id),
+                )
 
             conn.commit()
             conn.close()
-            return jsonify({"message": "Candidates assigned successfully"})
+            return jsonify({"message": "Candidates assigned successfully"}), 200
+
         except Exception as e:
             if conn:
                 conn.rollback()

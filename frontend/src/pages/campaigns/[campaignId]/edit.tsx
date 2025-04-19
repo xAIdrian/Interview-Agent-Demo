@@ -4,7 +4,8 @@ import { useRouter } from 'next/router';
 import { PrimaryButton } from '../../../components/Button';
 import { PageTemplate } from '../../../components/PageTemplate';
 import { Spinner } from '../../../components/ui/Spinner';
-import { UserGroupIcon } from '@heroicons/react/24/outline';
+import { Modal } from '../../../components/ui/Modal';
+import { UserGroupIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://main-service-48k0.onrender.com';
 
@@ -44,6 +45,8 @@ const EditCampaignPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [initialAssignments, setInitialAssignments] = useState<string[]>([]);
   
   // Campaign state
   const [campaign, setCampaign] = useState<Campaign>({
@@ -88,7 +91,7 @@ const EditCampaignPage = () => {
     fetchCandidates();
   }, []);
   
-  // Add useEffect to fetch current assignments
+  // Update the useEffect that fetches current assignments
   useEffect(() => {
     const fetchCurrentAssignments = async () => {
       if (!campaignId) return;
@@ -96,7 +99,9 @@ const EditCampaignPage = () => {
       try {
         const response = await axios.get(`${API_URL}/api/campaigns/${campaignId}/assignments`);
         const currentAssignments = response.data;
-        setSelectedCandidates(currentAssignments.map((assignment: any) => assignment.user_id));
+        const assignmentIds = currentAssignments.map((assignment: any) => assignment.user_id);
+        setSelectedCandidates(assignmentIds);
+        setInitialAssignments(assignmentIds);
       } catch (error) {
         console.error('Error fetching current assignments:', error);
         // Don't show error to user as this is not critical
@@ -344,7 +349,7 @@ const EditCampaignPage = () => {
     });
   };
   
-  // Update handleSubmit to include candidate assignment
+  // Update handleSubmit to include success modal
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -359,6 +364,12 @@ const EditCampaignPage = () => {
     
     if (campaign.questions.length === 0) {
       setError('At least one question is required');
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (selectedCandidates.length === 0) {
+      setError('At least one candidate must be selected');
       setIsSubmitting(false);
       return;
     }
@@ -397,20 +408,32 @@ const EditCampaignPage = () => {
       );
 
       if (response.status === 200) {
-        // If candidates were selected, assign them to the campaign
-        if (selectedCandidates.length > 0) {
+        // Only make assignment request if there are changes
+        const hasAssignmentChanges = 
+          initialAssignments.length !== selectedCandidates.length ||
+          !initialAssignments.every(id => selectedCandidates.includes(id)) ||
+          !selectedCandidates.every(id => initialAssignments.includes(id));
+
+        if (hasAssignmentChanges) {
           try {
-            await axios.post(`${API_URL}/api/campaigns/${campaignId}/assignments`, {
+            const assignmentResponse = await axios.post(`${API_URL}/api/campaigns/${campaignId}/assignments`, {
               user_ids: selectedCandidates
             });
+
+            if (assignmentResponse.data.message === "Candidates assigned successfully" || 
+                assignmentResponse.data.message === "No candidates assigned") {
+              setShowSuccessModal(true);
+            } else {
+              setError('Failed to update candidate assignments');
+            }
           } catch (error) {
             console.error('Error assigning candidates:', error);
-            // Continue with redirect even if assignment fails
+            setError('Failed to update candidate assignments');
           }
+        } else {
+          // No changes to assignments, just show success modal
+          setShowSuccessModal(true);
         }
-        
-        // Redirect to campaigns list
-        router.push('/campaigns');
       } else {
         setError('Failed to update campaign');
       }
@@ -420,6 +443,11 @@ const EditCampaignPage = () => {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleSuccessModalClose = () => {
+    setShowSuccessModal(false);
+    router.push('/campaigns');
   };
   
   if (isLoading) {
@@ -438,13 +466,6 @@ const EditCampaignPage = () => {
     <PageTemplate title="Edit Campaign" maxWidth="lg">
       <div className="w-full bg-white shadow-md rounded-lg p-6">
         <h2 className="text-2xl font-bold mb-6">Edit Campaign</h2>
-        
-        {/* Display any error message */}
-        {error && (
-          <div className="mb-4 p-2 bg-red-100 text-red-700 rounded">
-            {error}
-          </div>
-        )}
         
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Campaign details */}
@@ -509,24 +530,10 @@ const EditCampaignPage = () => {
                 required
               />
             </div>
-            
-            <div className="flex items-center">
-              <input
-                id="is_public"
-                name="is_public"
-                type="checkbox"
-                checked={campaign.is_public}
-                onChange={handleCampaignChange}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-              />
-              <label htmlFor="is_public" className="ml-2 block text-sm text-gray-700">
-                Publish Campaign
-              </label>
-            </div>
           </div>
           
           {/* Add Candidate Selection Section */}
-          {/* <div className="space-y-4">
+          <div className="space-y-4">
             <div className="flex justify-between items-center">
               <h2 className="text-xl font-semibold">Candidate Assignment</h2>
               <UserGroupIcon className="h-6 w-6 text-gray-500" />
@@ -566,7 +573,7 @@ const EditCampaignPage = () => {
                 </div>
               )}
             </div>
-          </div> */}
+          </div>
           
           {/* Questions */}
           <div>
@@ -610,14 +617,6 @@ const EditCampaignPage = () => {
                         className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500"
                         required
                       />
-                      <button
-                        type="button"
-                        onClick={() => optimizePrompt(index)}
-                        disabled={optimizing[index]}
-                        className="mt-2 bg-green-500 text-white px-4 py-1 rounded hover:bg-green-700 text-sm disabled:bg-green-300"
-                      >
-                        {optimizing[index] ? 'Optimizing...' : 'Optimize with AI'}
-                      </button>
                       
                       {/* Optimized prompt container */}
                       {showOptimized[index] && (
@@ -698,8 +697,46 @@ const EditCampaignPage = () => {
               {isSubmitting ? 'Updating...' : 'Update Campaign'}
             </PrimaryButton>
           </div>
+          {/* Display any error message */}
+          {error && (
+            <div className="mb-4 p-2 bg-red-100 text-red-700 rounded">
+              {error}
+            </div>
+          )}
         </form>
       </div>
+
+      {/* Loading Modal */}
+      <Modal 
+        isOpen={isSubmitting}
+        title="Updating Campaign"
+      >
+        <div className="flex flex-col items-center space-y-4">
+          <Spinner size="large" />
+          <p className="text-gray-600 text-center">
+            Please wait while we update your campaign and assign candidates...
+          </p>
+        </div>
+      </Modal>
+
+      {/* Success Modal */}
+      <Modal 
+        isOpen={showSuccessModal}
+        title="Campaign Updated Successfully"
+      >
+        <div className="flex flex-col items-center space-y-4">
+          <CheckCircleIcon className="h-12 w-12 text-green-500" />
+          <p className="text-gray-600 text-center">
+            Your campaign has been updated successfully! Click the button below to return to the campaigns page.
+          </p>
+          <PrimaryButton
+            onClick={handleSuccessModalClose}
+            className="mt-4"
+          >
+            Return to Campaigns
+          </PrimaryButton>
+        </div>
+      </Modal>
     </PageTemplate>
   );
 };
