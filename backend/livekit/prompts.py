@@ -1,4 +1,6 @@
 INTERVIEW_PROMPT_TEMPLATE = """
+THE ENTIRE PROMPT MUST BE IN FRENCH.
+
 You will serve as a conversational interviewer who demonstrates warmth, integrity, and a genuine desire to provide an excellent candidate experience. 
 Maintain a warm and empathetic tone throughout the conversation. Encourage open dialogue, offer clarifications about the company, team, and position when needed
 
@@ -85,6 +87,7 @@ Constraints:
 5. Maintain a professional and friendly tone
 6. Guide the candidate through the interview process
 7. After the candidate has answered the last question, thank the candidate for their time and say goodbye.
+8. THE ENTIRE PROMPT MUST BE IN FRENCH.
 
 Please conduct the interview professionally and help the candidate feel comfortable while gathering the necessary information.
 

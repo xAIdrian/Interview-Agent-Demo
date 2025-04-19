@@ -44,6 +44,15 @@ interface Campaign {
   job_description: string;
 }
 
+interface CampaignAssignment {
+  id: string;
+  campaign_id: string;
+  user_id: string;
+  created_at: string;
+  name: string;
+  email: string;
+}
+
 // Define API base URL for consistent usage
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://main-service-48k0.onrender.com';
 
@@ -51,6 +60,7 @@ const CampaignsPage = () => {
   const router = useRouter();
   const { user, isAuthenticated, isAdmin } = useAuth();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [campaignAssignments, setCampaignAssignments] = useState<Record<string, CampaignAssignment[]>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [isClient, setIsClient] = useState(false);
@@ -63,12 +73,12 @@ const CampaignsPage = () => {
   }, []);
 
   useEffect(() => {
-    if (!isClient) return;
+    if (!isClient || !isAuthenticated) return;
 
     const fetchCampaigns = async () => {
       try {
         setIsLoading(true);
-        // Always use the /api/campaigns endpoint
+        // Fetch campaigns
         const response = await axios.get(`${API_BASE_URL}/api/campaigns`);
         
         // Ensure all campaign IDs are strings
@@ -77,8 +87,32 @@ const CampaignsPage = () => {
           id: String(campaign.id)
         }));
         
-        setCampaigns(campaignsWithStringIds);
-        AuthLogger.info(`Loaded ${campaignsWithStringIds.length} campaigns successfully`);
+        // Fetch assignments for each campaign
+        const assignments: Record<string, CampaignAssignment[]> = {};
+        for (const campaign of campaignsWithStringIds) {
+          try {
+            const assignmentsResponse = await axios.get(
+              `${API_BASE_URL}/api/campaigns/${campaign.id}/assignments`
+            );
+            assignments[campaign.id] = assignmentsResponse.data;
+          } catch (err) {
+            console.error(`Error fetching assignments for campaign ${campaign.id}:`, err);
+            assignments[campaign.id] = [];
+          }
+        }
+        setCampaignAssignments(assignments);
+
+        // Only filter campaigns for non-admin users
+        const filteredCampaigns = isAdmin 
+          ? campaignsWithStringIds  // Admins see all campaigns
+          : campaignsWithStringIds.filter((campaign: Campaign) => {
+              const campaignAssignments = assignments[campaign.id] || [];
+              return campaignAssignments.some(assignment => assignment.email === user?.email);
+            });
+        
+        setCampaigns(filteredCampaigns);
+        AuthLogger.info(`Loaded ${filteredCampaigns.length} campaigns successfully`);
+        
       } catch (err) {
         console.error('Error fetching campaigns:', err);
         setError('Failed to load campaigns. Please try again.');
@@ -94,7 +128,7 @@ const CampaignsPage = () => {
     };
 
     fetchCampaigns();
-  }, [isClient]);
+  }, [isClient, isAuthenticated, user?.email, isAdmin]);
 
   const handleActionClick = (id: string) => {
     if (isAdmin) {
@@ -113,18 +147,6 @@ const CampaignsPage = () => {
       formatter: (cell: any) => {
         const text = cell.getValue() || '';
         return text.length > 100 ? text.substring(0, 100) + '...' : text;
-      }
-    },
-    { 
-      title: "Status", 
-      field: "is_public", 
-      hozAlign: "center" as "center", 
-      widthGrow: 1,
-      formatter: (cell: any) => {
-        const isPublic = cell.getValue();
-        return isPublic ? 
-          '<div class="flex items-center justify-center text-green-600"><CheckCircleIcon class="h-5 w-5" /></div>' : 
-          '<div class="flex items-center justify-center text-red-600"><XCircleIcon class="h-5 w-5" /></div>';
       }
     },
     { 
