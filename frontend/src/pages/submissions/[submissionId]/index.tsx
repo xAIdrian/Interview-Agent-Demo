@@ -65,6 +65,113 @@ interface Submission {
   resume_analysis?: ResumeAnalysis;
 }
 
+// Scoring Display component
+function ScoringDisplay({ submission }: { submission: Submission }) {
+  return (
+    <div className="w-full bg-white rounded-lg shadow p-4 mb-4">
+      <div className="space-y-6">
+        {/* Strengths and Weaknesses Section */}
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <h3 className="text-lg font-medium text-gray-900">Strengths and Weaknesses</h3>
+            <div className="relative group">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400 cursor-help" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div className="absolute left-0 mt-2 w-64 bg-white p-2 rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10">
+                <p className="text-xs text-gray-600">Analysis of your technical skills, experience, and qualifications compared to the job requirements.</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-gray-50 p-4 rounded-lg">
+            {submission.resume_analysis ? (
+              <div className="space-y-4">
+                <div>
+                  <h4 className="text-sm font-medium text-gray-700 mb-2">Strengths</h4>
+                  <ul className="list-disc list-inside space-y-1">
+                    {submission.resume_analysis.strengths.map((strength, index) => (
+                      <li key={index} className="text-sm text-gray-600">{strength}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div>
+                  <h4 className="text-sm font-medium text-gray-700 mb-2">Weaknesses</h4>
+                  <ul className="list-disc list-inside space-y-1">
+                    {submission.resume_analysis.weaknesses.map((weakness, index) => (
+                      <li key={index} className="text-sm text-gray-600">{weakness}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500">No resume analysis available</p>
+            )}
+          </div>
+        </div>
+
+        {/* Overall Fit Section */}
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <h3 className="text-lg font-medium text-gray-900">Overall Fit</h3>
+            <div className="relative group">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400 cursor-help" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div className="absolute left-0 mt-2 w-64 bg-white p-2 rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10">
+                <p className="text-xs text-gray-600">A comprehensive assessment of how well your skills, experience, and responses align with the position requirements.</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-gray-50 p-4 rounded-lg">
+            {submission.resume_analysis ? (
+              <div className="space-y-2">
+                <div className="text-2xl font-bold text-gray-900">
+                  {submission.resume_analysis.percent_match}% Match
+                </div>
+                <p className="text-sm text-gray-600">{submission.resume_analysis.overall_fit}</p>
+                <p className="text-sm text-gray-500">{submission.resume_analysis.percent_match_reason}</p>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500">No overall fit assessment available</p>
+            )}
+          </div>
+        </div>
+
+        {/* Questions and Answers Section */}
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <h3 className="text-lg font-medium text-gray-900">Questions and Answers</h3>
+            <div className="relative group">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400 cursor-help" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div className="absolute left-0 mt-2 w-64 bg-white p-2 rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10">
+                <p className="text-xs text-gray-600">Detailed scoring of your responses to each interview question, evaluating technical knowledge, problem-solving, and communication skills.</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-gray-50 p-4 rounded-lg">
+            <div className="space-y-4">
+              {submission.answers?.map((answer) => (
+                <div key={answer.id} className="border-b border-gray-200 pb-4 last:border-b-0 last:pb-0">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-sm font-medium text-gray-900">{answer.question?.title}</h4>
+                    <span className="text-sm font-medium text-gray-900">{answer.score || 'Not scored'}</span>
+                  </div>
+                  <p className="text-sm text-gray-600 mb-2">{answer.transcript}</p>
+                  {answer.score_rationale && (
+                    <p className="text-sm text-gray-500 italic">{answer.score_rationale}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const SubmissionDetailsPage = () => {
   const router = useRouter();
   const { submissionId } = router.query;
@@ -373,28 +480,47 @@ const SubmissionDetailsPage = () => {
           {/* Resume Analysis Section */}
           {submission.resume_analysis && (
             <div className="mb-6">
-              <h2 className="text-xl font-bold mb-4">Resume Analysis</h2>
-                <div className="mt-6">
+              <div className="mt-6">
+                <div className="flex items-center gap-2">
                   <h3 className="text-lg font-semibold mb-2">Overall Fit</h3>
-                  <p className="text-gray-700 mb-4">{submission.resume_analysis.overall_fit}</p>
-                  
-                  <p className="text-gray-600 mt-2 text-sm">{submission.resume_analysis.percent_match_reason}</p>
-                  <div className="flex items-center space-x-4">
-                    <div className="flex-1">
-                      <div className="h-4 bg-gray-200 rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-blue-500 rounded-full" 
-                          style={{ width: `${submission.resume_analysis.percent_match}%` }}
-                        />
-                      </div>
+                  <div className="relative group">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400 cursor-help" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <div className="absolute left-0 mt-2 w-64 bg-white p-2 rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10">
+                      <p className="text-xs text-gray-600">A comprehensive assessment of how well your skills, experience, and responses align with the position requirements.</p>
                     </div>
-                    <span className="text-lg font-semibold">{submission.resume_analysis.percent_match}% Match</span>
                   </div>
                 </div>
+                <p className="text-gray-700 mb-4">{submission.resume_analysis.overall_fit}</p>
+                
+                <p className="text-gray-600 mt-2 text-sm">{submission.resume_analysis.percent_match_reason}</p>
+                <div className="flex items-center space-x-4">
+                  <div className="flex-1">
+                    <div className="h-4 bg-gray-200 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-blue-500 rounded-full" 
+                        style={{ width: `${submission.resume_analysis.percent_match}%` }}
+                      />
+                    </div>
+                  </div>
+                  <span className="text-lg font-semibold">{submission.resume_analysis.percent_match}% Match</span>
+                </div>
+              </div>
               <div className="bg-gray-50 rounded-lg p-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <h3 className="text-lg font-semibold mb-2">Strengths</h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-lg font-semibold mb-2">Strengths</h3>
+                      <div className="relative group">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400 cursor-help" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <div className="absolute left-0 mt-2 w-64 bg-white p-2 rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10">
+                          <p className="text-xs text-gray-600">Detailed scoring of your responses to each interview question, evaluating technical knowledge, problem-solving, and communication skills.</p>
+                        </div>
+                      </div>
+                    </div>
                     <ul className="list-disc pl-5 space-y-1">
                       {submission.resume_analysis.strengths.map((strength, index) => (
                         <li key={index} className="text-green-600">{strength}</li>
@@ -402,9 +528,18 @@ const SubmissionDetailsPage = () => {
                     </ul>
                   </div>
                   
-
                   <div>
-                    <h3 className="text-lg font-semibold mb-2">Weaknesses</h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-lg font-semibold mb-2">Weaknesses</h3>
+                      <div className="relative group">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400 cursor-help" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <div className="absolute left-0 mt-2 w-64 bg-white p-2 rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10">
+                          <p className="text-xs text-gray-600">Detailed scoring of your responses to each interview question, evaluating technical knowledge, problem-solving, and communication skills.</p>
+                        </div>
+                      </div>
+                    </div>
                     <ul className="list-disc pl-5 space-y-1">
                       {submission.resume_analysis.weaknesses.map((weakness, index) => (
                         <li key={index} className="text-red-600">{weakness}</li>
@@ -412,13 +547,22 @@ const SubmissionDetailsPage = () => {
                     </ul>
                   </div>
                 </div>
-                
               </div>
             </div>
           )}
           
           {/* Answers and scoring */}
-          <h2 className="text-xl font-bold mb-4">Questions & Answers</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-bold mb-4">Questions & Answers</h2>
+            <div className="relative group">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400 cursor-help" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div className="absolute left-0 mt-2 w-64 bg-white p-2 rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10">
+                <p className="text-xs text-gray-600">Detailed scoring of your responses to each interview question, evaluating technical knowledge, problem-solving, and communication skills.</p>
+              </div>
+            </div>
+          </div>
           
           {submission.answers && submission.answers.length > 0 ? (
             <div className="space-y-6">

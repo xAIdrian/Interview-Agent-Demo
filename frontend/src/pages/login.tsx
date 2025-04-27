@@ -11,9 +11,8 @@ const LoginPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
   const router = useRouter();
-  const { login, clearError, isAuthenticated } = useAuth();
+  const { login, clearError, isAuthenticated, error } = useAuth();
   
   // Get the redirect URL from query parameters
   const redirectPath = router.query?.redirect as string || '/candidate';
@@ -35,8 +34,6 @@ const LoginPage = () => {
       if (success) {
         router.push(redirectPath);
       }
-    } catch (error) {
-      setError('An unexpected error occurred');
     } finally {
       setIsLoading(false);
     }
@@ -50,8 +47,15 @@ const LoginPage = () => {
       <PageTemplate title="Login">
         <div className="max-w-md mx-auto">
           {error && (
-            <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
-              {error}
+            <div className="mb-4 rounded-md bg-red-50 p-4">
+              <div className="flex">
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-red-800">Error</h3>
+                  <div className="mt-2 text-sm text-red-700">
+                    <p>{error}</p>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
           <form onSubmit={handleSubmit} className="space-y-4">
