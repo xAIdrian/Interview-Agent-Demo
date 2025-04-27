@@ -5,10 +5,9 @@ boto3
 botocore==1.37.21 
 flask-cors
 flask-jwt-extended
-fpdf
+fpdf==1.7.2
 livekit==0.22.0
 livekit-agents==0.12.20
-livekit-plugins-deepgram==0.7.3
 livekit-plugins-openai==0.12.3
 numpy
 openai

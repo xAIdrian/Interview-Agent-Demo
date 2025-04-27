@@ -299,6 +299,9 @@ def get_questions():
         if conditions:
             query += " WHERE " + " AND ".join(conditions)
 
+    # Add ORDER BY clause to ensure questions are ordered by order_index
+    query += " ORDER BY order_index"
+
     # Execute query
     cursor.execute(query, params)
     questions = cursor.fetchall()
@@ -319,7 +322,9 @@ def get_question(id):
     # Ensure ID is a string
     question_id = str(id)
 
-    cursor.execute("SELECT * FROM questions WHERE id = ?", (question_id,))
+    cursor.execute(
+        "SELECT * FROM questions WHERE id = ? ORDER BY order_index", (question_id,)
+    )
     question = cursor.fetchone()
     conn.close()
 
@@ -1141,7 +1146,9 @@ def update_campaign_with_questions(id):
     )
 
     # Get existing questions for this campaign
-    cursor.execute("SELECT id FROM questions WHERE campaign_id = ?", (id,))
+    cursor.execute(
+        "SELECT id FROM questions WHERE campaign_id = ? ORDER BY order_index", (id,)
+    )
     existing_question_ids = [row[0] for row in cursor.fetchall()]
 
     # Track which question IDs are still present in the updated data
@@ -2199,25 +2206,83 @@ def submit_interview():
 
         # Calculate total score
         total_score = sum(score["score"] for score in interview_scores)
+        max_possible_score = sum(q["max_points"] for q in questions)
+
+        # Extract strengths and weaknesses from interview answers
+        interview_strengths = []
+        interview_weaknesses = []
+        for score in interview_scores:
+            rationale = score.get("rationale", "")
+            if "strength" in rationale.lower():
+                interview_strengths.append(rationale)
+            if "weakness" in rationale.lower():
+                interview_weaknesses.append(rationale)
+
+        # Combine interview strengths/weaknesses with resume analysis
+        combined_strengths = []
+        combined_weaknesses = []
+        if resume_analysis:
+            combined_strengths = (
+                resume_analysis.get("strengths", []) + interview_strengths
+            )
+            combined_weaknesses = (
+                resume_analysis.get("weaknesses", []) + interview_weaknesses
+            )
+        else:
+            combined_strengths = interview_strengths
+            combined_weaknesses = interview_weaknesses
+
+        # Calculate overall match score as average of interview score (normalized to 100) and resume fit score
+        interview_score_normalized = (total_score / max_possible_score) * 100
+        resume_fit_score = resume_analysis.get("fit_score", 0) if resume_analysis else 0
+        overall_match_score = (interview_score_normalized + resume_fit_score) / 2
 
         # Update each answer in submission_answers
         for score in interview_scores:
-            answer_id = str(uuid.uuid4())
+            # Check if answer already exists
             cursor.execute(
                 """
-                INSERT INTO submission_answers 
-                (id, submission_id, question_id, transcript, score, score_rationale)
-                VALUES (?, ?, ?, ?, ?, ?)
+                SELECT id FROM submission_answers 
+                WHERE submission_id = ? AND question_id = ?
                 """,
-                (
-                    answer_id,
-                    data["submission_id"],
-                    score["question_id"],
-                    score["response"],
-                    score["score"],
-                    score["rationale"],
-                ),
+                (data["submission_id"], score["question_id"]),
             )
+            existing_answer = cursor.fetchone()
+
+            if existing_answer:
+                # Update existing answer
+                cursor.execute(
+                    """
+                    UPDATE submission_answers 
+                    SET transcript = ?, score = ?, score_rationale = ?
+                    WHERE submission_id = ? AND question_id = ?
+                    """,
+                    (
+                        score["response"],
+                        score["score"],
+                        score["rationale"],
+                        data["submission_id"],
+                        score["question_id"],
+                    ),
+                )
+            else:
+                # Insert new answer
+                answer_id = str(uuid.uuid4())
+                cursor.execute(
+                    """
+                    INSERT INTO submission_answers 
+                    (id, submission_id, question_id, transcript, score, score_rationale)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        answer_id,
+                        data["submission_id"],
+                        score["question_id"],
+                        score["response"],
+                        score["score"],
+                        score["rationale"],
+                    ),
+                )
 
         # Mark submission as complete and update total score
         cursor.execute(
@@ -2236,15 +2301,11 @@ def submit_interview():
         formatted_resume_analysis = None
         if resume_analysis and isinstance(resume_analysis, dict):
             formatted_resume_analysis = {
-                "strengths": resume_analysis.get("strengths", []),
-                "weaknesses": resume_analysis.get("weaknesses", []),
+                "strengths": combined_strengths,
+                "weaknesses": combined_weaknesses,
                 "overall_fit": resume_analysis.get("overall_fit", ""),
-                "percent_match": resume_analysis.get(
-                    "fit_score", 0
-                ),  # Changed from percent_match to fit_score
-                "percent_match_reason": resume_analysis.get(
-                    "fit_reason", ""
-                ),  # Changed from percent_match_reason to fit_reason
+                "percent_match": overall_match_score,
+                "percent_match_reason": resume_analysis.get("fit_reason", ""),
             }
 
         return (
@@ -2254,7 +2315,7 @@ def submit_interview():
                     "message": "Interview scored successfully",
                     "submission_id": data["submission_id"],
                     "total_score": total_score,
-                    "max_possible_score": sum(q["max_points"] for q in questions),
+                    "max_possible_score": max_possible_score,
                     "interview_scores": interview_scores,
                     "resume_analysis": formatted_resume_analysis,
                 }

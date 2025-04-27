@@ -90,6 +90,13 @@ You will create a JSON array containing a dictionary representing each of your a
 
 Your rationale should take into consideration the requirements of the {campaign_title} position and the context provided.
 
+Your task is to score each answer on a scale, not just with binary pass/fail outcomes.
+
+Use scaled scoring where partial alignment with the ideal answer earns proportionate credit. 
+For example: if a candidate requests a salary of $70k and the ideal is $50k, do not score them zero — instead, assign them most of the possible points based on proximity. 
+Apply this principle across all answers.  Quantitative and qualitative should use the same scale.
+
+
 Provide only the JSON array in plaintext. Do not use any markdown functionality.
 
 # CANDIDATE RESPONSES
@@ -186,7 +193,7 @@ Job Description: {job_description}
 # TASK
 Analyze the candidate's resume against the job requirements and provide:
 1. Key strengths that make them a good fit
-2. Potential weaknesses or gaps
+2. Potential weaknesses or gaps (do not make these too critical or negative.  Soften the language so you don't hurt the candidate's feelings)
 3. Overall assessment of their fit for the role
 
 Consider:
