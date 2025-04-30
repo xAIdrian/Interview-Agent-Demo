@@ -41,7 +41,7 @@ import json
 import re
 import bcrypt
 from livekit.token_server import LiveKitTokenServer
-from datetime import datetime
+from datetime import datetime, timedelta
 import sqlite3
 import random
 import string
@@ -2462,6 +2462,10 @@ def test_create_campaign():
             if not created_campaign:
                 raise Exception("Campaign was not saved to database")
 
+            # Generate direct access URL
+            base_url = request.host_url.rstrip("/")
+            direct_access_url = f"{base_url}/campaigns/{campaign_id}"
+
             # Prepare response
             response = jsonify(
                 {
@@ -2476,6 +2480,7 @@ def test_create_campaign():
                         "max_points": total_max_points,
                         "is_public": data.get("is_public", False),
                         "questions": questions_created,
+                        "direct_access_url": direct_access_url,
                     },
                 }
             )
@@ -2502,33 +2507,27 @@ def test_create_campaign():
 def handle_campaign_assignments(campaign_id):
     """Handle campaign assignments - GET for retrieving assignments, POST for creating new assignments."""
     if request.method == "GET":
-        try:
-            conn = get_db_connection()
-            cursor = conn.cursor()
+        conn = get_db_connection()
+        cursor = conn.cursor()
 
-            # Get assignments for this campaign
+        try:
             cursor.execute(
                 """
-                SELECT ca.*, u.name, u.email
-                FROM campaign_assignments ca
-                JOIN users u ON ca.user_id = u.id
+                SELECT u.* FROM users u
+                JOIN campaign_assignments ca ON u.id = ca.user_id
                 WHERE ca.campaign_id = ?
-            """,
+                """,
                 (campaign_id,),
             )
-
             assignments = cursor.fetchall()
-            columns = ["id", "campaign_id", "user_id", "created_at", "name", "email"]
-            result = [
-                map_row_to_dict(assignment, columns) for assignment in assignments
-            ]
+            columns = ["id", "email", "name", "is_admin"]
+            result = [map_row_to_dict(row, columns) for row in assignments]
+            return jsonify(result)
 
-            conn.close()
-            return jsonify(result), 200
         except Exception as e:
-            if conn:
-                conn.close()
             return jsonify({"error": str(e)}), 500
+        finally:
+            conn.close()
 
     elif request.method == "POST":
         try:
@@ -2636,4 +2635,84 @@ def get_resume_analysis(submission_id):
         )
     finally:
         if "conn" in locals():
+            conn.close()
+
+
+@api_bp.route("/campaigns/<string:campaign_id>/validate-token", methods=["GET"])
+def validate_campaign_token(campaign_id):
+    """Validate a campaign access token."""
+    access_token = request.args.get("token")
+
+    if not access_token:
+        return jsonify({"error": "No access token provided"}), 400
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Check if token exists and is valid
+        cursor.execute(
+            """
+            SELECT * FROM campaign_access_tokens 
+            WHERE campaign_id = ? AND access_token = ? 
+            AND is_used = FALSE 
+            AND expires_at > CURRENT_TIMESTAMP
+            """,
+            (campaign_id, access_token),
+        )
+        token_record = cursor.fetchone()
+
+        if not token_record:
+            return jsonify({"error": "Invalid or expired access token"}), 401
+
+        # Mark token as used
+        cursor.execute(
+            """
+            UPDATE campaign_access_tokens 
+            SET is_used = TRUE 
+            WHERE campaign_id = ? AND access_token = ?
+            """,
+            (campaign_id, access_token),
+        )
+
+        # Get campaign details
+        cursor.execute(
+            """
+            SELECT c.*, 
+                   (SELECT COUNT(*) FROM questions WHERE campaign_id = c.id) as question_count
+            FROM campaigns c 
+            WHERE c.id = ?
+            """,
+            (campaign_id,),
+        )
+        campaign = cursor.fetchone()
+
+        if not campaign:
+            return jsonify({"error": "Campaign not found"}), 404
+
+        conn.commit()
+
+        # Return campaign details
+        columns = [
+            "id",
+            "title",
+            "max_user_submissions",
+            "max_points",
+            "is_public",
+            "campaign_context",
+            "job_description",
+            "question_count",
+        ]
+        result = map_row_to_dict(campaign, columns)
+
+        return jsonify(
+            {"success": True, "message": "Token validated successfully", "data": result}
+        )
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        return jsonify({"error": f"Error validating token: {str(e)}"}), 500
+    finally:
+        if conn:
             conn.close()
