@@ -45,28 +45,85 @@ interface User {
   is_admin: boolean;
 }
 
+interface SuccessModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  directAccessUrl?: string;
+}
+
+function SuccessModal({ isOpen, onClose, directAccessUrl }: SuccessModalProps) {
+  const [copied, setCopied] = useState(false);
+
+  if (!isOpen) return null;
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(directAccessUrl || '');
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-8 max-w-lg w-full mx-4">
+        <div className="flex items-center space-x-2 mb-6">
+          <CheckCircleIcon className="h-8 w-8 text-green-500" />
+          <h2 className="text-2xl font-bold text-gray-900">Campaign Created Successfully!</h2>
+        </div>
+        
+        {directAccessUrl && (
+          <div className="mb-6">
+            <h3 className="text-lg font-semibold mb-2">Share Link</h3>
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm text-gray-600 break-all">{directAccessUrl}</p>
+                <button
+                  onClick={handleCopy}
+                  className="flex-shrink-0 inline-flex items-center px-3 py-1 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                >
+                  {copied ? 'Copied!' : 'Copy'}
+                </button>
+              </div>
+            </div>
+            <p className="mt-2 text-sm text-gray-500">
+              Share this link with candidates to give them direct access to the interview campaign.
+            </p>
+          </div>
+        )}
+
+        <div className="flex justify-end">
+          <button
+            onClick={onClose}
+            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          >
+            Continue
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const CreateCampaignPage = () => {
   const router = useRouter();
   const { isAuthenticated } = useAuth();
   const [isClient, setIsClient] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [directAccessUrl, setDirectAccessUrl] = useState<string>('');
   
   // Campaign state
   const [campaign, setCampaign] = useState<Campaign>({
     title: '',
     campaign_context: '',
-    job_description: '', // Added job description with empty initial value
+    job_description: '',
     max_user_submissions: 1,
     is_public: false,
-    questions: [
-      {
-        title: '',
-        scoring_prompt: '',
-        max_points: 10
-      }
-    ]
+    questions: []
   });
   
   // AI optimization states
@@ -274,61 +331,63 @@ const CreateCampaignPage = () => {
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
+
     setIsSubmitting(true);
     setError('');
 
-    // Validate form
-    if (!campaign.title.trim()) {
-      setError('Campaign title is required');
-      setIsSubmitting(false);
-      return;
-    }
-
-    if (!campaign.job_description.trim()) {
-      setError('Job description is required');
-      setIsSubmitting(false);
-      return;
-    }
-
-    if (!campaign.campaign_context.trim()) {
-      setError('Campaign context is required');
-      setIsSubmitting(false);
-      return;
-    }
-
-    if (campaign.questions.length === 0) {
-      setError('At least one question is required');
-      setIsSubmitting(false);
-      return;
-    }
-
-    if (selectedCandidates.length === 0) {
-      setError('At least one candidate must be selected');
-      setIsSubmitting(false);
-      return;
-    }
-
-    for (const question of campaign.questions) {
-      if (!question.title.trim()) {
-        setError('All questions must have a title');
-        setIsSubmitting(false);
-        return;
-      }
-      
-      if (!question.scoring_prompt.trim()) {
-        setError('All questions must have a scoring prompt');
-        setIsSubmitting(false);
-        return;
-      }
-      
-      if (question.max_points <= 0) {
-        setError('All questions must have max points greater than 0');
-        setIsSubmitting(false);
-        return;
-      }
-    }
-
     try {
+      // Validate form
+      if (!campaign.title.trim()) {
+        setError('Campaign title is required');
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (!campaign.job_description.trim()) {
+        setError('Job description is required');
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (!campaign.campaign_context.trim()) {
+        setError('Campaign context is required');
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (campaign.questions.length === 0) {
+        setError('At least one question is required');
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (selectedCandidates.length === 0) {
+        setError('At least one candidate must be selected');
+        setIsSubmitting(false);
+        return;
+      }
+
+      for (const question of campaign.questions) {
+        if (!question.title.trim()) {
+          setError('All questions must have a title');
+          setIsSubmitting(false);
+          return;
+        }
+        
+        if (!question.scoring_prompt.trim()) {
+          setError('All questions must have a scoring prompt');
+          setIsSubmitting(false);
+          return;
+        }
+        
+        if (question.max_points <= 0) {
+          setError('All questions must have max points greater than 0');
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
       // Prepare questions data
       const questionsData = campaign.questions.map(q => ({
         ...q,
@@ -347,6 +406,9 @@ const CreateCampaignPage = () => {
 
       if (response.data.success) {
         const campaignId = response.data.data.id;
+        // Construct the direct access URL using localhost:3000
+        const directUrl = `http://localhost:3000/campaigns/${campaignId}`;
+        setDirectAccessUrl(directUrl);
         
         // If candidates were selected, assign them to the campaign
         if (selectedCandidates.length > 0) {
@@ -368,6 +430,8 @@ const CreateCampaignPage = () => {
             setIsSubmitting(false);
             return;
           }
+        } else {
+          setShowSuccessModal(true);
         }
       } else {
         setError(response.data.message || 'Failed to create campaign');
@@ -628,18 +692,11 @@ const CreateCampaignPage = () => {
         isOpen={showSuccessModal}
         title="Campaign Created Successfully"
       >
-        <div className="flex flex-col items-center space-y-4">
-          <CheckCircleIcon className="h-12 w-12 text-green-500" />
-          <p className="text-gray-600 text-center">
-            Your campaign has been created successfully! Click the button below to return to the campaigns page.
-          </p>
-          <PrimaryButton
-            onClick={handleSuccessModalClose}
-            className="mt-4"
-          >
-            Return to Campaigns
-          </PrimaryButton>
-        </div>
+        <SuccessModal
+          isOpen={showSuccessModal}
+          onClose={handleSuccessModalClose}
+          directAccessUrl={directAccessUrl}
+        />
       </Modal>
     </PageTemplate>
   );
