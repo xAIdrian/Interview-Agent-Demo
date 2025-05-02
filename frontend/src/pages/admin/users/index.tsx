@@ -147,11 +147,11 @@ const UsersPage = () => {
       <div className="bg-white shadow-md rounded-lg p-6">
         <div className="flex justify-end items-center mb-6">
           <Link 
-            href="/admin/users/create" 
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md font-medium flex items-center"
+            href="/admin/users/create?type=admin" 
+            className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md font-medium flex items-center"
           >
             <UserPlusIcon className="h-5 w-5 mr-2" />
-            Add New User
+            Add New Admin
           </Link>
         </div>
 
@@ -169,7 +169,7 @@ const UsersPage = () => {
           <>
             {users.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
-                No users found. Create a new user to get started.
+                No users found.
               </div>
             ) : (
               <div className="overflow-x-auto">
