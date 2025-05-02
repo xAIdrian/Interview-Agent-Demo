@@ -6,6 +6,7 @@ import LiveKitInterviewComponent from '@/components/livekit/LiveKitInterviewComp
 import Link from 'next/link';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/app/components/AuthProvider';
+import { Modal } from '@/components/Modal';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://main-service-48k0.onrender.com';
 
@@ -46,6 +47,7 @@ const LiveKitInterviewPage: React.FC = () => {
   });
   const [isCreatingUser, setIsCreatingUser] = useState(false);
   const [submissionId, setSubmissionId] = useState<string | null>(null);
+  const [showMaxAttemptsModal, setShowMaxAttemptsModal] = useState(false);
 
   useEffect(() => {
     if (campaignId) {
@@ -92,17 +94,14 @@ const LiveKitInterviewPage: React.FC = () => {
   };
 
   const onStartInterview = async () => {
-    if (!campaignId) return;
-    
-    // Validate resume file
-    if (!resumeFile) {
-      setError('Please upload your resume before starting the interview');
+    if (!campaignId || typeof campaignId !== 'string') {
+      setError('Invalid campaign ID');
       return;
     }
 
-    // Validate candidate data
+    // Validate inputs
     if (!candidateData.name || !candidateData.email) {
-      setError('Please fill in your name and email');
+      setError('Name and email are required');
       return;
     }
 
@@ -113,35 +112,36 @@ const LiveKitInterviewPage: React.FC = () => {
       return;
     }
 
-    let userId: string | null = null;
+    if (!resumeFile) {
+      setError('Please upload your resume');
+      return;
+    }
+
+    setIsCreatingUser(true);
+    setError(null);
     let newSubmissionId: string | null = null;
 
     try {
-      setError(null);
-      setIsCreatingUser(true);
-
-      // Create candidate user
+      // Create or get user
       const userResponse = await axios.post(`${API_BASE_URL}/api/users`, {
         name: candidateData.name,
         email: candidateData.email,
-        is_admin: false
+        phone_number: candidateData.phoneNumber
       });
 
-      if (!userResponse.data.id) {
-        throw new Error('Failed to create user account');
+      // Check if user has reached maximum attempts
+      if (userResponse.data.max_attempts_reached) {
+        setShowMaxAttemptsModal(true);
+        return;
       }
-      
-      userId = userResponse.data.id;
 
-      // Create a submission for the new user
+      const userId = userResponse.data.id;
+
+      // Create submission
       const submissionResponse = await axios.post(`${API_BASE_URL}/api/submissions`, {
         campaign_id: campaignId,
         user_id: userId
       });
-
-      if (!submissionResponse.data.id) {
-        throw new Error('Failed to create submission');
-      }
 
       newSubmissionId = submissionResponse.data.id;
       setSubmissionId(newSubmissionId);
@@ -151,7 +151,7 @@ const LiveKitInterviewPage: React.FC = () => {
       formData.append('resume', resumeFile);
       formData.append('user_id', userId!);
       formData.append('submission_id', newSubmissionId!);
-      formData.append('position_id', campaignId as string);
+      formData.append('position_id', campaignId);
 
       const resumeResponse = await axios.post(`${API_BASE_URL}/api/upload_resume`, formData, {
         headers: {
@@ -182,14 +182,6 @@ const LiveKitInterviewPage: React.FC = () => {
           await axios.delete(`${API_BASE_URL}/api/submissions/${newSubmissionId}`);
         } catch (cleanupErr) {
           console.error('Failed to cleanup submission:', cleanupErr);
-        }
-      }
-      
-      if (userId) {
-        try {
-          await axios.delete(`${API_BASE_URL}/api/users/${userId}`);
-        } catch (cleanupErr) {
-          console.error('Failed to cleanup user:', cleanupErr);
         }
       }
       
@@ -431,6 +423,27 @@ const LiveKitInterviewPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Maximum Attempts Modal */}
+      <Modal
+        isOpen={showMaxAttemptsModal}
+        onClose={() => {}}
+        title="Maximum Attempts Reached"
+      >
+        <div className="p-6">
+          <div className="text-center">
+            <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
+              <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">Maximum Attempts Reached</h3>
+            <p className="text-gray-600 mb-6">
+              You have already completed the maximum allowed attempts for this interview.
+            </p>
+          </div>
+        </div>
+      </Modal>
     </>
   );
 };

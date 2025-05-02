@@ -581,7 +581,6 @@ def get_submission_for_interview(id):
 
 # POST routes
 @api_bp.route("/users", methods=["POST"])
-# @admin_required
 def create_user():
     data = request.json
 
@@ -600,9 +599,54 @@ def create_user():
 
         # Check if user with this email already exists
         cursor.execute("SELECT id FROM users WHERE email = ?", (email,))
-        if cursor.fetchone():
-            conn.close()
-            return jsonify({"error": "A user with this email already exists"}), 400
+        existing_user = cursor.fetchone()
+
+        if existing_user:
+            # Check submission count for this user
+            user_id = existing_user[0]
+            cursor.execute(
+                """
+                SELECT COUNT(*) 
+                FROM submissions s
+                WHERE s.user_id = ? AND s.is_complete = TRUE
+            """,
+                (user_id,),
+            )
+            submission_count = cursor.fetchone()[0]
+
+            if submission_count >= 2:
+                conn.close()
+                return (
+                    jsonify(
+                        {
+                            "id": str(user_id),
+                            "email": email,
+                            "name": data.get("name", ""),
+                            "is_admin": False,
+                            "existing_user": True,
+                            "submission_count": submission_count,
+                            "message": "Maximum attempts reached",
+                            "max_attempts_reached": True,
+                        }
+                    ),
+                    200,
+                )
+
+            # Return existing user if they haven't reached max attempts
+            return (
+                jsonify(
+                    {
+                        "id": str(user_id),
+                        "email": email,
+                        "name": data.get("name", ""),
+                        "is_admin": False,
+                        "existing_user": True,
+                        "submission_count": submission_count,
+                        "max_attempts_reached": False,
+                    }
+                ),
+                200,
+            )
 
         # Generate a UUID for the user
         user_id = str(uuid.uuid4())
@@ -633,6 +677,8 @@ def create_user():
         # Prepare response with string IDs and exclude sensitive information
         columns = ["id", "email", "name", "is_admin"]
         result = map_row_to_dict(new_user, columns)
+        result["existing_user"] = False
+        result["submission_count"] = 0
 
         # If we generated a temporary password, include it in the response
         if data.get("password") is None:
