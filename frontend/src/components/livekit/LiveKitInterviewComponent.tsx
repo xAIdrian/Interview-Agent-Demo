@@ -244,7 +244,8 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
           transcript: formattedTranscript,
           submissionId,
           campaignId,
-          userId: user.id
+          userId: user.id,
+          transcriptLength: formattedTranscript.length
         });
         
         setIsProcessingSubmission(true);
@@ -255,19 +256,40 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
           transcript: formattedTranscript
         });
 
+        console.log('📝 Submit interview response:', response.data);
+
         if (response.data.success) {
-          console.log('✅ Interview submitted successfully');
+          console.log('✅ Interview submitted successfully', {
+            submissionId,
+            totalScore: response.data.total_score,
+            maxPossibleScore: response.data.max_possible_score
+          });
+
+          // Verify the submission was marked as complete
+          const verifyResponse = await axios.get(`${API_URL}/api/submissions/${submissionId}`);
+          console.log('🔍 Verifying submission status:', verifyResponse.data);
+          
+          if (!verifyResponse.data.is_complete) {
+            console.error('❌ Submission was not marked as complete');
+            throw new Error('Submission was not marked as complete');
+          }
+
           setIsProcessingSubmission(false);
           router.push('/campaigns');
         } else {
+          console.error('❌ Interview submission failed:', response.data.error);
           throw new Error(response.data.error || 'Failed to submit interview');
         }
       } else {
         setTranscript(newTranscript);
       }
     } catch (err) {
-      console.error('Error submitting interview:', err);
+      console.error('❌ Error submitting interview:', err);
+      if (axios.isAxiosError(err)) {
+        console.error('Response data:', err.response?.data);
+      }
       setError('Failed to submit interview. Please try again.');
+      setIsProcessingSubmission(false);
     } 
   };
 
@@ -279,6 +301,11 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
       }
 
       setIsProcessingSubmission(true);
+      
+      // Wait a short time for any final transcriptions to be processed
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Submit the final transcript
       await handleTranscriptUpdate(true, transcript);
     } catch (err) {
       console.error('Error during disconnect:', err);
