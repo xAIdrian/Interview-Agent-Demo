@@ -41,6 +41,12 @@ const LiveKitInterviewPage: React.FC = () => {
   const [resumeFile, setResumeFile] = useState<File | null>(null);
   const { handleStartInterview: startInterview, isLoading: interviewLoading, error: interviewError, isUploadingResume, submissionId } = useLiveKitInterview(campaignId as string);
   const { user } = useAuth();
+  const [candidateData, setCandidateData] = useState({
+    name: '',
+    email: '',
+    phoneNumber: ''
+  });
+  const [isCreatingUser, setIsCreatingUser] = useState(false);
 
   useEffect(() => {
     if (campaignId) {
@@ -78,6 +84,14 @@ const LiveKitInterviewPage: React.FC = () => {
     setRoom(null);
   };
 
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setCandidateData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
   const onStartInterview = async () => {
     if (!campaignId) return;
     
@@ -87,17 +101,76 @@ const LiveKitInterviewPage: React.FC = () => {
       return;
     }
 
+    // Validate candidate data
+    if (!candidateData.name || !candidateData.email) {
+      setError('Please fill in your name and email');
+      return;
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(candidateData.email)) {
+      setError('Please enter a valid email address');
+      return;
+    }
+
     try {
-      setError(null); // Clear any previous errors
-      
-      // Start interview with resume file
-      const { token, room } = await startInterview(campaignId as string, resumeFile);
-      
+      setError(null);
+      setIsCreatingUser(true);
+
+      // Create candidate user
+      const userResponse = await axios.post(`${API_BASE_URL}/api/users`, {
+        name: candidateData.name,
+        email: candidateData.email,
+        is_admin: false
+      });
+
+      if (!userResponse.data.id) {
+        throw new Error('Failed to create user account');
+      }
+
+      // Create a submission for the new user
+      const submissionResponse = await axios.post(`${API_BASE_URL}/api/submissions`, {
+        campaign_id: campaignId,
+        user_id: userResponse.data.id
+      });
+
+      if (!submissionResponse.data.id) {
+        throw new Error('Failed to create submission');
+      }
+
+      // Upload resume
+      const formData = new FormData();
+      formData.append('resume', resumeFile);
+      formData.append('user_id', userResponse.data.id);
+      formData.append('submission_id', submissionResponse.data.id);
+      formData.append('position_id', campaignId as string);
+
+      const resumeResponse = await axios.post(`${API_BASE_URL}/api/upload_resume`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      if (!resumeResponse.data.message) {
+        throw new Error('Failed to upload resume');
+      }
+
+      // Get LiveKit token
+      const tokenResponse = await axios.get(`${API_BASE_URL}/api/livekit/token`, {
+        params: {
+          room: `interview-${submissionResponse.data.id}`,
+          campaignId
+        }
+      });
+
       // If successful, proceed with the interview
-      onFormSubmit(token, room);
+      onFormSubmit(tokenResponse.data.token, tokenResponse.data.room);
     } catch (err) {
       console.error('Error starting interview:', err);
       setError(err instanceof Error ? err.message : 'Failed to start interview');
+    } finally {
+      setIsCreatingUser(false);
     }
   };
   
@@ -184,7 +257,62 @@ const LiveKitInterviewPage: React.FC = () => {
                   </p>
                 </div>
               </div>
+            </div>
+
+            {/* Candidate Information Section */}
+            <div className="bg-white shadow rounded-lg p-6 mb-6">
+              <div className="px-4 py-5 sm:px-6">
+                <h2 className="text-lg leading-6 font-medium text-gray-900">Your Information</h2>
+                <p className="mt-1 text-sm text-gray-500">
+                  Please provide your details to begin the interview.
+                </p>
+              </div>
+              <div className="border-t border-gray-200 px-4 py-5 sm:px-6">
+                <div className="space-y-4">
+                  <div>
+                    <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+                      Full Name *
+                    </label>
+                    <input
+                      type="text"
+                      name="name"
+                      id="name"
+                      value={candidateData.name}
+                      onChange={handleInputChange}
+                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                      Email Address *
+                    </label>
+                    <input
+                      type="email"
+                      name="email"
+                      id="email"
+                      value={candidateData.email}
+                      onChange={handleInputChange}
+                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700">
+                      Phone Number (Optional)
+                    </label>
+                    <input
+                      type="tel"
+                      name="phoneNumber"
+                      id="phoneNumber"
+                      value={candidateData.phoneNumber}
+                      onChange={handleInputChange}
+                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
                 </div>
+              </div>
+            </div>
                 
             {/* Resume Upload Section */}
             <div className="bg-white shadow rounded-lg p-6 mb-6">
@@ -261,33 +389,23 @@ const LiveKitInterviewPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Error Display */}
             {error && (
-              <div className="mb-6">
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative">
-                  {error}
-            </div>
-          </div>
-        )}
-        
-            {/* Start Interview Button */}
-            <div className="mt-6">
+              <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
+                {error}
+              </div>
+            )}
+
             <button
-                onClick={onStartInterview}
-                disabled={interviewLoading || isUploadingResume || !resumeFile}
-                className={`w-full py-3 px-4 rounded-md text-white 
-                  ${interviewLoading || isUploadingResume || !resumeFile
-                    ? 'bg-gray-400 cursor-not-allowed'
-                    : 'bg-blue-500 hover:bg-blue-600'
-                  }`}
-              >
-                {interviewLoading || isUploadingResume 
-                  ? 'Starting Interview...' 
-                  : !resumeFile 
-                    ? 'Upload Resume to Start'
-                    : 'Start Interview'}
-              </button>
-                </div>
+              onClick={onStartInterview}
+              disabled={isCreatingUser || interviewLoading || isUploadingResume}
+              className={`w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-semibold
+                ${(isCreatingUser || interviewLoading || isUploadingResume) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-700'}`}
+            >
+              {isCreatingUser ? 'Creating Account...' : 
+               isUploadingResume ? 'Uploading Resume...' :
+               interviewLoading ? 'Starting Interview...' : 
+               'Start Interview'}
+            </button>
           </div>
         )}
       </div>
