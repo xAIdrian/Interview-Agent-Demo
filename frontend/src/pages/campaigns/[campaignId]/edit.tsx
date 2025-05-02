@@ -5,19 +5,19 @@ import { PrimaryButton } from '../../../components/Button';
 import { PageTemplate } from '../../../components/PageTemplate';
 import { Spinner } from '../../../components/ui/Spinner';
 import { Modal } from '../../../components/ui/Modal';
-import { UserGroupIcon, CheckCircleIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { TrashIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/app/components/AuthProvider';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://main-service-48k0.onrender.com';
 
 // Define interface for Question object
 interface Question {
-  id?: string; // ID is required for existing questions
+  id?: string;
   title: string;
   body?: string;
   scoring_prompt: string;
   max_points: number;
-  original_prompt?: string; // For storing original prompt during optimization
+  original_prompt?: string;
 }
 
 // Define interface for Campaign object
@@ -31,14 +31,6 @@ interface Campaign {
   questions: Question[];
 }
 
-// Add interface for User
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  is_admin: boolean;
-}
-
 const EditCampaignPage = () => {
   const router = useRouter();
   const { campaignId } = router.query;
@@ -48,7 +40,6 @@ const EditCampaignPage = () => {
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [initialAssignments, setInitialAssignments] = useState<string[]>([]);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   
@@ -67,53 +58,10 @@ const EditCampaignPage = () => {
   const [optimizedPrompts, setOptimizedPrompts] = useState<{[key: number]: string}>({});
   const [showOptimized, setShowOptimized] = useState<{[key: number]: boolean}>({});
   
-  // Candidate states
-  const [candidates, setCandidates] = useState<User[]>([]);
-  const [selectedCandidates, setSelectedCandidates] = useState<string[]>([]);
-  const [isLoadingCandidates, setIsLoadingCandidates] = useState(false);
-  
   // Use client-side only rendering
   useEffect(() => {
     setIsClient(true);
   }, []);
-  
-  // Add useEffect to fetch candidates
-  useEffect(() => {
-    const fetchCandidates = async () => {
-      try {
-        const response = await axios.get(`${API_URL}/api/users`);
-        // Ensure response.data is an array before filtering
-        const users = Array.isArray(response.data) ? response.data : [];
-        const nonAdminUsers = users.filter((user: User) => !user.is_admin);
-        setCandidates(nonAdminUsers);
-      } catch (error) {
-        console.error('Error fetching candidates:', error);
-        setError('Failed to fetch candidates');
-      }
-    };
-
-    fetchCandidates();
-  }, []);
-  
-  // Update the useEffect that fetches current assignments
-  useEffect(() => {
-    const fetchCurrentAssignments = async () => {
-      if (!campaignId) return;
-      
-      try {
-        const response = await axios.get(`${API_URL}/api/campaigns/${campaignId}/assignments`);
-        const currentAssignments = response.data;
-        const assignmentIds = currentAssignments.map((assignment: any) => assignment.user_id);
-        setSelectedCandidates(assignmentIds);
-        setInitialAssignments(assignmentIds);
-      } catch (error) {
-        console.error('Error fetching current assignments:', error);
-        // Don't show error to user as this is not critical
-      }
-    };
-
-    fetchCurrentAssignments();
-  }, [campaignId]);
   
   // Use useCallback to prevent dependency cycle
   const fetchCampaign = useCallback(async () => {
@@ -138,17 +86,8 @@ const EditCampaignPage = () => {
         `${API_URL}/api/questions?campaign_id=${campaignId}`
       );
       
-      // Fetch current assignments
-      const assignmentsResponse = await axios.get(
-        `${API_URL}/api/campaigns/${campaignId}/assignments`
-      );
-      
       const campaignData = campaignResponse.data;
       const questionsData = questionsResponse.data;
-      const currentAssignments = assignmentsResponse.data;
-      
-      // Set selected candidates
-      setSelectedCandidates(currentAssignments.map((assignment: any) => assignment.user_id));
       
       // Combine data into campaign state
       setCampaign({
@@ -342,18 +281,7 @@ const EditCampaignPage = () => {
     });
   };
   
-  // Add handler for candidate selection
-  const handleCandidateSelection = (userId: string) => {
-    setSelectedCandidates(prev => {
-      if (prev.includes(userId)) {
-        return prev.filter(id => id !== userId);
-      } else {
-        return [...prev, userId];
-      }
-    });
-  };
-  
-  // Update handleSubmit to include success modal
+  // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -368,12 +296,6 @@ const EditCampaignPage = () => {
     
     if (campaign.questions.length === 0) {
       setError('At least one question is required');
-      setIsSubmitting(false);
-      return;
-    }
-
-    if (selectedCandidates.length === 0) {
-      setError('At least one candidate must be selected');
       setIsSubmitting(false);
       return;
     }
@@ -399,7 +321,7 @@ const EditCampaignPage = () => {
     }
     
     try {
-      // First update the campaign
+      // Update the campaign
       const response = await axios.post(
         `${API_URL}/api/campaigns/${campaignId}/update`,
         {
@@ -412,32 +334,7 @@ const EditCampaignPage = () => {
       );
 
       if (response.status === 200) {
-        // Only make assignment request if there are changes
-        const hasAssignmentChanges = 
-          initialAssignments.length !== selectedCandidates.length ||
-          !initialAssignments.every(id => selectedCandidates.includes(id)) ||
-          !selectedCandidates.every(id => initialAssignments.includes(id));
-
-        if (hasAssignmentChanges) {
-          try {
-            const assignmentResponse = await axios.post(`${API_URL}/api/campaigns/${campaignId}/assignments`, {
-              user_ids: selectedCandidates
-            });
-
-            if (assignmentResponse.data.message === "Candidates assigned successfully" || 
-                assignmentResponse.data.message === "No candidates assigned") {
-              setShowSuccessModal(true);
-            } else {
-              setError('Failed to update candidate assignments');
-            }
-          } catch (error) {
-            console.error('Error assigning candidates:', error);
-            setError('Failed to update candidate assignments');
-          }
-        } else {
-          // No changes to assignments, just show success modal
-          setShowSuccessModal(true);
-        }
+        setShowSuccessModal(true);
       } else {
         setError('Failed to update campaign');
       }
@@ -607,49 +504,6 @@ const EditCampaignPage = () => {
             </div>
           </div>
           
-          {/* Add Candidate Selection Section */}
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <h2 className="text-xl font-semibold">Candidate Assignment</h2>
-              <UserGroupIcon className="h-6 w-6 text-gray-500" />
-            </div>
-            
-            <div className="border rounded-lg p-4 space-y-4">
-              <p className="text-sm text-gray-600">
-                Select candidates to assign to this campaign. You can also assign candidates later.
-              </p>
-              
-              {isLoadingCandidates ? (
-                <div className="flex justify-center">
-                  <Spinner size="small" />
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {candidates.map((candidate) => (
-                    <div
-                      key={candidate.id}
-                      className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                        selectedCandidates.includes(candidate.id)
-                          ? 'border-blue-500 bg-blue-50'
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                      onClick={() => handleCandidateSelection(candidate.id)}
-                    >
-                      <div className="font-medium">{candidate.name}</div>
-                      <div className="text-sm text-gray-600">{candidate.email}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-              
-              {candidates.length === 0 && !isLoadingCandidates && (
-                <div className="text-center text-gray-500 py-4">
-                  No candidates available to assign.
-                </div>
-              )}
-            </div>
-          </div>
-          
           {/* Questions */}
           <div>
             <h3 className="text-xl font-bold mb-4">Questions</h3>
@@ -789,7 +643,7 @@ const EditCampaignPage = () => {
         <div className="flex flex-col items-center space-y-4">
           <Spinner size="large" />
           <p className="text-gray-600 text-center">
-            Please wait while we update your campaign and assign candidates...
+            Please wait while we update your campaign...
           </p>
         </div>
       </Modal>
