@@ -5,7 +5,8 @@ import { PrimaryButton } from '../../../components/Button';
 import { PageTemplate } from '../../../components/PageTemplate';
 import { Spinner } from '../../../components/ui/Spinner';
 import { Modal } from '../../../components/ui/Modal';
-import { UserGroupIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
+import { UserGroupIcon, CheckCircleIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { useAuth } from '@/app/components/AuthProvider';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://main-service-48k0.onrender.com';
 
@@ -41,12 +42,15 @@ interface User {
 const EditCampaignPage = () => {
   const router = useRouter();
   const { campaignId } = router.query;
+  const { user } = useAuth();
   const [isClient, setIsClient] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [initialAssignments, setInitialAssignments] = useState<string[]>([]);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   // Campaign state
   const [campaign, setCampaign] = useState<Campaign>({
@@ -468,6 +472,27 @@ const EditCampaignPage = () => {
     }
   };
   
+  const handleDeleteCampaign = async () => {
+    if (!campaignId) return;
+    
+    try {
+      setIsDeleting(true);
+      const response = await axios.delete(`${API_URL}/api/campaigns/${campaignId}`);
+      
+      if (response.data.success) {
+        router.push('/campaigns');
+      } else {
+        setError('Failed to delete campaign');
+      }
+    } catch (error) {
+      console.error('Error deleting campaign:', error);
+      setError('Failed to delete campaign. Please try again.');
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteModal(false);
+    }
+  };
+  
   if (isLoading) {
     return (
       <PageTemplate title="Edit Campaign" maxWidth="lg">
@@ -483,7 +508,19 @@ const EditCampaignPage = () => {
   return (
     <PageTemplate title="Edit Campaign" maxWidth="lg">
       <div className="w-full bg-white shadow-md rounded-lg p-6">
-        <h2 className="text-2xl font-bold mb-6">Edit Campaign</h2>
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-bold">Edit Campaign</h2>
+          {user?.is_admin && (
+            <button
+              onClick={() => setShowDeleteModal(true)}
+              className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 flex items-center gap-2"
+              disabled={isDeleting}
+            >
+              <TrashIcon className="h-5 w-5" />
+              {isDeleting ? 'Deleting...' : 'Delete Campaign'}
+            </button>
+          )}
+        </div>
         
         {/* Campaign Link Section */}
         <div className="mb-8 p-4 bg-gray-50 rounded-lg border border-gray-200">
@@ -773,6 +810,35 @@ const EditCampaignPage = () => {
           >
             Return to Campaigns
           </PrimaryButton>
+        </div>
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        isOpen={showDeleteModal}
+        title="Delete Campaign"
+      >
+        <div className="p-6">
+          <p className="text-gray-700 mb-4">
+            Are you sure you want to delete this campaign? This action cannot be undone and will delete all associated questions and submissions.
+          </p>
+          <div className="flex justify-end gap-4">
+            <button
+              onClick={() => setShowDeleteModal(false)}
+              className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300"
+              disabled={isDeleting}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleDeleteCampaign}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2"
+              disabled={isDeleting}
+            >
+              <TrashIcon className="h-5 w-5" />
+              {isDeleting ? 'Deleting...' : 'Delete Campaign'}
+            </button>
+          </div>
         </div>
       </Modal>
     </PageTemplate>
