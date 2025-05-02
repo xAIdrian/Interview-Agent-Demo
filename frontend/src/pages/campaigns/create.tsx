@@ -12,8 +12,7 @@ import {
   SparklesIcon,
   ArrowPathIcon,
   CheckCircleIcon,
-  XCircleIcon,
-  UserGroupIcon
+  XCircleIcon
 } from '@heroicons/react/24/outline';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://main-service-48k0.onrender.com';
@@ -31,80 +30,10 @@ interface Question {
 interface Campaign {
   title: string;
   campaign_context: string;
-  job_description: string; // Added job description field
+  job_description: string;
   max_user_submissions: number;
   is_public: boolean;
   questions: Question[];
-}
-
-// Add interface for User
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  is_admin: boolean;
-}
-
-interface SuccessModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  directAccessUrl?: string;
-}
-
-function SuccessModal({ isOpen, onClose, directAccessUrl }: SuccessModalProps) {
-  const [copied, setCopied] = useState(false);
-
-  if (!isOpen) return null;
-
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(directAccessUrl || '');
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error('Failed to copy:', err);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-8 max-w-lg w-full mx-4">
-        <div className="flex items-center space-x-2 mb-6">
-          <CheckCircleIcon className="h-8 w-8 text-green-500" />
-          <h2 className="text-2xl font-bold text-gray-900">Campaign Created Successfully!</h2>
-        </div>
-        
-        {directAccessUrl && (
-          <div className="mb-6">
-            <h3 className="text-lg font-semibold mb-2">Share Link</h3>
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-sm text-gray-600 break-all">{directAccessUrl}</p>
-                <button
-                  onClick={handleCopy}
-                  className="flex-shrink-0 inline-flex items-center px-3 py-1 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                >
-                  {copied ? 'Copied!' : 'Copy'}
-                </button>
-              </div>
-            </div>
-            <p className="mt-2 text-sm text-gray-500">
-              Share this link with candidates to give them direct access to the interview campaign.
-            </p>
-          </div>
-        )}
-
-        <div className="flex justify-end">
-          <button
-            onClick={onClose}
-            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-          >
-            Continue
-          </button>
-        </div>
-      </div>
-    </div>
-  );
 }
 
 const CreateCampaignPage = () => {
@@ -131,33 +60,9 @@ const CreateCampaignPage = () => {
   const [optimizedPrompts, setOptimizedPrompts] = useState<{[key: number]: string}>({});
   const [showOptimized, setShowOptimized] = useState<{[key: number]: boolean}>({});
   
-  // Candidate states
-  const [candidates, setCandidates] = useState<User[]>([]);
-  const [selectedCandidates, setSelectedCandidates] = useState<string[]>([]);
-  const [isLoadingCandidates, setIsLoadingCandidates] = useState(false);
-  
   // Use client-side only rendering
   useEffect(() => {
     setIsClient(true);
-  }, []);
-  
-  // Add useEffect to fetch candidates
-  useEffect(() => {
-    const fetchCandidates = async () => {
-      setIsLoadingCandidates(true);
-      try {
-        const response = await axios.get('/api/users');
-        const nonAdminUsers = response.data.filter((user: User) => !user.is_admin);
-        setCandidates(nonAdminUsers);
-      } catch (error) {
-        console.error('Error fetching candidates:', error);
-        setError('Failed to load candidates');
-      } finally {
-        setIsLoadingCandidates(false);
-      }
-    };
-
-    fetchCandidates();
   }, []);
   
   if (!isClient) {
@@ -317,17 +222,6 @@ const CreateCampaignPage = () => {
     });
   };
   
-  // Add handler for candidate selection
-  const handleCandidateSelection = (userId: string) => {
-    setSelectedCandidates(prev => {
-      if (prev.includes(userId)) {
-        return prev.filter(id => id !== userId);
-      } else {
-        return [...prev, userId];
-      }
-    });
-  };
-  
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -362,12 +256,6 @@ const CreateCampaignPage = () => {
         return;
       }
 
-      if (selectedCandidates.length === 0) {
-        setError('At least one candidate must be selected');
-        setIsSubmitting(false);
-        return;
-      }
-
       for (const question of campaign.questions) {
         if (!question.title.trim()) {
           setError('All questions must have a title');
@@ -394,7 +282,7 @@ const CreateCampaignPage = () => {
         body: q.title // Set body to title when submitting
       }));
 
-      // First create the campaign
+      // Create the campaign
       const response = await axios.post(`${API_BASE_URL}/api/test-campaigns`, {
         ...campaign,
         questions: questionsData
@@ -409,40 +297,15 @@ const CreateCampaignPage = () => {
         // Construct the direct access URL using localhost:3000
         const directUrl = `http://localhost:3000/campaigns/${campaignId}`;
         setDirectAccessUrl(directUrl);
-        
-        // If candidates were selected, assign them to the campaign
-        if (selectedCandidates.length > 0) {
-          try {
-            const assignmentResponse = await axios.post(`${API_BASE_URL}/api/campaigns/${campaignId}/assignments`, {
-              user_ids: selectedCandidates
-            });
-
-            if (assignmentResponse.data.message === "Candidates assigned successfully") {
-              setShowSuccessModal(true);
-            } else {
-              setError(assignmentResponse.data.message || 'Failed to assign candidates');
-              setIsSubmitting(false);
-              return;
-            }
-          } catch (error: any) {
-            console.error('Error assigning candidates:', error);
-            setError(error.response?.data?.error || 'Failed to assign candidates');
-            setIsSubmitting(false);
-            return;
-          }
-        } else {
-          setShowSuccessModal(true);
-        }
+        setShowSuccessModal(true);
       } else {
         setError(response.data.message || 'Failed to create campaign');
         setIsSubmitting(false);
-        return;
       }
     } catch (error: any) {
       console.error('Error creating campaign:', error);
       setError(error.response?.data?.message || 'Failed to create campaign. Please try again.');
       setIsSubmitting(false);
-      return;
     }
   };
 
@@ -508,49 +371,6 @@ const CreateCampaignPage = () => {
                   required
                 />
               </div>
-            </div>
-          </div>
-
-          {/* Add Candidate Selection Section */}
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <h2 className="text-xl font-semibold">Candidate Assignment</h2>
-              <UserGroupIcon className="h-6 w-6 text-gray-500" />
-            </div>
-            
-            <div className="border rounded-lg p-4 space-y-4">
-              <p className="text-sm text-gray-600">
-                Select candidates to assign to this campaign. You can also assign candidates later.
-              </p>
-              
-              {isLoadingCandidates ? (
-                <div className="flex justify-center">
-                  <Spinner size="small" />
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {candidates.map((candidate) => (
-                    <div
-                      key={candidate.id}
-                      className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                        selectedCandidates.includes(candidate.id)
-                          ? 'border-blue-500 bg-blue-50'
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                      onClick={() => handleCandidateSelection(candidate.id)}
-                    >
-                      <div className="font-medium">{candidate.name}</div>
-                      <div className="text-sm text-gray-600">{candidate.email}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-              
-              {candidates.length === 0 && !isLoadingCandidates && (
-                <div className="text-center text-gray-500 py-4">
-                  No candidates available to assign.
-                </div>
-              )}
             </div>
           </div>
 
@@ -682,7 +502,7 @@ const CreateCampaignPage = () => {
         <div className="flex flex-col items-center space-y-4">
           <Spinner size="large" />
           <p className="text-gray-600 text-center">
-            Please wait while we create your campaign and assign candidates...
+            Please wait while we create your campaign...
           </p>
         </div>
       </Modal>
@@ -690,13 +510,24 @@ const CreateCampaignPage = () => {
       {/* Success Modal */}
       <Modal 
         isOpen={showSuccessModal}
+        onClose={handleSuccessModalClose}
         title="Campaign Created Successfully"
+        shareUrl={directAccessUrl}
       >
-        <SuccessModal
-          isOpen={showSuccessModal}
-          onClose={handleSuccessModalClose}
-          directAccessUrl={directAccessUrl}
-        />
+        <div className="flex flex-col items-center space-y-4">
+          <CheckCircleIcon className="h-12 w-12 text-green-500" />
+          <div className="text-center">
+            <p className="text-gray-600 mb-4">
+              Your campaign has been created successfully!
+            </p>
+          </div>
+          <PrimaryButton
+            onClick={handleSuccessModalClose}
+            className="mt-4"
+          >
+            Return to Campaigns
+          </PrimaryButton>
+        </div>
       </Modal>
     </PageTemplate>
   );
