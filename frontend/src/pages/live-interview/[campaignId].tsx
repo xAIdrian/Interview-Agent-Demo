@@ -3,7 +3,6 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import axios from 'axios';
 import LiveKitInterviewComponent from '@/components/livekit/LiveKitInterviewComponent';
-import { useLiveKitInterview } from '@/components/livekit/useLiveKitInterview';
 import Link from 'next/link';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/app/components/AuthProvider';
@@ -39,7 +38,6 @@ const LiveKitInterviewPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [resumeFile, setResumeFile] = useState<File | null>(null);
-  const { handleStartInterview: startInterview, isLoading: interviewLoading, error: interviewError, isUploadingResume, submissionId } = useLiveKitInterview(campaignId as string);
   const { user } = useAuth();
   const [candidateData, setCandidateData] = useState({
     name: '',
@@ -47,6 +45,7 @@ const LiveKitInterviewPage: React.FC = () => {
     phoneNumber: ''
   });
   const [isCreatingUser, setIsCreatingUser] = useState(false);
+  const [submissionId, setSubmissionId] = useState<string | null>(null);
 
   useEffect(() => {
     if (campaignId) {
@@ -114,6 +113,9 @@ const LiveKitInterviewPage: React.FC = () => {
       return;
     }
 
+    let userId: string | null = null;
+    let newSubmissionId: string | null = null;
+
     try {
       setError(null);
       setIsCreatingUser(true);
@@ -128,22 +130,27 @@ const LiveKitInterviewPage: React.FC = () => {
       if (!userResponse.data.id) {
         throw new Error('Failed to create user account');
       }
+      
+      userId = userResponse.data.id;
 
       // Create a submission for the new user
       const submissionResponse = await axios.post(`${API_BASE_URL}/api/submissions`, {
         campaign_id: campaignId,
-        user_id: userResponse.data.id
+        user_id: userId
       });
 
       if (!submissionResponse.data.id) {
         throw new Error('Failed to create submission');
       }
 
+      newSubmissionId = submissionResponse.data.id;
+      setSubmissionId(newSubmissionId);
+
       // Upload resume
       const formData = new FormData();
       formData.append('resume', resumeFile);
-      formData.append('user_id', userResponse.data.id);
-      formData.append('submission_id', submissionResponse.data.id);
+      formData.append('user_id', userId!);
+      formData.append('submission_id', newSubmissionId!);
       formData.append('position_id', campaignId as string);
 
       const resumeResponse = await axios.post(`${API_BASE_URL}/api/upload_resume`, formData, {
@@ -159,7 +166,7 @@ const LiveKitInterviewPage: React.FC = () => {
       // Get LiveKit token
       const tokenResponse = await axios.get(`${API_BASE_URL}/api/livekit/token`, {
         params: {
-          room: `interview-${submissionResponse.data.id}`,
+          room: `interview-${newSubmissionId}`,
           campaignId
         }
       });
@@ -168,6 +175,24 @@ const LiveKitInterviewPage: React.FC = () => {
       onFormSubmit(tokenResponse.data.token, tokenResponse.data.room);
     } catch (err) {
       console.error('Error starting interview:', err);
+      
+      // Cleanup on failure
+      if (newSubmissionId) {
+        try {
+          await axios.delete(`${API_BASE_URL}/api/submissions/${newSubmissionId}`);
+        } catch (cleanupErr) {
+          console.error('Failed to cleanup submission:', cleanupErr);
+        }
+      }
+      
+      if (userId) {
+        try {
+          await axios.delete(`${API_BASE_URL}/api/users/${userId}`);
+        } catch (cleanupErr) {
+          console.error('Failed to cleanup user:', cleanupErr);
+        }
+      }
+      
       setError(err instanceof Error ? err.message : 'Failed to start interview');
     } finally {
       setIsCreatingUser(false);
@@ -210,7 +235,7 @@ const LiveKitInterviewPage: React.FC = () => {
         token={token}
         room={room}
         onDisconnect={onDisconnect}
-        submissionId={submissionId}
+        submissionId={submissionId!}
       />
     );
   }
@@ -397,14 +422,11 @@ const LiveKitInterviewPage: React.FC = () => {
 
             <button
               onClick={onStartInterview}
-              disabled={isCreatingUser || interviewLoading || isUploadingResume}
+              disabled={isCreatingUser}
               className={`w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-semibold
-                ${(isCreatingUser || interviewLoading || isUploadingResume) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-700'}`}
+                ${isCreatingUser ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-700'}`}
             >
-              {isCreatingUser ? 'Creating Account...' : 
-               isUploadingResume ? 'Uploading Resume...' :
-               interviewLoading ? 'Starting Interview...' : 
-               'Start Interview'}
+              {isCreatingUser ? 'Creating Account...' : 'Start Interview'}
             </button>
           </div>
         )}
