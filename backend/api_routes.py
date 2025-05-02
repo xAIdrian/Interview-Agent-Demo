@@ -2716,3 +2716,50 @@ def validate_campaign_token(campaign_id):
     finally:
         if conn:
             conn.close()
+
+
+@api_bp.route("/campaigns/<string:id>/link", methods=["GET", "POST"])
+def handle_campaign_link(id):
+    """Handle campaign link operations - GET for retrieving link, POST for creating/updating link."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    try:
+        if request.method == "GET":
+            cursor.execute(
+                "SELECT link_url FROM campaign_links WHERE campaign_id = ?", (id,)
+            )
+            result = cursor.fetchone()
+
+            if result:
+                return jsonify({"link_url": result[0]})
+            return jsonify({"link_url": None}), 404
+
+        elif request.method == "POST":
+            # Generate or update the campaign link
+            link_url = f"{request.host_url.rstrip('/')}/campaigns/{id}"
+
+            cursor.execute(
+                """
+                INSERT INTO campaign_links (campaign_id, link_url)
+                VALUES (?, ?)
+                ON CONFLICT(campaign_id) DO UPDATE SET
+                    link_url = excluded.link_url,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (id, link_url),
+            )
+
+            conn.commit()
+            return jsonify(
+                {
+                    "message": "Campaign link created/updated successfully",
+                    "link_url": link_url,
+                }
+            )
+
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()

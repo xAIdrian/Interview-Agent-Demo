@@ -450,6 +450,24 @@ const EditCampaignPage = () => {
     router.push('/campaigns');
   };
   
+  const handleCopyLink = async () => {
+    const link = `${typeof window !== 'undefined' ? window.location.origin : ''}/campaigns/${campaignId}`;
+    try {
+      await navigator.clipboard.writeText(link);
+      // Show temporary "Copied!" message
+      const button = document.querySelector('#copy-link-button');
+      if (button) {
+        const originalText = button.textContent;
+        button.textContent = 'Copied!';
+        setTimeout(() => {
+          button.textContent = originalText;
+        }, 2000);
+      }
+    } catch (err) {
+      console.error('Failed to copy link:', err);
+    }
+  };
+  
   if (isLoading) {
     return (
       <PageTemplate title="Edit Campaign" maxWidth="lg">
@@ -467,6 +485,26 @@ const EditCampaignPage = () => {
       <div className="w-full bg-white shadow-md rounded-lg p-6">
         <h2 className="text-2xl font-bold mb-6">Edit Campaign</h2>
         
+        {/* Campaign Link Section */}
+        <div className="mb-8 p-4 bg-gray-50 rounded-lg border border-gray-200">
+          <div className="flex justify-between items-center mb-2">
+            <h3 className="text-lg font-semibold text-gray-700">Campaign Link</h3>
+            <button
+              id="copy-link-button"
+              type="button"
+              onClick={handleCopyLink}
+              className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+            >
+              Copy Link
+            </button>
+          </div>
+          <div className="bg-white border border-gray-200 rounded-lg p-3">
+            <p className="text-sm text-gray-600 break-all">
+              {typeof window !== 'undefined' ? `${window.location.origin}/campaigns/${campaignId}` : ''}
+            </p>
+          </div>
+        </div>
+
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Campaign details */}
           <div className="space-y-4">

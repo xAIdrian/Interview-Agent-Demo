@@ -5,6 +5,9 @@ import { PageTemplate } from '../../../components/PageTemplate';
 import Link from 'next/link';
 import { AuthLogger } from '../../../utils/logging';
 import { useAuth } from '@/app/components/AuthProvider';
+import { Modal } from '../../../components/ui/Modal';
+import { CheckCircleIcon } from '@heroicons/react/24/outline';
+import { PrimaryButton } from '../../../components/Button/PrimaryButton';
 
 // Define API base URL for consistent usage
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://main-service-48k0.onrender.com';
@@ -55,6 +58,7 @@ const CampaignDetailsPage = () => {
     can_submit: true,
     has_completed_submission: false,
   });
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   // Setup auth on component mount
   useEffect(() => {
@@ -205,6 +209,11 @@ const CampaignDetailsPage = () => {
     completed_submissions: Math.min(submissionStatus.completed_submissions, submissionStatus.max_submissions)
   };
 
+  const handleSuccessModalClose = () => {
+    setShowSuccessModal(false);
+    router.push('/campaigns');
+  };
+
   return (
     <PageTemplate title={isAdmin ? "Campaign Details" : "Position Details"} maxWidth="lg">
       <div className="flex justify-end mb-4 items-center">
@@ -339,6 +348,33 @@ const CampaignDetailsPage = () => {
           )}
         </>
       ) : null}
+
+      {/* Success Modal */}
+      <Modal 
+        isOpen={showSuccessModal}
+        onClose={handleSuccessModalClose}
+        title="Campaign Created Successfully"
+      >
+        <div className="flex flex-col items-center space-y-4">
+          <CheckCircleIcon className="h-12 w-12 text-green-500" />
+          <div className="text-center">
+            <p className="text-gray-600 mb-4">
+              Your campaign has been created successfully!
+            </p>
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
+              <p className="text-sm text-gray-600 break-all">
+                {typeof window !== 'undefined' ? `${window.location.origin}/campaigns/${campaignId}` : ''}
+              </p>
+            </div>
+          </div>
+          <PrimaryButton
+            onClick={handleSuccessModalClose}
+            className="mt-4"
+          >
+            Return to Campaigns
+          </PrimaryButton>
+        </div>
+      </Modal>
     </PageTemplate>
   );
 };
