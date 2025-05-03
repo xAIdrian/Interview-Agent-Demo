@@ -2,6 +2,19 @@
 
 # AI Candidate Scoring
 
+## Using the Application
+
+Curl command to create a new admin user:
+```
+curl -X POST \
+  https://your-api-url.com/api/admins \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "username": "your_username",
+    "password": "your_password"
+  }'
+```
+
 ## Overview
 
 This project is an AI-powered candidate scoring system that allows administrators to create hiring campaigns and candidates to take one-way video interviews. The system automatically scores the interviews using AI and generates detailed reports.

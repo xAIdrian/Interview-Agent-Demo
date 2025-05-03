@@ -40,24 +40,6 @@ const AdminIndexPage = () => {
           </div>
           
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {/* Users Management Card */}
-            <Link href="/admin/users" className="block">
-              <div className="bg-white overflow-hidden shadow rounded-lg hover:shadow-lg transition-all duration-200 hover:scale-[1.02]">
-                <div className="p-6">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0 bg-blue-100 rounded-md p-3">
-                      <UserGroupIcon className="h-6 w-6 text-blue-600" />
-                    </div>
-                    <div className="ml-4">
-                      <h3 className="text-lg font-medium text-gray-900">Users Management</h3>
-                      <p className="mt-1 text-sm text-gray-500">
-                        Manage user accounts and permissions
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </Link>
 
             {/* Campaigns Management Card */}
             <Link href="/campaigns" className="block">
