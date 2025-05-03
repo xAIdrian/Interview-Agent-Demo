@@ -37,6 +37,7 @@ const CreateCampaignFromDocPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [campaignId, setCampaignId] = useState<string>('');
   const [file, setFile] = useState<File | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState('standard');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -393,6 +394,8 @@ const CreateCampaignFromDocPage = () => {
       });
 
       if (response.data.success) {
+        const newCampaignId = response.data.data.id;
+        setCampaignId(newCampaignId);
         setShowSuccessModal(true);
       } else {
         setError(response.data.message || 'Failed to create campaign');
@@ -697,6 +700,7 @@ const CreateCampaignFromDocPage = () => {
       <Modal 
         isOpen={showSuccessModal}
         title="Campaign Created Successfully"
+        shareUrl={typeof window !== 'undefined' ? `${window.location.origin}/live-interview/${campaignId}` : ''}
       >
         <div className="flex flex-col items-center space-y-4">
           <CheckCircleIcon className="h-12 w-12 text-green-500" />
