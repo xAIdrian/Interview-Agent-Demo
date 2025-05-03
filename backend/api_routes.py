@@ -160,25 +160,46 @@ def handle_campaigns():
         return jsonify({}), 200
 
     if request.method == "GET":
+        # Get user_id from either session or query params
+        user_id = session.get("user_id") or request.args.get("user_id")
+
+        if not user_id:
+            return jsonify({"error": "Authentication required"}), 401
+
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM campaigns")
-        campaigns = cursor.fetchall()
-        columns = [
-            "id",
-            "title",
-            "max_user_submissions",
-            "max_points",
-            "is_public",
-            "campaign_context",
-            "job_description",
-            "created_by",
-            "created_at",
-            "updated_at",
-        ]
-        result = [map_row_to_dict(campaign, columns) for campaign in campaigns]
-        conn.close()
-        return jsonify(result)
+
+        try:
+            # Only fetch campaigns created by or assigned to the specified user
+            cursor.execute(
+                """
+                SELECT DISTINCT c.* 
+                FROM campaigns c
+                LEFT JOIN campaign_assignments ca ON c.id = ca.campaign_id
+                WHERE c.created_by = ? OR ca.user_id = ?
+            """,
+                (user_id, user_id),
+            )
+
+            campaigns = cursor.fetchall()
+            columns = [
+                "id",
+                "title",
+                "max_user_submissions",
+                "max_points",
+                "is_public",
+                "campaign_context",
+                "job_description",
+                "created_by",
+                "created_at",
+                "updated_at",
+            ]
+            result = [map_row_to_dict(campaign, columns) for campaign in campaigns]
+            conn.close()
+            return jsonify(result)
+        except Exception as e:
+            conn.close()
+            return jsonify({"error": str(e)}), 500
 
     if request.method == "POST":
         data = request.get_json()
@@ -230,9 +251,13 @@ def handle_campaigns():
             conn.close()
 
 
-# Update GET /campaigns/<id> to use the helper function
 @api_bp.route("/campaigns/<string:id>", methods=["GET"])
 def get_campaign(id):
+    # Get user identity from session
+    user_id = session.get("user_id")
+    if not user_id:
+        return jsonify({"error": "Authentication required"}), 401
+
     conn = get_db_connection()
     cursor = conn.cursor()
 
@@ -241,10 +266,14 @@ def get_campaign(id):
         campaign_id = str(id)
         print(f"Looking for campaign with ID: {campaign_id}")  # Debug log
 
-        # Try to find the campaign with the given ID
+        # Try to find the campaign with the given ID and verify ownership
         cursor.execute(
-            "SELECT * FROM campaigns WHERE id = ? OR CAST(id AS TEXT) = ?",
-            (campaign_id, campaign_id),
+            """
+            SELECT * FROM campaigns 
+            WHERE (id = ? OR CAST(id AS TEXT) = ?) 
+            AND created_by = ?
+            """,
+            (campaign_id, campaign_id, user_id),
         )
 
         campaign = cursor.fetchone()
@@ -263,8 +292,8 @@ def get_campaign(id):
             result = map_row_to_dict(campaign, columns)
             return jsonify(result)
         else:
-            print("Campaign not found")  # Debug log
-            return jsonify({"error": "Campaign not found"}), 404
+            print("Campaign not found or access denied")  # Debug log
+            return jsonify({"error": "Campaign not found or access denied"}), 404
 
     except Exception as e:
         print(f"Error retrieving campaign: {str(e)}")  # Debug log
@@ -358,8 +387,23 @@ def get_submissions():
         # Get filter parameters
         filters = request.args.to_dict()
 
+        # For admin users, only show submissions for campaigns they created
+        if is_admin:
+            if "campaign_id" in filters:
+                # If a specific campaign is requested, verify ownership
+                cursor.execute(
+                    "SELECT created_by FROM campaigns WHERE id = ?",
+                    (filters["campaign_id"],),
+                )
+                campaign = cursor.fetchone()
+                if not campaign or campaign["created_by"] != user_id:
+                    return jsonify({"error": "Access denied"}), 403
+            else:
+                # Only show submissions for campaigns created by this admin
+                query += " WHERE c.created_by = ?"
+                filters["created_by"] = user_id
         # For non-admin users, always filter by their user_id
-        if not is_admin and user_id:
+        elif user_id:
             filters["s.user_id"] = user_id
 
         # Build WHERE clause and get parameters
@@ -470,7 +514,6 @@ def get_public_campaigns():
 
 
 @api_bp.route("/submissions/<string:id>", methods=["GET"])
-# @admin_required
 def get_submission_by_id(id):
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -482,15 +525,35 @@ def get_submission_by_id(id):
     # Verify that the ID is a string
     submission_id = ensure_string_id(id)
 
-    # Check if user has access to this submission
-    # if not is_admin:
-    # cursor.execute("SELECT user_id FROM submissions WHERE id = ?", (submission_id,))
-    # submission = cursor.fetchone()
-    # if not submission or submission[0] != user_id:
-    # conn.close()
-    # return jsonify({"error": "Access denied for user"}), 403
+    # First, check if the user has access to this submission
+    cursor.execute(
+        """
+        SELECT s.*, c.created_by as campaign_creator
+        FROM submissions s
+        JOIN campaigns c ON s.campaign_id = c.id
+        WHERE s.id = ?
+        """,
+        (submission_id,),
+    )
+    submission = cursor.fetchone()
 
-    # Get submission details
+    if not submission:
+        conn.close()
+        return jsonify({"error": "Submission not found"}), 404
+
+    # Check access permissions
+    if is_admin:
+        # Admin can only access submissions for campaigns they created
+        if submission["campaign_creator"] != user_id:
+            conn.close()
+            return jsonify({"error": "Access denied"}), 403
+    else:
+        # Non-admin users can only access their own submissions
+        if submission["user_id"] != user_id:
+            conn.close()
+            return jsonify({"error": "Access denied"}), 403
+
+    # Get full submission details
     cursor.execute(
         """
         SELECT s.*, u.email, c.title AS campaign_title
@@ -503,9 +566,6 @@ def get_submission_by_id(id):
     )
 
     submission = cursor.fetchone()
-    if not submission:
-        conn.close()
-        return jsonify({"error": "Submission not found"}), 404
 
     # Get submission answers
     cursor.execute(
@@ -771,6 +831,7 @@ def create_new_user():
 # @admin_required
 def create_campaign():
     data = request.json
+    user_id = session.get("user_id")  # Get the current user's ID
 
     try:
         conn = get_db_connection()
@@ -784,8 +845,8 @@ def create_campaign():
         # Insert the campaign using MariaDB's UUID_SHORT() function
         cursor.execute(
             """
-            INSERT INTO campaigns (id, title, max_user_submissions, max_points, is_public, campaign_context, job_description)
-            VALUES (UUID_SHORT(), ?, ?, ?, ?, ?, ?) RETURNING *
+            INSERT INTO campaigns (id, title, max_user_submissions, max_points, is_public, campaign_context, job_description, created_by)
+            VALUES (UUID_SHORT(), ?, ?, ?, ?, ?, ?, ?) RETURNING *
         """,
             (
                 data.get("title"),
@@ -794,6 +855,7 @@ def create_campaign():
                 data.get("is_public", False),
                 data.get("campaign_context", ""),
                 data.get("job_description", ""),
+                user_id,  # Add the creator's user ID
             ),
         )
 
@@ -842,6 +904,7 @@ def create_campaign():
             "is_public",
             "campaign_context",
             "job_description",
+            "created_by",
         ]
         result = map_row_to_dict(new_campaign, campaign_columns)
         result["questions"] = questions_created
@@ -2474,18 +2537,21 @@ def test_create_campaign():
         cursor = conn.cursor()
 
         try:
-            # Generate a simpler UUID that SQLite can handle
-            campaign_id = str(
-                uuid.uuid4().hex[:8]
-            )  # Use first 8 characters of hex UUID
+            # Generate a UUID string
+            campaign_id = str(uuid.uuid4())
+
+            # Convert user_id to string to avoid integer overflow
+            user_id = (
+                str(data.get("user_id")) if data.get("user_id") is not None else None
+            )
 
             # Insert campaign
             cursor.execute(
                 """
                 INSERT INTO campaigns (
                     id, title, max_user_submissions, max_points, 
-                    is_public, campaign_context, job_description
-                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    is_public, campaign_context, job_description, created_by
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     campaign_id,
@@ -2495,16 +2561,15 @@ def test_create_campaign():
                     data.get("is_public", False),
                     data.get("campaign_context", ""),
                     data.get("job_description", ""),
+                    user_id,  # Now using the string version of user_id
                 ),
             )
 
             # Insert questions
             questions_created = []
             for question in data.get("questions", []):
-                # Generate a simpler UUID for questions
-                question_id = str(
-                    uuid.uuid4().hex[:8]
-                )  # Use first 8 characters of hex UUID
+                # Generate a UUID string for questions
+                question_id = str(uuid.uuid4())
 
                 cursor.execute(
                     """
