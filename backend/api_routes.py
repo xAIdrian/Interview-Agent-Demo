@@ -163,23 +163,24 @@ def handle_campaigns():
         # Get user_id from either session or query params
         user_id = session.get("user_id") or request.args.get("user_id")
 
-        if not user_id:
-            return jsonify({"error": "Authentication required"}), 401
-
         conn = get_db_connection()
         cursor = conn.cursor()
 
         try:
             # Only fetch campaigns created by or assigned to the specified user
-            cursor.execute(
-                """
-                SELECT DISTINCT c.* 
-                FROM campaigns c
-                LEFT JOIN campaign_assignments ca ON c.id = ca.campaign_id
-                WHERE c.created_by = ? OR ca.user_id = ?
-            """,
-                (user_id, user_id),
-            )
+            if user_id:
+                cursor.execute(
+                    """
+                    SELECT DISTINCT c.* 
+                    FROM campaigns c
+                    LEFT JOIN campaign_assignments ca ON c.id = ca.campaign_id
+                    WHERE c.created_by = ? OR ca.user_id = ?
+                """,
+                    (user_id, user_id),
+                )
+            else:
+                # If no user_id, fetch all campaigns
+                cursor.execute("SELECT * FROM campaigns")
 
             campaigns = cursor.fetchall()
             columns = [
@@ -253,11 +254,6 @@ def handle_campaigns():
 
 @api_bp.route("/campaigns/<string:id>", methods=["GET"])
 def get_campaign(id):
-    # Get user identity from session
-    user_id = session.get("user_id")
-    if not user_id:
-        return jsonify({"error": "Authentication required"}), 401
-
     conn = get_db_connection()
     cursor = conn.cursor()
 
@@ -266,14 +262,13 @@ def get_campaign(id):
         campaign_id = str(id)
         print(f"Looking for campaign with ID: {campaign_id}")  # Debug log
 
-        # Try to find the campaign with the given ID and verify ownership
+        # Get the campaign without authentication check
         cursor.execute(
             """
             SELECT * FROM campaigns 
-            WHERE (id = ? OR CAST(id AS TEXT) = ?) 
-            AND created_by = ?
+            WHERE id = ? OR CAST(id AS TEXT) = ?
             """,
-            (campaign_id, campaign_id, user_id),
+            (campaign_id, campaign_id),
         )
 
         campaign = cursor.fetchone()
@@ -288,12 +283,13 @@ def get_campaign(id):
                 "is_public",
                 "campaign_context",
                 "job_description",
+                "created_by",
             ]
             result = map_row_to_dict(campaign, columns)
             return jsonify(result)
         else:
-            print("Campaign not found or access denied")  # Debug log
-            return jsonify({"error": "Campaign not found or access denied"}), 404
+            print("Campaign not found")  # Debug log
+            return jsonify({"error": "Campaign not found"}), 404
 
     except Exception as e:
         print(f"Error retrieving campaign: {str(e)}")  # Debug log

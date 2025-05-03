@@ -43,6 +43,7 @@ const CreateCampaignPage = () => {
   const [error, setError] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [campaignId, setCampaignId] = useState<string>('');
   const [directAccessUrl, setDirectAccessUrl] = useState<string>('');
   
   // Campaign state
@@ -295,6 +296,7 @@ const CreateCampaignPage = () => {
 
       if (response.data.success) {
         const campaignId = response.data.data.id;
+        setCampaignId(campaignId);
         // Construct the direct access URL using localhost:3000
         const directUrl = `${API_BASE_URL}/live-interview/${campaignId}`;
         setDirectAccessUrl(directUrl);
@@ -498,7 +500,7 @@ const CreateCampaignPage = () => {
         isOpen={showSuccessModal}
         onClose={handleSuccessModalClose}
         title="Campaign Created Successfully"
-        shareUrl={directAccessUrl}
+        shareUrl={typeof window !== 'undefined' ? `${window.location.origin}/live-interview/${campaignId}` : ''}
       >
         <div className="flex flex-col items-center space-y-4">
           <CheckCircleIcon className="h-12 w-12 text-green-500" />
