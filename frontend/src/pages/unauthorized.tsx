@@ -11,7 +11,7 @@ const UnauthorizedPage = () => {
   return (
     <>
       <Head>
-        <title>Unauthorized Access | Gulpin AI Interview</title>
+        <title>Unauthorized Access</title>
       </Head>
       <PageTemplate title="Unauthorized Access">
         <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">

@@ -200,7 +200,7 @@ const CampaignsPage = () => {
   return (
     <>
       <Head>
-        <title>{isAdmin ? 'Campaigns' : 'Available Positions'} | Gulpin AI Interview</title>
+        <title>{isAdmin ? 'Campaigns' : 'Available Positions'}</title>
       </Head>
       <PageTemplate title={isAdmin ? 'Campaigns' : 'Available Positions'} maxWidth="lg">
         <div className="w-full bg-white shadow-md rounded-lg p-6">

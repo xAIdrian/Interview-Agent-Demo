@@ -121,7 +121,7 @@ const RegisterPage = () => {
   return (
     <>
       <Head>
-        <title>Register | Gulpin AI Interview</title>
+        <title>Register</title>
       </Head>
       <PageTemplate title="Create an Account">
         <div className="flex min-h-full flex-col justify-center py-12 sm:px-6 lg:px-8">
