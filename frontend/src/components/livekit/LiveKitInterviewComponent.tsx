@@ -251,7 +251,7 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
           }
 
           setIsProcessingSubmission(false);
-          router.push('/campaigns');
+          onInterviewComplete(submissionId); // Call the callback instead of redirecting
         } else {
           console.error('❌ Interview submission failed:', response.data.error);
           setHasSubmitted(false); // Reset submission flag on failure

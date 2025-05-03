@@ -185,13 +185,6 @@ const CampaignDetailsPage = () => {
 
     return (
       <div className="flex items-center space-x-2">
-        <button
-          onClick={handleStartInterview}
-          className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-700"
-          disabled={isLoading}
-        >
-          {isLoading ? 'Starting...' : 'Start Interview'}
-        </button>
         <Link 
           href="/campaigns"
           className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-700"
@@ -264,42 +257,8 @@ const CampaignDetailsPage = () => {
         </div>
       ) : campaign ? (
         <>
-          {!isAdmin && (
-            <div className="bg-white shadow overflow-hidden sm:rounded-lg mb-6">
-              <div className="px-4 py-5 sm:px-6">
-                <h2 className="text-lg leading-6 font-medium text-gray-900">Your Application Status</h2>
-              </div>
-              <div className="border-t border-gray-200">
-                <dl>
-                  <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                    <dt className="text-sm font-medium text-gray-500">Attempts Used</dt>
-                    <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                      {safeSubmissionStatus.total_submissions} of {safeSubmissionStatus.max_submissions}
-                    </dd>
-                  </div>
-                  <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                    <dt className="text-sm font-medium text-gray-500">Completed Interviews</dt>
-                    <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                      {safeSubmissionStatus.completed_submissions}
-                    </dd>
-                  </div>
-                  {safeSubmissionStatus.has_completed_submission && (
-                    <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                      <dt className="text-sm font-medium text-gray-500">Status</dt>
-                      <dd className="mt-1 text-sm text-green-600 sm:mt-0 sm:col-span-2">
-                        Interview Completed
-                      </dd>
-                    </div>
-                  )}
-                </dl>
-              </div>
-            </div>
-          )}
 
           <div className="bg-white shadow overflow-hidden sm:rounded-lg mb-6">
-            <div className="px-4 py-5 sm:px-6">
-              <h2 className="text-lg leading-6 font-medium text-gray-900">Position Information</h2>
-            </div>
             <div className="border-t border-gray-200">
               <dl>
                 <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
@@ -309,14 +268,6 @@ const CampaignDetailsPage = () => {
                 <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                   <dt className="text-sm font-medium text-gray-500">Job Description</dt>
                   <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{campaign.job_description}</dd>
-                </div>
-                <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                  <dt className="text-sm font-medium text-gray-500">Status</dt>
-                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                    <span className={`px-2 py-1 rounded ${campaign.is_public ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                      {campaign.is_public ? 'Public' : 'Private'}
-                    </span>
-                  </dd>
                 </div>
               </dl>
             </div>
@@ -363,7 +314,7 @@ const CampaignDetailsPage = () => {
             </p>
             <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
               <p className="text-sm text-gray-600 break-all">
-                {typeof window !== 'undefined' ? `${window.location.origin}/campaigns/${campaignId}` : ''}
+                {typeof window !== 'undefined' ? `${window.location.origin}/live-interview/${campaignId}` : ''}
               </p>
             </div>
           </div>

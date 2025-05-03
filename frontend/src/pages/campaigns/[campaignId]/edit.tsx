@@ -351,12 +351,32 @@ const EditCampaignPage = () => {
     router.push('/campaigns');
   };
   
-  const handleCopyLink = async () => {
-    const link = `${typeof window !== 'undefined' ? window.location.origin : ''}/campaigns/${campaignId}`;
+  const handleCopyLink = async (e: React.MouseEvent) => {
+    e.preventDefault(); // Prevent any default behavior
+    const link = `${typeof window !== 'undefined' ? window.location.origin : ''}/live-interview/${campaignId}`;
+    const button = document.querySelector('#copy-link-button');
+    
     try {
-      await navigator.clipboard.writeText(link);
-      // Show temporary "Copied!" message
-      const button = document.querySelector('#copy-link-button');
+      // Create a temporary textarea element
+      const textarea = document.createElement('textarea');
+      textarea.value = link;
+      textarea.setAttribute('readonly', '');
+      textarea.style.cssText = 'position: fixed; pointer-events: none; opacity: 0;'; // Use fixed positioning and make invisible
+      
+      document.body.appendChild(textarea);
+      textarea.select();
+      
+      // Try the modern clipboard API first
+      try {
+        await navigator.clipboard.writeText(link);
+      } catch (clipboardErr) {
+        // Fallback to the older execCommand method
+        document.execCommand('copy');
+      }
+      
+      document.body.removeChild(textarea);
+      
+      // Update button text temporarily
       if (button) {
         const originalText = button.textContent;
         button.textContent = 'Copied!';
@@ -366,6 +386,14 @@ const EditCampaignPage = () => {
       }
     } catch (err) {
       console.error('Failed to copy link:', err);
+      // Show error state on button
+      if (button) {
+        const originalText = button.textContent;
+        button.textContent = 'Failed to copy';
+        setTimeout(() => {
+          button.textContent = originalText;
+        }, 2000);
+      }
     }
   };
   
@@ -434,7 +462,7 @@ const EditCampaignPage = () => {
           </div>
           <div className="bg-white border border-gray-200 rounded-lg p-3">
             <p className="text-sm text-gray-600 break-all">
-              {typeof window !== 'undefined' ? `${window.location.origin}/campaigns/${campaignId}` : ''}
+              {typeof window !== 'undefined' ? `${window.location.origin}/live-interview/${campaignId}` : ''}
             </p>
           </div>
         </div>

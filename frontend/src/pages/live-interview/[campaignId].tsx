@@ -252,12 +252,9 @@ const LiveKitInterviewPage: React.FC = () => {
               <p className="text-gray-600 mb-6">
                 Thank you for completing the interview. Your responses have been recorded.
               </p>
-              <button
-                onClick={() => router.push('/campaigns')}
-                className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:text-sm"
-              >
-                Return to Campaigns
-              </button>
+              <p>
+                You can close this window now.
+              </p>
             </div>
           </div>
         </Modal>
@@ -268,26 +265,11 @@ const LiveKitInterviewPage: React.FC = () => {
   return (
     <>
       <Head>
-        <title>{campaign?.title || 'AI Interview'} | Gulpin-AI</title>
+        <title>{campaign?.title || 'AI Interview'}</title>
         <meta name="description" content="AI-Powered Interview Experience" />
       </Head>
       
       <div className="container mx-auto px-4 py-8">
-        {/* Header Section */}
-        <div className="mb-8">
-          <div className="flex items-center gap-4 mb-6">
-            <Link 
-              href="/campaigns" 
-              className="flex items-center text-gray-600 hover:text-gray-900 transition-colors"
-            >
-              <ArrowLeftIcon className="h-5 w-5 mr-2" />
-              Back to Campaigns
-            </Link>
-          </div>
-          <h1 className="text-3xl font-bold text-gray-900">
-            {campaign?.title || 'AI Interview'}
-          </h1>
-        </div>
 
         {campaign && (
           <div className="mb-8">
@@ -298,13 +280,6 @@ const LiveKitInterviewPage: React.FC = () => {
                 <div>
                   <h2 className="text-xl font-semibold mb-2">Job Description</h2>
                   <p className="text-gray-700 mb-4">{campaign.job_description}</p>
-                </div>
-                
-                <div>
-                  <h2 className="text-xl font-semibold mb-2">Submission Details</h2>
-                  <p className="text-gray-700">
-                    Maximum Submissions: {campaign.max_user_submissions}
-                  </p>
                 </div>
               </div>
             </div>
@@ -474,12 +449,6 @@ const LiveKitInterviewPage: React.FC = () => {
             <p className="text-gray-600 mb-6">
               {maxAttemptsMessage}
             </p>
-            <button
-              onClick={() => router.push('/campaigns')}
-              className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:text-sm"
-            >
-              Return to Campaigns
-            </button>
           </div>
         </div>
       </Modal>
