@@ -18,6 +18,7 @@ import { Track } from 'livekit-client';
 import axios from 'axios';
 import { Modal } from '@/components/ui/Modal';
 import { Spinner } from '@/components/ui/Spinner';
+import { Toast } from '@/components/ui/Toast';
 import { useRouter } from 'next/router';
 import { useAuth } from '@/app/components/AuthProvider';
 import { Dialog } from '@headlessui/react';
@@ -67,6 +68,7 @@ const SimpleVoiceAssistant: React.FC<{ onTranscriptUpdate: (transcript: any[]) =
   });
 
   const [messages, setMessages] = React.useState<Array<{ id?: string; type: 'agent' | 'user'; text: string }>>([]);
+  const [isWaitingForFirstResponse, setIsWaitingForFirstResponse] = useState(true);
 
   // Memoize the transcript update to prevent unnecessary re-renders
   const handleTranscriptUpdate = React.useCallback((newMessages: any[]) => {
@@ -79,12 +81,17 @@ const SimpleVoiceAssistant: React.FC<{ onTranscriptUpdate: (transcript: any[]) =
       ...(userTranscriptions?.map((t) => ({ ...t, type: 'user' as const })) ?? []),
     ].sort((a, b) => a.firstReceivedTime - b.firstReceivedTime);
 
+    // Check if we've received the first agent response
+    if (isWaitingForFirstResponse && agentTranscriptions && agentTranscriptions.length > 0) {
+      setIsWaitingForFirstResponse(false);
+    }
+
     // Only update if messages have actually changed
     if (JSON.stringify(allMessages) !== JSON.stringify(messages)) {
       setMessages(allMessages);
       handleTranscriptUpdate(allMessages);
     }
-  }, [agentTranscriptions, userTranscriptions, messages, handleTranscriptUpdate]);
+  }, [agentTranscriptions, userTranscriptions, messages, handleTranscriptUpdate, isWaitingForFirstResponse]);
 
   return (
     <div className="voice-assistant-container">
@@ -108,7 +115,14 @@ const SimpleVoiceAssistant: React.FC<{ onTranscriptUpdate: (transcript: any[]) =
           <div className="p-4 h-80 overflow-y-auto">
             {messages.length === 0 && (
               <div className="interview-instructions text-center py-8 text-gray-500">
-                <p>The interviewer will ask you questions. Answer naturally as if in a real interview.</p>
+                {isWaitingForFirstResponse ? (
+                  <div className="flex flex-col items-center space-y-3">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                    <p>Waiting for the interviewer to begin...</p>
+                  </div>
+                ) : (
+                  <p>The interviewer will ask you questions. Answer naturally as if in a real interview.</p>
+                )}
               </div>
             )}
             {messages.map((msg, index) => (
@@ -121,61 +135,16 @@ const SimpleVoiceAssistant: React.FC<{ onTranscriptUpdate: (transcript: any[]) =
   );
 };
 
-const OnboardingModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-8 max-w-2xl mx-4 shadow-xl">
-        <div className="text-center">
-          <h2 className="text-3xl font-bold text-blue-600 mb-6">Welcome to Your AI Interview! 🎯</h2>
-          
-          <div className="space-y-4 text-left mb-8">
-            <p className="text-lg text-gray-700">
-              Before we begin, let's make sure you're set up for success:
-            </p>
-            
-            <div className="bg-blue-50 p-4 rounded-lg">
-              <h3 className="text-xl font-semibold text-blue-800 mb-3">Quick Tips for a Great Interview:</h3>
-              <ul className="space-y-3 text-blue-700">
-                <li className="flex items-start">
-                  <span className="mr-2">🎙️</span>
-                  Find a quiet space where you won't be interrupted and there is no extra noise
-                </li>
-                <li className="flex items-start">
-                  <span className="mr-2">💡</span>
-                  Take your time to provide complete, thoughtful answers
-                </li>
-                <li className="flex items-start">
-                  <span className="mr-2">🎯</span>
-                  Be yourself - we want to get to know the real you!
-                </li>
-              </ul>
-            </div>
-
-            <p className="text-gray-600 italic">
-              "Remember: This is your moment to shine. We're here to help you showcase your best self!"
-            </p>
-          </div>
-
-          <button
-            onClick={onClose}
-            className="bg-blue-600 text-white px-8 py-3 rounded-lg text-lg font-semibold hover:bg-blue-700 transition-colors duration-200 shadow-lg hover:shadow-xl"
-          >
-            I'm Ready to Begin! 🚀
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, room, submissionId, onDisconnect }: LiveKitInterviewComponentProps) => {
   const livekitUrl = 'wss://default-test-oyjqa9xh.livekit.cloud';
-  const [showOnboarding, setShowOnboarding] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isProcessingSubmission, setIsProcessingSubmission] = useState(false);
   const [transcript, setTranscript] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [hasSubmitted, setHasSubmitted] = useState(false);
   const [submissionStatus, setSubmissionStatus] = useState<SubmissionStatus>({
     total_submissions: 0,
     completed_submissions: 0,
@@ -211,7 +180,6 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
           has_completed_submission: completedSubmissions > 0
         });
 
-        // No longer need to generate token and submissionId here since they are passed as props
       } catch (err) {
         console.error('Error fetching submission status:', err);
         setError('Failed to load submission status');
@@ -231,7 +199,12 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
 
     try {
       if (submitInterview) {
-        
+        // Prevent duplicate submissions
+        if (hasSubmitted) {
+          console.log('Interview already submitted, skipping duplicate submission');
+          return;
+        }
+
         // Ensure transcript is an array and not empty
         const formattedTranscript = Array.isArray(newTranscript) ? newTranscript : [];
         if (formattedTranscript.length === 0) {
@@ -249,6 +222,8 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
         });
         
         setIsProcessingSubmission(true);
+        setHasSubmitted(true); // Mark as submitted before making the request
+        
         const response = await axios.post(`${API_URL}/api/submit_interview`, {
           campaign_id: campaignId,
           user_id: user.id,
@@ -270,14 +245,16 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
           console.log('🔍 Verifying submission status:', verifyResponse.data);
           
           if (!verifyResponse.data.is_complete) {
-            console.error('❌ Submission was not marked as complete');
-            throw new Error('Submission was not marked as complete');
+            console.log('⚠️ Submission was not marked as complete');
+            setToastMessage('Your interview was submitted but may take a few minutes to process completely.');
+            setShowToast(true);
           }
 
           setIsProcessingSubmission(false);
           router.push('/campaigns');
         } else {
           console.error('❌ Interview submission failed:', response.data.error);
+          setHasSubmitted(false); // Reset submission flag on failure
           throw new Error(response.data.error || 'Failed to submit interview');
         }
       } else {
@@ -290,6 +267,7 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
       }
       setError('Failed to submit interview. Please try again.');
       setIsProcessingSubmission(false);
+      setHasSubmitted(false); // Reset submission flag on error
     } 
   };
 
@@ -297,6 +275,11 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
     try {
       if (!submissionId) {
         console.error('No submissionId available for submission');
+        return;
+      }
+
+      if (hasSubmitted) {
+        console.log('Interview already submitted, skipping duplicate submission');
         return;
       }
 
@@ -310,6 +293,7 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
     } catch (err) {
       console.error('Error during disconnect:', err);
       setError('Failed to properly disconnect. Please try again.');
+      setHasSubmitted(false); // Reset submission flag on error
     } 
   };
 
@@ -331,20 +315,59 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
   }
 
   return (
-    <div className="livekit-interview">
-      {showOnboarding && (
-        <OnboardingModal onClose={() => setShowOnboarding(false)} />
+    <div className="livekit-interview space-y-6">
+      {showToast && (
+        <Toast
+          message={toastMessage}
+          duration={5000}
+          onClose={() => setShowToast(false)}
+        />
       )}
+      
+      {/* Interview Instructions */}
+      <div className="bg-white rounded-lg p-8 shadow-lg">
+        <h2 className="text-3xl font-bold text-blue-600 mb-6">Welcome to Your AI Interview! 🎯</h2>
+        
+        <div className="space-y-4">
+          <p className="text-lg text-gray-700">
+            Before we begin, let's make sure you're set up for success:
+          </p>
+          
+          <div className="bg-blue-50 p-4 rounded-lg">
+            <h3 className="text-xl font-semibold text-blue-800 mb-3">Quick Tips for a Great Interview:</h3>
+            <ul className="space-y-3 text-blue-700">
+              <li className="flex items-start">
+                <span className="mr-2">🎙️</span>
+                Find a quiet space where you won't be interrupted and there is no extra noise
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">💡</span>
+                Take your time to provide complete, thoughtful answers
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">🎯</span>
+                Be yourself - we want to get to know the real you!
+              </li>
+            </ul>
+          </div>
+
+          <p className="text-gray-600 italic">
+            "Remember: This is your moment to shine. We're here to help you showcase your best self!"
+          </p>
+        </div>
+      </div>
+
+      {/* Interview Interface */}
       <div className="bg-white rounded-lg overflow-hidden shadow-lg">
         <div className="p-4 bg-blue-600 text-white">
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-bold">Interview Session: {user?.name}</h2>
             <button 
-              onClick={() => {
-                console.log('🔌 LiveKit disconnected, submitting transcript...');
-                handleDisconnect();
-              }}
-              className="px-3 py-1 bg-white text-blue-600 rounded hover:bg-blue-50 transition-colors"
+              onClick={handleDisconnect}
+              disabled={hasSubmitted || isProcessingSubmission}
+              className={`px-3 py-1 bg-white text-blue-600 rounded transition-colors ${
+                (hasSubmitted || isProcessingSubmission) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-50'
+              }`}
             >
               End Interview
             </button>
@@ -358,10 +381,7 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
             connect={true}
             video={false}
             audio={true}
-            onDisconnected={() => {
-              console.log('🔌 LiveKit disconnected, submitting transcript...');
-              handleDisconnect();
-            }}
+            onDisconnected={handleDisconnect}
           >
             <RoomAudioRenderer />
             <SimpleVoiceAssistant onTranscriptUpdate={(transcript) => handleTranscriptUpdate(false, transcript)} />

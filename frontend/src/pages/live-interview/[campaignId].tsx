@@ -48,6 +48,8 @@ const LiveKitInterviewPage: React.FC = () => {
   const [isCreatingUser, setIsCreatingUser] = useState(false);
   const [submissionId, setSubmissionId] = useState<string | null>(null);
   const [showMaxAttemptsModal, setShowMaxAttemptsModal] = useState(false);
+  const [maxAttemptsMessage, setMaxAttemptsMessage] = useState<string | null>(null);
+  const [isInterviewComplete, setIsInterviewComplete] = useState(false);
 
   useEffect(() => {
     if (campaignId) {
@@ -126,12 +128,14 @@ const LiveKitInterviewPage: React.FC = () => {
       const userResponse = await axios.post(`${API_BASE_URL}/api/users`, {
         name: candidateData.name,
         email: candidateData.email,
-        phone_number: candidateData.phoneNumber
+        phone_number: candidateData.phoneNumber,
+        campaign_id: campaignId
       });
 
-      // Check if user has reached maximum attempts
+      // Check if user has reached maximum attempts for this campaign
       if (userResponse.data.max_attempts_reached) {
         setShowMaxAttemptsModal(true);
+        setMaxAttemptsMessage(userResponse.data.message || 'Maximum attempts reached for this campaign');
         return;
       }
 
@@ -218,17 +222,46 @@ const LiveKitInterviewPage: React.FC = () => {
 
   if (token && room) {
     return (
-      <LiveKitInterviewComponent
-        campaignId={campaignId as string}
-        onInterviewComplete={() => {
-          console.log('Interview completed');
-          router.push('/campaigns');
-        }}
-        token={token}
-        room={room}
-        onDisconnect={onDisconnect}
-        submissionId={submissionId!}
-      />
+      <>
+        <LiveKitInterviewComponent
+          campaignId={campaignId as string}
+          onInterviewComplete={() => {
+            console.log('Interview completed');
+            setIsInterviewComplete(true);
+          }}
+          token={token}
+          room={room}
+          onDisconnect={onDisconnect}
+          submissionId={submissionId!}
+        />
+        
+        {/* Interview Complete Modal */}
+        <Modal
+          isOpen={isInterviewComplete}
+          onClose={() => {}}
+          title="Interview Complete"
+        >
+          <div className="p-6">
+            <div className="text-center">
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 mb-4">
+                <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Interview Successfully Completed</h3>
+              <p className="text-gray-600 mb-6">
+                Thank you for completing the interview. Your responses have been recorded.
+              </p>
+              <button
+                onClick={() => router.push('/campaigns')}
+                className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:text-sm"
+              >
+                Return to Campaigns
+              </button>
+            </div>
+          </div>
+        </Modal>
+      </>
     );
   }
 
@@ -439,8 +472,14 @@ const LiveKitInterviewPage: React.FC = () => {
             </div>
             <h3 className="text-lg font-medium text-gray-900 mb-2">Maximum Attempts Reached</h3>
             <p className="text-gray-600 mb-6">
-              You have already completed the maximum allowed attempts for this interview.
+              {maxAttemptsMessage}
             </p>
+            <button
+              onClick={() => router.push('/campaigns')}
+              className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:text-sm"
+            >
+              Return to Campaigns
+            </button>
           </div>
         </div>
       </Modal>
