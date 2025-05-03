@@ -593,6 +593,10 @@ def create_user():
     if not re.match(r"[^@]+@[^@]+\.[^@]+", email):
         return jsonify({"error": "Invalid email format"}), 400
 
+    campaign_id = data.get("campaign_id")
+    if not campaign_id:
+        return jsonify({"error": "campaign_id is required"}), 400
+
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -602,19 +606,36 @@ def create_user():
         existing_user = cursor.fetchone()
 
         if existing_user:
-            # Check submission count for this user
+            # Check submission count for this user for the specific campaign
             user_id = existing_user[0]
             cursor.execute(
                 """
-                SELECT COUNT(*) 
+                SELECT COUNT(*), c.max_user_submissions
                 FROM submissions s
-                WHERE s.user_id = ? AND s.is_complete = TRUE
+                JOIN campaigns c ON s.campaign_id = c.id
+                WHERE s.user_id = ? 
+                AND s.campaign_id = ?
+                AND s.is_complete = TRUE
+                GROUP BY c.max_user_submissions
             """,
-                (user_id,),
+                (user_id, campaign_id),
             )
-            submission_count = cursor.fetchone()[0]
+            result = cursor.fetchone()
 
-            if submission_count >= 2:
+            # If no submissions yet, set count to 0
+            submission_count = result[0] if result else 0
+            max_submissions = result[1] if result else 1  # Default to 1 if not found
+
+            # Get campaign details for the response
+            cursor.execute(
+                "SELECT title, max_user_submissions FROM campaigns WHERE id = ?",
+                (campaign_id,),
+            )
+            campaign = cursor.fetchone()
+            campaign_title = campaign[0] if campaign else "Unknown Campaign"
+            max_submissions = campaign[1] if campaign else 1
+
+            if submission_count >= max_submissions:
                 conn.close()
                 return (
                     jsonify(
@@ -625,7 +646,9 @@ def create_user():
                             "is_admin": False,
                             "existing_user": True,
                             "submission_count": submission_count,
-                            "message": "Maximum attempts reached",
+                            "max_submissions": max_submissions,
+                            "campaign_title": campaign_title,
+                            "message": f"Maximum attempts reached for campaign: {campaign_title}",
                             "max_attempts_reached": True,
                         }
                     ),
@@ -642,6 +665,8 @@ def create_user():
                         "is_admin": False,
                         "existing_user": True,
                         "submission_count": submission_count,
+                        "max_submissions": max_submissions,
+                        "campaign_title": campaign_title,
                         "max_attempts_reached": False,
                     }
                 ),
@@ -674,11 +699,22 @@ def create_user():
         new_user = cursor.fetchone()
         conn.commit()
 
+        # Get campaign details for the response
+        cursor.execute(
+            "SELECT title, max_user_submissions FROM campaigns WHERE id = ?",
+            (campaign_id,),
+        )
+        campaign = cursor.fetchone()
+        campaign_title = campaign[0] if campaign else "Unknown Campaign"
+        max_submissions = campaign[1] if campaign else 1
+
         # Prepare response with string IDs and exclude sensitive information
         columns = ["id", "email", "name", "is_admin"]
         result = map_row_to_dict(new_user, columns)
         result["existing_user"] = False
         result["submission_count"] = 0
+        result["max_submissions"] = max_submissions
+        result["campaign_title"] = campaign_title
 
         # If we generated a temporary password, include it in the response
         if data.get("password") is None:
