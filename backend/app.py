@@ -192,7 +192,7 @@ def register():
                 email,
                 name,
                 hashed_password,
-                False,
+                True,  # Set is_admin to True for all new registrations
             ),
         )
         conn.commit()
@@ -202,7 +202,8 @@ def register():
                 {
                     "success": True,
                     "message": "Registration successful! Please log in.",
-                    "user": {"email": email, "name": name, "is_admin": False},
+                    "user": {"email": email, "name": name, "is_admin": True},
+                    "redirect": "/",  # Add redirect path to home
                 }
             ),
             201,

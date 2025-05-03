@@ -545,22 +545,6 @@ const CreateCampaignFromDocPage = () => {
                   placeholder="Enter the complete job description for this role"
                 />
               </div>
-              
-              <div>
-                <label htmlFor="max_user_submissions" className="block text-sm font-medium text-gray-700">
-                  Max User Submissions
-                </label>
-                <input
-                  id="max_user_submissions"
-                  name="max_user_submissions"
-                  type="number"
-                  value={campaign.max_user_submissions}
-                  onChange={handleCampaignChange}
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500"
-                  min="1"
-                  required
-                />
-              </div>
             </div>
             
             {/* Questions */}

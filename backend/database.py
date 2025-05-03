@@ -60,7 +60,7 @@ def create_users_table():
             text(
                 """
             CREATE TABLE IF NOT EXISTS users (
-                id BIGINT PRIMARY KEY,
+                id TEXT PRIMARY KEY,
                 email VARCHAR(255) NOT NULL UNIQUE,
                 name VARCHAR(255) NOT NULL,
                 password_hash VARCHAR(255) NOT NULL,
@@ -83,14 +83,14 @@ def create_campaigns_table():
             text(
                 """
             CREATE TABLE IF NOT EXISTS campaigns (
-                id BIGINT PRIMARY KEY,
+                id TEXT PRIMARY KEY,
                 title VARCHAR(255) NOT NULL,
                 max_user_submissions INT NOT NULL DEFAULT 1,
                 max_points INT NOT NULL,
                 is_public BOOLEAN NOT NULL DEFAULT FALSE,
                 campaign_context TEXT,
                 job_description TEXT,
-                created_by BIGINT,
+                created_by TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (created_by) REFERENCES users(id)
@@ -110,8 +110,8 @@ def create_questions_table():
             text(
                 """
             CREATE TABLE IF NOT EXISTS questions (
-                id BIGINT PRIMARY KEY,
-                campaign_id BIGINT NOT NULL,
+                id TEXT PRIMARY KEY,
+                campaign_id TEXT NOT NULL,
                 title VARCHAR(255) NOT NULL,
                 body TEXT NOT NULL,
                 scoring_prompt TEXT NOT NULL,
@@ -136,9 +136,9 @@ def create_submissions_table():
             text(
                 """
             CREATE TABLE IF NOT EXISTS submissions (
-                id BIGINT PRIMARY KEY,
-                campaign_id BIGINT NOT NULL,
-                user_id BIGINT NOT NULL,
+                id TEXT PRIMARY KEY,
+                campaign_id TEXT NOT NULL,
+                user_id TEXT NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 completed_at TIMESTAMP DEFAULT NULL,
@@ -164,9 +164,9 @@ def create_submission_answers_table():
             text(
                 """
             CREATE TABLE IF NOT EXISTS submission_answers (
-                id BIGINT PRIMARY KEY,
-                submission_id BIGINT NOT NULL,
-                question_id BIGINT NOT NULL,
+                id TEXT PRIMARY KEY,
+                submission_id TEXT NOT NULL,
+                question_id TEXT NOT NULL,
                 video_path VARCHAR(255) DEFAULT NULL,
                 transcript TEXT NOT NULL,
                 score INT DEFAULT NULL,
@@ -192,9 +192,9 @@ def create_campaign_assignments_table():
             text(
                 """
             CREATE TABLE IF NOT EXISTS campaign_assignments (
-                id BIGINT PRIMARY KEY,
-                campaign_id BIGINT NOT NULL,
-                user_id BIGINT NOT NULL,
+                id TEXT PRIMARY KEY,
+                campaign_id TEXT NOT NULL,
+                user_id TEXT NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (campaign_id) REFERENCES campaigns(id),
                 FOREIGN KEY (user_id) REFERENCES users(id),
@@ -215,8 +215,8 @@ def create_resume_analysis_table():
             text(
                 """
             CREATE TABLE IF NOT EXISTS resume_analysis (
-                id BIGINT PRIMARY KEY,
-                submission_id BIGINT NOT NULL,
+                id TEXT PRIMARY KEY,
+                submission_id TEXT NOT NULL,
                 strengths TEXT,
                 weaknesses TEXT,
                 overall_fit TEXT,
@@ -242,6 +242,56 @@ def create_resume_analysis_table():
         session.close()
 
 
+def migrate_campaigns_table_id_type():
+    """Convert the campaigns table ID columns from BIGINT to TEXT"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        # Create a new campaigns table with TEXT IDs
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS campaigns_new (
+                id TEXT PRIMARY KEY,
+                title VARCHAR(255) NOT NULL,
+                max_user_submissions INT NOT NULL DEFAULT 1,
+                max_points INT NOT NULL,
+                is_public BOOLEAN NOT NULL DEFAULT FALSE,
+                campaign_context TEXT,
+                job_description TEXT,
+                created_by TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (created_by) REFERENCES users(id)
+            )
+        """
+        )
+
+        # Copy data from old table to new table, converting IDs to TEXT
+        cursor.execute(
+            """
+            INSERT OR IGNORE INTO campaigns_new 
+            SELECT CAST(id AS TEXT), title, max_user_submissions, max_points, 
+                   is_public, campaign_context, job_description, 
+                   CAST(created_by AS TEXT), created_at, updated_at
+            FROM campaigns
+        """
+        )
+
+        # Drop the old table
+        cursor.execute("DROP TABLE IF EXISTS campaigns")
+
+        # Rename the new table to campaigns
+        cursor.execute("ALTER TABLE campaigns_new RENAME TO campaigns")
+
+        conn.commit()
+        print("Successfully migrated campaigns table to use TEXT IDs")
+    except Exception as e:
+        print(f"Error migrating campaigns table: {str(e)}")
+        conn.rollback()
+    finally:
+        conn.close()
+
+
 def create_tables():
     create_users_table()
     create_campaigns_table()
@@ -250,6 +300,8 @@ def create_tables():
     create_submission_answers_table()
     create_campaign_assignments_table()
     create_resume_analysis_table()
+    migrate_campaigns_table_id_type()
+    migrate_submissions_table_add_resume_columns()
 
 
 def migrate_submissions_table_add_resume_columns():
@@ -295,7 +347,7 @@ def map_row_to_dict(row, columns, string_id_columns=None):
     Args:
         row: Database row (tuple)
         columns: List of column names
-        string_id_columns: List of column names that should be converted to strings
+        string_id_columns: List of column names that should be treated as strings
                           (default: ['id', 'user_id', 'campaign_id', 'submission_id', 'question_id'])
 
     Returns:
@@ -308,14 +360,15 @@ def map_row_to_dict(row, columns, string_id_columns=None):
             "campaign_id",
             "submission_id",
             "question_id",
+            "created_by",
         ]
 
     result = {}
     for i, column in enumerate(columns):
         if i < len(row):
-            # Convert ID columns to strings
-            if column in string_id_columns:
-                result[column] = ensure_string_id(row[i])
+            # For ID columns, ensure the value is a string if it's not None
+            if column in string_id_columns and row[i] is not None:
+                result[column] = str(row[i])
             else:
                 result[column] = row[i]
 

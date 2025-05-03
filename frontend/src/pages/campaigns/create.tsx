@@ -38,7 +38,7 @@ interface Campaign {
 
 const CreateCampaignPage = () => {
   const router = useRouter();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const [isClient, setIsClient] = useState(false);
   const [error, setError] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -225,7 +225,7 @@ const CreateCampaignPage = () => {
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isSubmitting) return;
+    if (isSubmitting || !user) return;
 
     setIsSubmitting(true);
     setError('');
@@ -285,7 +285,8 @@ const CreateCampaignPage = () => {
       // Create the campaign
       const response = await axios.post(`${API_BASE_URL}/api/test-campaigns`, {
         ...campaign,
-        questions: questionsData
+        questions: questionsData,
+        user_id: user.id
       }, {
         headers: {
           'Content-Type': 'application/json'
@@ -295,7 +296,7 @@ const CreateCampaignPage = () => {
       if (response.data.success) {
         const campaignId = response.data.data.id;
         // Construct the direct access URL using localhost:3000
-        const directUrl = `http://localhost:3000/campaigns/${campaignId}`;
+        const directUrl = `${API_BASE_URL}/live-interview/${campaignId}`;
         setDirectAccessUrl(directUrl);
         setShowSuccessModal(true);
       } else {
@@ -356,21 +357,6 @@ const CreateCampaignPage = () => {
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                 required
               />
-            </div>
-
-            <div className="flex space-x-4">
-              <div className="flex-1">
-                <label className="block text-sm font-medium text-gray-700">Max User Submissions</label>
-                <input
-                  type="number"
-                  name="max_user_submissions"
-                  value={campaign.max_user_submissions}
-                  onChange={handleCampaignChange}
-                  min="1"
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  required
-                />
-              </div>
             </div>
           </div>
 
