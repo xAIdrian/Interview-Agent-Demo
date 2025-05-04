@@ -385,13 +385,7 @@ const SubmissionDetailsPage = () => {
       
       AuthLogger.info(`Deleted submission ${submissionId}`);
       
-      // Redirect back to submissions list
-      // If we have a valid campaign_id, use it, otherwise go to the main submissions page
-      if (submission?.campaign_id && submission.campaign_id !== 'undefined') {
-        router.push(`/campaigns/${submission.campaign_id}/submissions`);
-      } else {
-        router.push('/submissions');
-      }
+      router.push(`/campaigns/${returnToCampaign}/submissions`);
     } catch (err) {
       console.error('Error deleting submission:', err);
       
