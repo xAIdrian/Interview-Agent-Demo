@@ -73,12 +73,13 @@ const CampaignDetailsPage = () => {
 
       try {
         setIsLoading(true);
-        const response = await axios.get(`${API_BASE_URL}/api/campaigns/${campaignId}`);
-        setCampaign(response.data);
+        // Fetch campaign details
+        const campaignResponse = await axios.get(`${API_BASE_URL}/api/campaigns/${campaignId}`);
+        setCampaign(campaignResponse.data);
         
         // Fetch questions for this campaign
-        const questionsResponse = await axios.get(`${API_BASE_URL}/api/campaigns/${campaignId}`);
-        setQuestions(questionsResponse.data);
+        const questionsResponse = await axios.get(`${API_BASE_URL}/api/questions?campaign_id=${campaignId}`);
+        setQuestions(questionsResponse.data || []);
         
         // If admin, fetch submission count
         if (isAdmin) {
@@ -101,9 +102,9 @@ const CampaignDetailsPage = () => {
           setSubmissionStatus({
             total_submissions: submissions.length,
             completed_submissions: completedSubmissions,
-            max_submissions: response.data.max_user_submissions,
-            can_submit: submissions.length < response.data.max_user_submissions && 
-                       completedSubmissions < response.data.max_user_submissions,
+            max_submissions: campaignResponse.data.max_user_submissions,
+            can_submit: submissions.length < campaignResponse.data.max_user_submissions && 
+                       completedSubmissions < campaignResponse.data.max_user_submissions,
             has_completed_submission: completedSubmissions > 0
           });
         }

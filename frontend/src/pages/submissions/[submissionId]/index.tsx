@@ -428,8 +428,8 @@ const SubmissionDetailsPage = () => {
             <div className="flex space-x-3">
               <Link 
                 href={returnToCampaign 
-                  ? `/campaigns/${returnToCampaign}/submissions` 
-                  : `/campaigns/${submission.campaign_id}/submissions`}
+                  ? `/campaigns/${returnToCampaign}` 
+                  : `/campaigns/${submission.campaign_id}`}
                 className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-700"
               >
                 Back to Campaign Submissions
