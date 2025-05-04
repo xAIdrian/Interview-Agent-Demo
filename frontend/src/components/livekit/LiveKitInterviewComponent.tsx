@@ -138,9 +138,33 @@ const SimpleVoiceAssistant: React.FC<{ onTranscriptUpdate: (transcript: any[]) =
 const InstructionsModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => {
   const [currentStep, setCurrentStep] = useState(1);
   const totalSteps = 3;
+  const [interviewCode, setInterviewCode] = useState('');
+  const [isCodeValid, setIsCodeValid] = useState(false);
+  const [isValidating, setIsValidating] = useState(false);
+  const [codeError, setCodeError] = useState('');
 
-  const handleNext = () => {
-    if (currentStep < totalSteps) {
+  const handleNext = async () => {
+    if (currentStep === 1) {
+      if (!interviewCode.trim()) {
+        setCodeError('Please enter an interview code');
+        return;
+      }
+      
+      setIsValidating(true);
+      setCodeError('');
+      
+      try {
+        // Here you would validate the interview code with your backend
+        // For now, we'll simulate a validation
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        setIsCodeValid(true);
+        setCurrentStep(currentStep + 1);
+      } catch (error) {
+        setCodeError('Invalid interview code. Please try again.');
+      } finally {
+        setIsValidating(false);
+      }
+    } else if (currentStep < totalSteps) {
       setCurrentStep(currentStep + 1);
     } else {
       onClose();
@@ -160,25 +184,39 @@ const InstructionsModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () =
           <div className="space-y-4">
             <h3 className="text-xl font-semibold text-blue-800 mb-3">Welcome to Your AI Interview! 🎯</h3>
             <p className="text-lg text-gray-700">
-              Before we begin, let's make sure you're set up for success. This interview will be conducted by our AI interviewer,
-              who will ask you questions and evaluate your responses.
+              To begin your interview, please enter the interview code provided to you:
             </p>
-            <div className="bg-blue-50 p-4 rounded-lg">
-              <h4 className="text-lg font-semibold text-blue-800 mb-2">Quick Tips for a Great Interview:</h4>
-              <ul className="space-y-3 text-blue-700">
-                <li className="flex items-start">
-                  <span className="mr-2">🎙️</span>
-                  Find a quiet space where you won't be interrupted
-                </li>
-                <li className="flex items-start">
-                  <span className="mr-2">💡</span>
-                  Take your time to provide complete, thoughtful answers
-                </li>
-                <li className="flex items-start">
-                  <span className="mr-2">🎯</span>
-                  Be yourself - we want to get to know the real you!
-                </li>
-              </ul>
+            <div className="space-y-2">
+              <div className="relative">
+                <input
+                  type="text"
+                  value={interviewCode}
+                  onChange={(e) => {
+                    setInterviewCode(e.target.value);
+                    setCodeError('');
+                  }}
+                  placeholder="Enter your interview code"
+                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                    codeError 
+                      ? 'border-red-300 focus:ring-red-200' 
+                      : 'border-gray-300 focus:ring-blue-200'
+                  }`}
+                />
+                {isValidating && (
+                  <div className="absolute right-3 top-2.5">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                  </div>
+                )}
+              </div>
+              {codeError && (
+                <p className="text-sm text-red-600">{codeError}</p>
+              )}
+            </div>
+            <div className="bg-blue-50 p-4 rounded-lg mt-4">
+              <h4 className="text-lg font-semibold text-blue-800 mb-2">Don't have an interview code?</h4>
+              <p className="text-blue-700">
+                If you haven't received an interview code, please contact your recruiter or the hiring team.
+              </p>
             </div>
           </div>
         );
@@ -212,14 +250,20 @@ const InstructionsModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () =
               </p>
               <div className="bg-blue-50 p-4 rounded-lg">
                 <ul className="space-y-3 text-blue-700">
-                  <li>✓ Speak clearly and at a normal pace</li>
-                  <li>✓ Answer questions thoroughly</li>
-                  <li>✓ Stay focused and engaged</li>
+                  <li className="flex items-start">
+                    <span className="mr-2">🎙️</span>
+                    Find a quiet space where you won't be interrupted
+                  </li>
+                  <li className="flex items-start">
+                    <span className="mr-2">💡</span>
+                    Take your time to provide complete, thoughtful answers
+                  </li>
+                  <li className="flex items-start">
+                    <span className="mr-2">🎯</span>
+                    Be yourself - we want to get to know the real you!
+                  </li>
                 </ul>
               </div>
-              <p className="text-gray-600 italic">
-                "This is your moment to shine. We're here to help you showcase your best self!"
-              </p>
             </div>
           </div>
         );
@@ -251,9 +295,19 @@ const InstructionsModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () =
           </button>
           <button
             onClick={handleNext}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            disabled={currentStep === 1 && (isValidating || !interviewCode.trim())}
+            className={`px-4 py-2 rounded ${
+              currentStep === 1 && (isValidating || !interviewCode.trim())
+                ? 'bg-blue-400 cursor-not-allowed'
+                : 'bg-blue-600 hover:bg-blue-700'
+            } text-white`}
           >
-            {currentStep === totalSteps ? 'Start Interview' : 'Next'}
+            {isValidating 
+              ? 'Validating...' 
+              : currentStep === totalSteps 
+                ? 'Start Interview' 
+                : 'Next'
+            }
           </button>
         </div>
       </div>
