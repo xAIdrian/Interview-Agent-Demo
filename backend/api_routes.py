@@ -139,7 +139,7 @@ def handle_users():
             cursor = conn.cursor()
 
             # Validate required fields
-            required_fields = ["email", "password", "name"]
+            required_fields = ["email", "name"]
             for field in required_fields:
                 if field not in data:
                     return jsonify({"error": f"Missing required field: {field}"}), 400
@@ -147,13 +147,16 @@ def handle_users():
             # Check if email already exists
             cursor.execute("SELECT id FROM users WHERE email = ?", (data["email"],))
             if cursor.fetchone():
-                return jsonify({"error": "Email already exists"}), 400
-
-            # Hash password
-            password_hash = generate_password_hash(data["password"])
+                conn.close()
+                return jsonify({"error": "Email already exists"}), 200
 
             # Generate UUID in Python
             user_id = str(uuid.uuid4())
+
+            # Only hash password if it's provided (for admin/login users)
+            password_hash = None
+            if data.get("password"):
+                password_hash = generate_password_hash(data["password"])
 
             # Insert new user
             cursor.execute(
@@ -165,7 +168,7 @@ def handle_users():
                     user_id,
                     data["email"],
                     data["name"],
-                    password_hash,
+                    password_hash,  # Can be None for candidate users
                     data.get("is_admin", False),
                 ),
             )
@@ -427,7 +430,7 @@ def handle_submissions():
                 SELECT s.*, c.title AS campaign_title, u.name AS user_name, u.email AS user_email
                 FROM submissions s
                 JOIN campaigns c ON s.campaign_id = c.id
-                JOIN users u ON s.user_id = u.id
+                LEFT JOIN users u ON s.user_id = u.id
             """
 
             # Get filter parameters and build WHERE clause
@@ -466,13 +469,13 @@ def handle_submissions():
             # Generate UUID for new submission
             submission_id = str(uuid.uuid4())
 
-            # Insert new submission
+            # Insert new submission without requiring user_id
             cursor.execute(
                 """
-                INSERT INTO submissions (id, campaign_id, user_id, created_at, updated_at)
-                VALUES (?, ?, ?, datetime('now'), datetime('now'))
+                INSERT INTO submissions (id, campaign_id, created_at, updated_at)
+                VALUES (?, ?, datetime('now'), datetime('now'))
                 """,
-                (submission_id, data["campaign_id"], data["user_id"]),
+                (submission_id, data["campaign_id"]),
             )
 
             conn.commit()
