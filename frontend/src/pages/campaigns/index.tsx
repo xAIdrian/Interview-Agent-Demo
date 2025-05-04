@@ -141,11 +141,8 @@ const CampaignsPage = () => {
   }, [isClient, isAuthenticated, user?.id, isAdmin]);
 
   const handleActionClick = (id: string) => {
-    if (isAdmin) {
-      router.push(`/campaigns/${id}/edit`);
-    } else {
-      router.push(`/campaigns/${id}`);
-    }
+    router.push(`/campaigns/${id}`);
+
   };
 
   const columns: ColumnDefinition[] = [
