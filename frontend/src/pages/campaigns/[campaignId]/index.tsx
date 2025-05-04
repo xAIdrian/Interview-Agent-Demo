@@ -359,19 +359,9 @@ const CampaignDetailsPage = () => {
                       <div className="flex items-center justify-between">
                         <div className="flex-grow">
                           <p className="text-sm font-medium text-gray-900">
-                            Question {index + 1}: {question.title}
+                            Question {index + 1}: {question.body}
                           </p>
-                          {isAdmin && (
-                            <p className="mt-1 text-xs text-gray-400">
-                              Scoring Prompt: {question.scoring_prompt}
-                            </p>
-                          )}
                         </div>
-                        {isAdmin && (
-                          <div className="ml-4 flex-shrink-0 text-sm text-gray-500">
-                            Max Points: {question.max_points}
-                          </div>
-                        )}
                       </div>
                     </li>
                   ))}
