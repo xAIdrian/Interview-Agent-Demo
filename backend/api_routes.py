@@ -480,8 +480,48 @@ def handle_submissions():
 
         except Exception as e:
             print("Error in get_submissions:", str(e))
+            if "conn" in locals():
+                conn.close()
+            return jsonify({"error": f"Failed to fetch submissions: {str(e)}"}), 500
+
+    elif request.method == "POST":
+        try:
+            data = request.json
+            conn = get_db_connection()
+            cursor = conn.cursor()
+
+            # Generate UUID for new submission
+            submission_id = str(uuid.uuid4())
+
+            # Insert new submission
+            cursor.execute(
+                """
+                INSERT INTO submissions (id, campaign_id, user_id, created_at, is_complete, total_points)
+                VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?, ?)
+                """,
+                (
+                    submission_id,
+                    data.get("campaign_id"),
+                    data.get("user_id"),
+                    data.get("is_complete", False),
+                    data.get("total_points"),
+                ),
+            )
+
+            conn.commit()
+            conn.close()
+
+            return (
+                jsonify(
+                    {"message": "Submission created successfully", "id": submission_id}
+                ),
+                201,
+            )
+
+        except Exception as e:
             print(f"Error creating submission: {e}")
             if "conn" in locals():
+                conn.rollback()
                 conn.close()
             return jsonify({"error": f"Failed to create submission: {str(e)}"}), 500
 
