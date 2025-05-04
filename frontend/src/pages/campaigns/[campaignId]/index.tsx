@@ -60,6 +60,21 @@ const CampaignDetailsPage = () => {
   });
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
+  // Handle copying campaign link
+  const handleCopyLink = () => {
+    const campaignLink = `${window.location.origin}/live-interview/${campaignId}`;
+    navigator.clipboard.writeText(campaignLink).then(() => {
+      const button = document.getElementById('copy-link-button');
+      if (button) {
+        const originalText = button.textContent;
+        button.textContent = 'Copied!';
+        setTimeout(() => {
+          button.textContent = originalText;
+        }, 2000);
+      }
+    });
+  };
+
   // Setup auth on component mount
   useEffect(() => {
     const isAdminUser = localStorage.getItem('isAdmin') === 'true';
@@ -258,7 +273,6 @@ const CampaignDetailsPage = () => {
         </div>
       ) : campaign ? (
         <>
-
           <div className="bg-white shadow overflow-hidden sm:rounded-lg mb-6">
             <div className="border-t border-gray-200">
               <dl>
@@ -273,6 +287,28 @@ const CampaignDetailsPage = () => {
               </dl>
             </div>
           </div>
+
+          {/* Campaign Link Section - Only visible for admin users */}
+          {isAdmin && (
+            <div className="mb-8 p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <div className="flex justify-between items-center mb-2">
+                <h3 className="text-lg font-semibold text-gray-700">Campaign Link</h3>
+                <button
+                  id="copy-link-button"
+                  type="button"
+                  onClick={handleCopyLink}
+                  className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                >
+                  Copy Link
+                </button>
+              </div>
+              <div className="bg-white border border-gray-200 rounded-lg p-3">
+                <p className="text-sm text-gray-600 break-all">
+                  {typeof window !== 'undefined' ? `${window.location.origin}/live-interview/${campaignId}` : ''}
+                </p>
+              </div>
+            </div>
+          )}
 
           {isAdmin && (
             <div className="bg-white shadow overflow-hidden sm:rounded-lg">

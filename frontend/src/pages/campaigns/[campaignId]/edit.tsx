@@ -567,7 +567,17 @@ const EditCampaignPage = () => {
     <PageTemplate title="Edit Campaign" maxWidth="lg">
       <div className="w-full bg-white shadow-md rounded-lg p-6">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold">Edit Campaign</h2>
+          <div className="flex items-center space-x-4">
+            <Link
+              href={`/campaigns/${campaignId}`}
+              className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 flex items-center gap-2"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+              </svg>
+              Back to Campaign
+            </Link>
+          </div>
           {user?.is_admin && (
             <button
               onClick={() => setShowDeleteModal(true)}
@@ -580,26 +590,6 @@ const EditCampaignPage = () => {
           )}
         </div>
         
-        {/* Campaign Link Section */}
-        <div className="mb-8 p-4 bg-gray-50 rounded-lg border border-gray-200">
-          <div className="flex justify-between items-center mb-2">
-            <h3 className="text-lg font-semibold text-gray-700">Campaign Link</h3>
-            <button
-              id="copy-link-button"
-              type="button"
-              onClick={handleCopyLink}
-              className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-            >
-              Copy Link
-            </button>
-          </div>
-          <div className="bg-white border border-gray-200 rounded-lg p-3">
-            <p className="text-sm text-gray-600 break-all">
-              {typeof window !== 'undefined' ? `${window.location.origin}/live-interview/${campaignId}` : ''}
-            </p>
-          </div>
-        </div>
-
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Campaign details */}
           <div className="space-y-4">
