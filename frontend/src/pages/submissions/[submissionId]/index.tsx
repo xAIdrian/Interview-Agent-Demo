@@ -532,7 +532,7 @@ const SubmissionDetailsPage = () => {
                       <div key={answer.id} className="p-6">
                         <div className="mb-4">
                           <h3 className="text-lg font-medium text-gray-900">
-                            Question {index + 1}: {answer.question_title}
+                            Question {index + 1}: {answer.body}
                           </h3>
                           <p className="mt-2 text-sm text-gray-600">{answer.body}</p>
                         </div>
@@ -567,10 +567,7 @@ const SubmissionDetailsPage = () => {
                                 <p className="mt-1 text-lg font-semibold text-gray-900">
                                   {answer.score !== null ? (
                                     <span>
-                                      {answer.score} / {answer.max_points}
-                                      <span className="ml-2 text-sm font-normal text-gray-500">
-                                        ({((answer.score / answer.max_points) * 100).toFixed(1)}%)
-                                      </span>
+                                      {answer.score}
                                     </span>
                                   ) : (
                                     'Not scored'
