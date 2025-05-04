@@ -197,6 +197,7 @@ const SubmissionDetailsPage = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [savingError, setSavingError] = useState('');
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [resumeAnalysis, setResumeAnalysis] = useState<ResumeAnalysis | null>(null);
 
   const fetchSubmissionData = async () => {
     if (!submissionId) return;
@@ -227,12 +228,23 @@ const SubmissionDetailsPage = () => {
     }
   };
 
+  const fetchResumeAnalysis = async () => {
+    if (!submissionId) return;
+    try {
+      const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/resume_analysis/${submissionId}`);
+      setResumeAnalysis(response.data);
+    } catch (error) {
+      console.error('Error fetching resume analysis:', error);
+    }
+  };
+
   useEffect(() => {
     if (submissionId) {
       const fetchData = async () => {
         await Promise.all([
           fetchSubmissionData(),
-          fetchDetailedAnswers()
+          fetchDetailedAnswers(),
+          fetchResumeAnalysis()
         ]);
       };
       fetchData();
@@ -430,7 +442,7 @@ const SubmissionDetailsPage = () => {
           )}
           
           {/* Resume Analysis Section */}
-          {submission.resume_analysis && (
+          {resumeAnalysis && (
             <div className="mb-6">
               <div className="mt-6">
                 <div className="flex items-center gap-2">
@@ -444,19 +456,19 @@ const SubmissionDetailsPage = () => {
                     </div>
                   </div>
                 </div>
-                <p className="text-gray-700 mb-4">{submission.resume_analysis.overall_fit}</p>
+                <p className="text-gray-700 mb-4">{resumeAnalysis.overall_fit}</p>
                 
-                <p className="text-gray-600 mt-2 text-sm">{submission.resume_analysis.percent_match_reason}</p>
+                <p className="text-gray-600 mt-2 text-sm">{resumeAnalysis.percent_match_reason}</p>
                 <div className="flex items-center space-x-4">
                   <div className="flex-1">
                     <div className="h-4 bg-gray-200 rounded-full overflow-hidden">
                       <div 
                         className="h-full bg-blue-500 rounded-full" 
-                        style={{ width: `${submission.resume_analysis.percent_match}%` }}
+                        style={{ width: `${resumeAnalysis.percent_match}%` }}
                       />
                     </div>
                   </div>
-                  <span className="text-lg font-semibold">{submission.resume_analysis.percent_match}% Match</span>
+                  <span className="text-lg font-semibold">{resumeAnalysis.percent_match}% Match</span>
                 </div>
               </div>
               <div className="bg-gray-50 rounded-lg p-6">
@@ -474,7 +486,7 @@ const SubmissionDetailsPage = () => {
                       </div>
                     </div>
                     <ul className="list-disc pl-5 space-y-1">
-                      {submission.resume_analysis.strengths.map((strength, index) => (
+                      {resumeAnalysis.strengths.map((strength, index) => (
                         <li key={index} className="text-green-600">{strength}</li>
                       ))}
                     </ul>
@@ -493,7 +505,7 @@ const SubmissionDetailsPage = () => {
                       </div>
                     </div>
                     <ul className="list-disc pl-5 space-y-1">
-                      {submission.resume_analysis.weaknesses.map((weakness, index) => (
+                      {resumeAnalysis.weaknesses.map((weakness, index) => (
                         <li key={index} className="text-red-600">{weakness}</li>
                       ))}
                     </ul>
