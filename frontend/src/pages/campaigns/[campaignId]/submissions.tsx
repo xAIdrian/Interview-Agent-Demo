@@ -251,7 +251,7 @@ const CampaignSubmissionsPage = () => {
   }, [submissions, isLoading, router]);
 
   return (
-    <PageTemplate title={`${campaign?.title || 'Campaign'} Submissions`} maxWidth="lg">
+    <PageTemplate title={`Submissions`} maxWidth="lg">
       <div className="flex justify-end mb-4 items-center">
         <Link 
           href={`/campaigns/${campaignId}`}
