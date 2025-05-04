@@ -121,7 +121,7 @@ const SimpleVoiceAssistant: React.FC<{ onTranscriptUpdate: (transcript: any[]) =
                     <p>Waiting for the interviewer to begin...</p>
                   </div>
                 ) : (
-                  <p>The interviewer will ask you questions. Answer naturally as if in a real interview.</p>
+                <p>The interviewer will ask you questions. Answer naturally as if in a real interview.</p>
                 )}
               </div>
             )}
@@ -204,7 +204,7 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
           console.log('Interview already submitted, skipping duplicate submission');
           return;
         }
-
+        
         // Ensure transcript is an array and not empty
         const formattedTranscript = Array.isArray(newTranscript) ? newTranscript : [];
         if (formattedTranscript.length === 0) {
@@ -275,6 +275,7 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
     try {
       if (!submissionId) {
         console.error('No submissionId available for submission');
+        setError('Missing submission ID');
         return;
       }
 
@@ -288,12 +289,30 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
       // Wait a short time for any final transcriptions to be processed
       await new Promise(resolve => setTimeout(resolve, 2000));
       
+      // Check if transcript is empty
+      if (!transcript || transcript.length === 0) {
+        setError('Cannot submit interview: no conversation recorded');
+        setIsProcessingSubmission(false);
+        return;
+      }
+
+      console.log('🚀 Submitting final interview transcript:', {
+        transcript,
+        submissionId,
+        campaignId,
+        transcriptLength: transcript.length
+      });
+
       // Submit the final transcript
       await handleTranscriptUpdate(true, transcript);
+      
+      // Call onDisconnect after successful submission
+      onDisconnect();
     } catch (err) {
       console.error('Error during disconnect:', err);
       setError('Failed to properly disconnect. Please try again.');
       setHasSubmitted(false); // Reset submission flag on error
+      setIsProcessingSubmission(false);
     } 
   };
 
@@ -363,13 +382,21 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-bold">Interview Session: {user?.name}</h2>
             <button 
-              onClick={handleDisconnect}
+              onClick={() => {
+                console.log('End Interview clicked', {
+                  hasSubmitted,
+                  isProcessingSubmission,
+                  transcript,
+                  submissionId
+                });
+                handleDisconnect();
+              }}
               disabled={hasSubmitted || isProcessingSubmission}
               className={`px-3 py-1 bg-white text-blue-600 rounded transition-colors ${
                 (hasSubmitted || isProcessingSubmission) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-50'
               }`}
             >
-              End Interview
+              {isProcessingSubmission ? 'Processing...' : hasSubmitted ? 'Submitted' : 'End Interview'}
             </button>
           </div>
         </div>

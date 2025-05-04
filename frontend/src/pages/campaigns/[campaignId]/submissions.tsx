@@ -198,8 +198,11 @@ const CampaignSubmissionsPage = () => {
               // Create View button
               const viewButton = document.createElement("a");
               viewButton.innerHTML = "View Answers";
+              // Ensure campaignId is a string and properly encoded
+              const returnToCampaign = String(campaignId);
+              console.log('🚀 ~ Creating view button with returnToCampaign:', returnToCampaign);
+              viewButton.href = `/submissions/${submissionId}?returnToCampaign=${encodeURIComponent(returnToCampaign)}`;
               viewButton.className = "px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm";
-              viewButton.href = `/submissions/${submissionId}`;
               container.appendChild(viewButton);
               
               //// Create Interview button

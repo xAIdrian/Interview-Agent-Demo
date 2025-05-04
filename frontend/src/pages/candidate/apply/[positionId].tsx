@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import axios from 'axios';
 import { PageTemplate } from '../../../components/PageTemplate';
 import Link from 'next/link';
+import { useAuth } from '@/app/components/AuthProvider';
 
 // Define API base URL for consistent usage
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://main-service-48k0.onrender.com';
@@ -15,11 +16,11 @@ interface Position {
 const ApplicationPage = () => {
   const router = useRouter();
   const { positionId } = router.query;
-  
+  const { user } = useAuth();
   const [position, setPosition] = useState<Position | null>(null);
   const [resume, setResume] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   // Set a default userId for demo purposes - using a numeric ID to match database expectations
   const [userId, setUserId] = useState(1);
@@ -177,7 +178,8 @@ const ApplicationPage = () => {
       // First, create a new submission
       const createSubmissionResponse = await axios.post(`${API_BASE_URL}/api/submissions`, {
         campaign_id: positionId,
-        user_id: userId,
+        email: user?.email,
+        name: user?.name,
         created_at: new Date().toISOString(),
         is_complete: false,
         total_points: null

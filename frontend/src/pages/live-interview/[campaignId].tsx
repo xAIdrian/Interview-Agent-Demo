@@ -144,8 +144,16 @@ const LiveKitInterviewPage: React.FC = () => {
       // Create submission
       const submissionResponse = await axios.post(`${API_BASE_URL}/api/submissions`, {
         campaign_id: campaignId,
-        user_id: userId
+        email: candidateData.email,
+        name: candidateData.name
       });
+
+      // Check if there's an error in the response
+      if (submissionResponse.data.error === "Maximum submission limit reached for this campaign") {
+        setShowMaxAttemptsModal(true);
+        setMaxAttemptsMessage("You have reached the maximum number of attempts allowed for this position. Please contact the hiring team for more information.");
+        return;
+      }
 
       newSubmissionId = submissionResponse.data.id;
       setSubmissionId(newSubmissionId);
@@ -322,19 +330,6 @@ const LiveKitInterviewPage: React.FC = () => {
                       required
                     />
                   </div>
-                  <div>
-                    <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700">
-                      Phone Number (Optional)
-                    </label>
-                    <input
-                      type="tel"
-                      name="phoneNumber"
-                      id="phoneNumber"
-                      value={candidateData.phoneNumber}
-                      onChange={handleInputChange}
-                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </div>
                 </div>
               </div>
             </div>
@@ -432,11 +427,12 @@ const LiveKitInterviewPage: React.FC = () => {
         )}
       </div>
 
-      {/* Maximum Attempts Modal */}
+      {/* Maximum Attempts Modal - Updated to be non-closeable */}
       <Modal
         isOpen={showMaxAttemptsModal}
-        onClose={() => {}}
+        onClose={() => {}} // Empty function to prevent closing
         title="Maximum Attempts Reached"
+        hideCloseButton={true} // Add this prop to Modal component
       >
         <div className="p-6">
           <div className="text-center">
@@ -448,6 +444,9 @@ const LiveKitInterviewPage: React.FC = () => {
             <h3 className="text-lg font-medium text-gray-900 mb-2">Maximum Attempts Reached</h3>
             <p className="text-gray-600 mb-6">
               {maxAttemptsMessage}
+            </p>
+            <p className="text-sm text-gray-500">
+              Please contact the hiring team for assistance.
             </p>
           </div>
         </div>
