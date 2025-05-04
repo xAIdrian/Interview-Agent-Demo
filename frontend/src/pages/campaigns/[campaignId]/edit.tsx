@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 import { useRouter } from 'next/router';
 import { PrimaryButton } from '../../../components/Button';
@@ -7,6 +7,16 @@ import { Spinner } from '../../../components/ui/Spinner';
 import { Modal } from '../../../components/ui/Modal';
 import { TrashIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/app/components/AuthProvider';
+import Link from 'next/link';
+// Import tabulator config before Tabulator
+import configureTabulatorDependencies from '../../../utils/tabulator-config';
+import { TabulatorFull as Tabulator } from 'tabulator-tables';
+import { AuthLogger } from '../../../utils/logging';
+import "tabulator-tables/dist/css/tabulator.min.css";
+import "../../../styles/tabulator.css"; // Import custom tabulator styles
+
+// Initialize Tabulator with required dependencies
+configureTabulatorDependencies();
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://main-service-48k0.onrender.com';
 
@@ -29,6 +39,25 @@ interface Campaign {
   max_user_submissions: number;
   is_public: boolean;
   questions: Question[];
+}
+
+// Add Submission interface
+interface Submission {
+  id: string;
+  campaign_id: string;
+  user_id: string;
+  created_at: string;
+  is_complete: boolean;
+  total_points: number | null;
+  email: string;
+  user_name: string | null;
+  campaign_name: string;
+}
+
+// Update the Tabulator Cell type
+interface TabulatorCell {
+  getValue: () => any;
+  getRow: () => { getData: () => Submission };
 }
 
 const EditCampaignPage = () => {
@@ -58,18 +87,22 @@ const EditCampaignPage = () => {
   const [optimizedPrompts, setOptimizedPrompts] = useState<{[key: number]: string}>({});
   const [showOptimized, setShowOptimized] = useState<{[key: number]: boolean}>({});
   
+  // Add submissions state and ref
+  const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const tableRef = useRef<HTMLDivElement>(null);
+  const tabulatorRef = useRef<Tabulator | null>(null);
+  
   // Use client-side only rendering
   useEffect(() => {
     setIsClient(true);
   }, []);
   
-  // Use useCallback to prevent dependency cycle
+  // Modify fetchCampaign to include submissions
   const fetchCampaign = useCallback(async () => {
     try {
       setIsLoading(true);
       setError('');
       
-      // Verify campaignId is available and is a string
       if (!campaignId) {
         setError('Invalid campaign ID');
         setIsLoading(false);
@@ -85,11 +118,21 @@ const EditCampaignPage = () => {
       const questionsResponse = await axios.get(
         `${API_URL}/api/questions?campaign_id=${campaignId}`
       );
+
+      // Fetch submissions for this campaign
+      const submissionsResponse = await axios.get(
+        `${API_URL}/api/submissions?campaign_id=${campaignId}`
+      );
       
       const campaignData = campaignResponse.data;
       const questionsData = questionsResponse.data;
+      const submissionsData = submissionsResponse.data.map((submission: any) => ({
+        ...submission,
+        id: String(submission.id),
+        campaign_id: String(submission.campaign_id),
+        user_id: String(submission.user_id)
+      }));
       
-      // Combine data into campaign state
       setCampaign({
         id: campaignData.id.toString(),
         title: campaignData.title,
@@ -105,6 +148,8 @@ const EditCampaignPage = () => {
           max_points: parseInt(q.max_points) || 10
         }))
       });
+
+      setSubmissions(submissionsData);
       
     } catch (error) {
       console.error('Error fetching campaign:', error);
@@ -120,6 +165,94 @@ const EditCampaignPage = () => {
       fetchCampaign();
     }
   }, [isClient, campaignId, fetchCampaign]);
+  
+  // Add Tabulator initialization effect
+  useEffect(() => {
+    if (isLoading || !tableRef.current || submissions.length === 0) return;
+    
+    try {
+      const formatDate = (date: string | null) => {
+        if (!date) return 'N/A';
+        return new Date(date).toLocaleString();
+      };
+      
+      tabulatorRef.current = new Tabulator(tableRef.current, {
+        data: submissions,
+        layout: "fitColumns",
+        pagination: true,
+        paginationSize: 10,
+        paginationSizeSelector: [5, 10, 20, 50],
+        movableColumns: true,
+        resizableRows: true,
+        columns: [
+          { 
+            title: "Candidate", 
+            field: "email", 
+            headerFilter: true, 
+            widthGrow: 2,
+            formatter: function(cell: any) {
+              const data = cell._cell.row.data;
+              const name = data.user_name || 'No name';
+              const email = data.email;
+              return `<div>
+                <div class="font-medium">${name}</div>
+              </div>`;
+            }
+          },
+          { 
+            title: "Created", 
+            field: "created_at", 
+            formatter: (cell) => formatDate(cell.getValue()),
+            sorter: "datetime",
+            widthGrow: 1
+          },
+          { 
+            title: "Score", 
+            field: "total_points", 
+            formatter: (cell) => {
+              const value = cell.getValue();
+              return value !== null ? value : 'Not scored';
+            },
+            sorter: "number",
+            widthGrow: 1
+          },
+          {
+            title: "Actions",
+            field: "id",
+            hozAlign: "center",
+            formatter: (cell: any) => {
+              const submissionId = String(cell.getValue());
+              const container = document.createElement("div");
+              container.className = "flex space-x-2";
+              
+              const viewButton = document.createElement("a");
+              viewButton.innerHTML = "View Answers";
+              viewButton.className = "px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm";
+              const returnToCampaign = String(campaignId);
+              console.log('🚀 ~ Creating view button with returnToCampaign:', returnToCampaign);
+              viewButton.href = `/submissions/${submissionId}?returnToCampaign=${encodeURIComponent(returnToCampaign)}`;
+              container.appendChild(viewButton);
+              
+              return container;
+            }
+          }
+        ],
+        initialSort: [
+          { column: "created_at", dir: "desc" }
+        ]
+      });
+    } catch (err) {
+      console.error("Error initializing tabulator:", err);
+      setError("Failed to initialize submission table. Please refresh the page.");
+    }
+    
+    return () => {
+      if (tabulatorRef.current) {
+        tabulatorRef.current.destroy();
+        tabulatorRef.current = null;
+      }
+    };
+  }, [submissions, isLoading]);
   
   if (!isClient) {
     return <div className="loading">Loading...</div>;
@@ -645,6 +778,84 @@ const EditCampaignPage = () => {
             </div>
           )}
         </form>
+
+        {/* Submissions Section */}
+        <div className="mt-12 border-t pt-8">
+          <h2 className="text-2xl font-bold mb-6">Submissions</h2>
+          
+          <div className="bg-white rounded-lg">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+              <div className="p-3 bg-gray-50 rounded">
+                <h3 className="text-sm font-medium text-gray-500">Total Submissions</h3>
+                <p className="text-2xl font-bold">{submissions.length}</p>
+              </div>
+              <div className="p-3 bg-gray-50 rounded">
+                <h3 className="text-sm font-medium text-gray-500">Completed</h3>
+                <p className="text-2xl font-bold">{submissions.filter(s => s.is_complete).length}</p>
+              </div>
+              <div className="p-3 bg-gray-50 rounded">
+                <h3 className="text-sm font-medium text-gray-500">In Progress</h3>
+                <p className="text-2xl font-bold">{submissions.filter(s => !s.is_complete).length}</p>
+              </div>
+              <div className="p-3 bg-gray-50 rounded">
+                <h3 className="text-sm font-medium text-gray-500">Average Score</h3>
+                <p className="text-2xl font-bold">
+                  {submissions.length > 0 && submissions.some(s => s.total_points !== null)
+                    ? (submissions.reduce((acc, s) => acc + (s.total_points || 0), 0) / 
+                      submissions.filter(s => s.total_points !== null).length).toFixed(1)
+                    : 'N/A'}
+                </p>
+              </div>
+            </div>
+
+            {submissions.length > 0 ? (
+              <div className="bg-white rounded-lg">
+                {error.includes("initialize submission table") ? (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Candidate</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {submissions.map((submission) => (
+                          <tr key={submission.id}>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div>
+                                <div className="font-medium">{submission.user_name || 'No name'}</div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">{new Date(submission.created_at).toLocaleString()}</td>
+                            <td className="px-6 py-4 whitespace-nowrap">{submission.total_points !== null ? submission.total_points : 'Not scored'}</td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <Link
+                                href={`/submissions/${submission.id}`}
+                                className="text-blue-600 hover:text-blue-900"
+                              >
+                                View
+                              </Link>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div ref={tableRef} className="w-full"></div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-8 bg-white rounded-lg">
+                <p className="text-gray-500">No submissions found for this campaign.</p>
+                <p className="text-gray-400 mt-2">Submissions will appear here when candidates complete the interview.</p>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Loading Modal */}

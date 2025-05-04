@@ -174,7 +174,21 @@ function ScoringDisplay({ submission }: { submission: Submission }) {
 
 const SubmissionDetailsPage = () => {
   const router = useRouter();
-  const { submissionId } = router.query;
+  const [returnToCampaign, setReturnToCampaign] = useState<string | null>(null);
+  const [submissionId, setSubmissionId] = useState<string | null>(null);
+  
+  // Handle router query updates
+  useEffect(() => {
+    if (router.isReady) {
+      const { submissionId: sid, returnToCampaign: cid } = router.query;
+      console.log('🚀 ~ Router query params:', router.query);
+      console.log('🚀 ~ submissionId:', sid);
+      console.log('🚀 ~ returnToCampaign:', cid);
+      
+      setSubmissionId(sid as string);
+      setReturnToCampaign(cid as string);
+    }
+  }, [router.isReady, router.query]);
   
   const [submission, setSubmission] = useState<Submission | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -409,33 +423,16 @@ const SubmissionDetailsPage = () => {
         </div>
       ) : submission ? (
         <div className="bg-white shadow-md rounded-lg p-6">
-          {/* Breadcrumbs */}
-          <div className="text-sm text-gray-500 mb-6">
-            <Link href="/campaigns" className="hover:text-blue-500">Campaigns</Link>
-            {' / '}
-            {submission.campaign && (
-              <>
-                <Link href={`/campaigns/${submission.campaign_id}`} className="hover:text-blue-500">
-                  {submission.campaign.title}
-                </Link>
-                {' / '}
-              </>
-            )}
-            <Link href={`/campaigns/${submission.campaign_id}/submissions`} className="hover:text-blue-500">
-              Submissions
-            </Link>
-            {' / '}
-            <span className="text-gray-700">Submission at {formatDate(submission.created_at)}</span>
-          </div>
-          
           {/* Action buttons */}
           <div className="flex justify-between mb-6">
             <div className="flex space-x-3">
               <Link 
-                href={`/submissions`}
+                href={returnToCampaign 
+                  ? `/campaigns/${returnToCampaign}/submissions` 
+                  : `/campaigns/${submission.campaign_id}/submissions`}
                 className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-700"
               >
-                Back to Submissions
+                Back to Campaign Submissions
               </Link>
               <button
                 onClick={deleteSubmission}
@@ -461,6 +458,20 @@ const SubmissionDetailsPage = () => {
               {savingError}
             </div>
           )}
+          
+          {/* Breadcrumbs */}
+          <div className="text-sm text-gray-500 mb-6">
+            <Link 
+              href={returnToCampaign 
+                ? `/campaigns/${returnToCampaign}/submissions` 
+                : `/campaigns/${submission.campaign_id}/submissions`} 
+              className="hover:text-blue-500"
+            >
+              {submission.campaign?.title || 'Campaign'} Submissions
+            </Link>
+            {' / '}
+            <span className="text-gray-700">Submission at {formatDate(submission.created_at)}</span>
+          </div>
           
           {/* Submission details */}
           {submission.user && (

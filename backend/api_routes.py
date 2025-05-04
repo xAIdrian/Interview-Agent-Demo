@@ -111,23 +111,102 @@ def build_filter_query(args):
 
 
 # GET routes
-@api_bp.route("/users", methods=["GET"])
-# @admin_required
-def get_users():
-    conn = get_db_connection()
-    cursor = conn.cursor()
+@api_bp.route("/users", methods=["GET", "POST"])
+def handle_users():
+    if request.method == "GET":
+        conn = get_db_connection()
+        cursor = conn.cursor()
 
-    filter_query, filter_values = build_filter_query(request.args)
-    cursor.execute(f"SELECT * FROM users {filter_query}", filter_values)
+        filter_query, filter_values = build_filter_query(request.args)
+        cursor.execute(f"SELECT * FROM users {filter_query}", filter_values)
 
-    users = cursor.fetchall()
-    columns = ["id", "email", "name", "password_hash", "is_admin"]
+        users = cursor.fetchall()
+        columns = ["id", "email", "name", "password_hash", "is_admin"]
 
-    # Use the helper function to map rows to dictionaries with string IDs
-    result = [map_row_to_dict(user, columns) for user in users]
+        # Use the helper function to map rows to dictionaries with string IDs
+        result = [map_row_to_dict(user, columns) for user in users]
 
-    conn.close()
-    return jsonify(result)
+        conn.close()
+        return jsonify(result)
+
+    elif request.method == "POST":
+        try:
+            data = request.json
+
+            # Validate required fields
+            required_fields = ["name", "email"]
+            for field in required_fields:
+                if not data.get(field):
+                    return jsonify({"error": f"{field} is required"}), 400
+
+            conn = get_db_connection()
+            cursor = conn.cursor()
+
+            # Check if user with this email already exists
+            cursor.execute("SELECT * FROM users WHERE email = ?", (data["email"],))
+            existing_user = cursor.fetchone()
+
+            if existing_user:
+                # Return existing user data with 200 status code
+                columns = [
+                    "id",
+                    "email",
+                    "name",
+                    "is_admin",
+                ]  # Removed phone_number from columns
+                result = map_row_to_dict(existing_user, columns)
+                conn.close()
+                return jsonify({"user": result, "message": "User already exists"}), 200
+
+            # Generate a random password if not provided
+            if not data.get("password"):
+                password = "".join(
+                    random.choices(string.ascii_letters + string.digits, k=12)
+                )
+                data["password"] = password
+
+            # Generate UUID for new user
+            user_id = str(uuid.uuid4())
+
+            # Insert new user
+            cursor.execute(
+                """
+                INSERT INTO users (id, name, email, password_hash, is_admin)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    user_id,
+                    data["name"],
+                    data["email"],
+                    generate_password_hash(data["password"], method="pbkdf2:sha256"),
+                    data.get("is_admin", False),
+                ),
+            )
+
+            conn.commit()
+
+            # Fetch the created user
+            cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
+            new_user = cursor.fetchone()
+            columns = ["id", "email", "name", "is_admin"]
+            result = map_row_to_dict(new_user, columns)
+
+            conn.close()
+
+            # Include the generated password in response if one was generated
+            if not data.get("password"):
+                result["generated_password"] = password
+
+            return (
+                jsonify({"user": result, "message": "User created successfully"}),
+                201,
+            )
+
+        except Exception as e:
+            print(f"Error creating user: {e}")
+            if "conn" in locals():
+                conn.close()
+            return jsonify({"error": f"Failed to create user: {str(e)}"}), 500
 
 
 @api_bp.route("/users/<string:id>", methods=["GET"])
@@ -362,78 +441,49 @@ def get_question(id):
         return jsonify({"error": "Question not found"}), 404
 
 
-@api_bp.route("/submissions", methods=["GET"])
-def get_submissions():
-    try:
-        # Get user identity from session
-        user_id = session.get("user_id")
-        is_admin = session.get("is_admin", False)
+@api_bp.route("/submissions", methods=["GET", "POST"])
+def handle_submissions():
+    if request.method == "GET":
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
 
-        conn = get_db_connection()
-        cursor = conn.cursor()
+            # Build the base query with joins
+            query = """
+                SELECT s.*, c.title AS campaign_title, u.name AS user_name, u.email AS user_email
+                FROM submissions s
+                JOIN campaigns c ON s.campaign_id = c.id
+                JOIN users u ON s.user_id = u.id
+            """
 
-        # Build the base query with joins - include both name and email
-        query = """
-            SELECT s.*, c.title AS campaign_title, u.name AS user_name, u.email AS user_email
-            FROM submissions s
-            JOIN campaigns c ON s.campaign_id = c.id
-            JOIN users u ON s.user_id = u.id
-        """
+            # Get filter parameters and build WHERE clause
+            filters = request.args.to_dict()
+            where_clause, params = build_filter_query(filters)
+            if where_clause:
+                query += " " + where_clause
 
-        # Get filter parameters
-        filters = request.args.to_dict()
+            # Execute query with parameters
+            cursor.execute(query, list(params) if params else [])
+            rows = cursor.fetchall()
 
-        # For admin users, only show submissions for campaigns they created
-        if is_admin:
-            if "campaign_id" in filters:
-                # If a specific campaign is requested, verify ownership
-                cursor.execute(
-                    "SELECT created_by FROM campaigns WHERE id = ?",
-                    (filters["campaign_id"],),
-                )
-                campaign = cursor.fetchone()
-                if not campaign or campaign["created_by"] != user_id:
-                    return jsonify({"error": "Access denied"}), 403
-            else:
-                # Only show submissions for campaigns created by this admin
-                query += " WHERE c.created_by = ?"
-                filters["created_by"] = user_id
-        # For non-admin users, always filter by their user_id
-        elif user_id:
-            filters["s.user_id"] = user_id
+            # Map rows to dictionaries using column names
+            columns = [desc[0] for desc in cursor.description]
+            submissions = []
+            for row in rows:
+                submission = {}
+                for i, col in enumerate(columns):
+                    submission[col] = row[i]
+                submissions.append(submission)
 
-        # Build WHERE clause and get parameters
-        where_clause, params = build_filter_query(filters)
-        if where_clause:
-            query += " " + where_clause
+            conn.close()
+            return jsonify(submissions)
 
-        print("Executing query:", query)
-        print("With parameters:", params)
-
-        # Execute query with parameters as a list
-        cursor.execute(query, list(params) if params else [])
-
-        rows = cursor.fetchall()
-        print("Raw database rows:", rows)
-
-        # Get column names from cursor description
-        columns = [desc[0] for desc in cursor.description]
-
-        # Map rows to dictionaries using column names
-        submissions = []
-        for row in rows:
-            submission = {}
-            for i, col in enumerate(columns):
-                submission[col] = row[i]
-            submissions.append(submission)
-
-        print("Mapped submissions:", submissions)
-
-        conn.close()
-        return jsonify(submissions)
-    except Exception as e:
-        print("Error in get_submissions:", str(e))
-        return jsonify({"error": str(e)}), 500
+        except Exception as e:
+            print("Error in get_submissions:", str(e))
+            print(f"Error creating submission: {e}")
+            if "conn" in locals():
+                conn.close()
+            return jsonify({"error": f"Failed to create submission: {str(e)}"}), 500
 
 
 @api_bp.route("/submission_answers", methods=["GET"])
@@ -509,537 +559,50 @@ def get_public_campaigns():
     return jsonify(result)
 
 
-@api_bp.route("/submissions/<string:id>", methods=["GET"])
-def get_submission_by_id(id):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-
-    # Get user identity from session
-    user_id = session.get("user_id")
-    is_admin = session.get("is_admin", False)
-
-    # Verify that the ID is a string
-    submission_id = ensure_string_id(id)
-
-    # First, check if the user has access to this submission
-    cursor.execute(
-        """
-        SELECT s.*, c.created_by as campaign_creator
-        FROM submissions s
-        JOIN campaigns c ON s.campaign_id = c.id
-        WHERE s.id = ?
-        """,
-        (submission_id,),
-    )
-    submission = cursor.fetchone()
-
-    if not submission:
-        conn.close()
-        return jsonify({"error": "Submission not found"}), 404
-
-    # Check access permissions
-    if is_admin:
-        # Admin can only access submissions for campaigns they created
-        if submission["campaign_creator"] != user_id:
-            conn.close()
-            return jsonify({"error": "Access denied"}), 403
-    else:
-        # Non-admin users can only access their own submissions
-        if submission["user_id"] != user_id:
-            conn.close()
-            return jsonify({"error": "Access denied"}), 403
-
-    # Get full submission details
-    cursor.execute(
-        """
-        SELECT s.*, u.email, c.title AS campaign_title
-        FROM submissions s
-        JOIN users u ON s.user_id = u.id
-        JOIN campaigns c ON s.campaign_id = c.id
-        WHERE s.id = ?
-    """,
-        (submission_id,),
-    )
-
-    submission = cursor.fetchone()
-
-    # Get submission answers
-    cursor.execute(
-        """
-        SELECT sa.*, q.title AS question_title
-        FROM submission_answers sa
-        JOIN questions q ON sa.question_id = q.id
-        WHERE sa.submission_id = ?
-    """,
-        (submission_id,),
-    )
-
-    answers = cursor.fetchall()
-
-    conn.close()
-
-    # Format response
-    columns_submission = [
-        "id",
-        "campaign_id",
-        "user_id",
-        "created_at",
-        "total_points",
-        "is_complete",
-        "email",
-        "campaign_title",
-    ]
-    columns_answers = [
-        "id",
-        "submission_id",
-        "question_id",
-        "video_path",
-        "transcript",
-        "score",
-        "score_rationale",
-        "question_title",
-    ]
-
-    result = {
-        "submission": map_row_to_dict(submission, columns_submission),
-        "answers": [map_row_to_dict(answer, columns_answers) for answer in answers],
-    }
-
-    return jsonify(result)
-
-
-# Add a public endpoint to get submission by ID for the interview page
-@api_bp.route("/submissions/<string:id>", methods=["GET"])
-def get_submission_for_interview(id):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute(
-        """
-        SELECT id, campaign_id, user_id, created_at, updated_at, 
-               is_complete, total_points, resume_path, resume_text
-        FROM submissions 
-        WHERE id = ?
-    """,
-        (id,),
-    )
-    submission = cursor.fetchone()
-    conn.close()
-
-    if not submission:
-        return jsonify({"error": "Submission not found"}), 404
-
-    # Convert to dict with column names
-    column_names = [desc[0] for desc in cursor.description]
-    submission_dict = {column_names[i]: submission[i] for i in range(len(column_names))}
-
-    return jsonify(submission_dict)
-
-
-# POST routes
-@api_bp.route("/users", methods=["POST"])
-def create_user():
-    data = request.json
-
-    # Validate required fields
-    if not data or "email" not in data or "name" not in data:
-        return jsonify({"error": "Required fields missing: email, name"}), 400
-
-    # Validate email format
-    email = data.get("email", "")
-    if not re.match(r"[^@]+@[^@]+\.[^@]+", email):
-        return jsonify({"error": "Invalid email format"}), 400
-
-    campaign_id = data.get("campaign_id")
-    if not campaign_id:
-        return jsonify({"error": "campaign_id is required"}), 400
-
+@api_bp.route("/submissions/<submission_id>", methods=["GET"])
+def get_submission_by_id(submission_id):
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        # Check if user with this email already exists
-        cursor.execute("SELECT id FROM users WHERE email = ?", (email,))
-        existing_user = cursor.fetchone()
-
-        if existing_user:
-            # Check submission count for this user for the specific campaign
-            user_id = existing_user[0]
-            cursor.execute(
-                """
-                SELECT COUNT(*), c.max_user_submissions
-                FROM submissions s
-                JOIN campaigns c ON s.campaign_id = c.id
-                WHERE s.user_id = ? 
-                AND s.campaign_id = ?
-                AND s.is_complete = TRUE
-                GROUP BY c.max_user_submissions
+        # Get submission with user information
+        cursor.execute(
+            """
+            SELECT s.*, u.email as user_email, u.name as user_name
+            FROM submissions s
+            JOIN users u ON s.user_id = u.id
+            WHERE s.id = ?
             """,
-                (user_id, campaign_id),
-            )
-            result = cursor.fetchone()
-
-            # If no submissions yet, set count to 0
-            submission_count = result[0] if result else 0
-            max_submissions = result[1] if result else 1  # Default to 1 if not found
-
-            # Get campaign details for the response
-            cursor.execute(
-                "SELECT title, max_user_submissions FROM campaigns WHERE id = ?",
-                (campaign_id,),
-            )
-            campaign = cursor.fetchone()
-            campaign_title = campaign[0] if campaign else "Unknown Campaign"
-            max_submissions = campaign[1] if campaign else 1
-
-            if submission_count >= max_submissions:
-                conn.close()
-                return (
-                    jsonify(
-                        {
-                            "id": str(user_id),
-                            "email": email,
-                            "name": data.get("name", ""),
-                            "is_admin": False,
-                            "existing_user": True,
-                            "submission_count": submission_count,
-                            "max_submissions": max_submissions,
-                            "campaign_title": campaign_title,
-                            "message": f"Maximum attempts reached for campaign: {campaign_title}",
-                            "max_attempts_reached": True,
-                        }
-                    ),
-                    200,
-                )
-
-            # Return existing user if they haven't reached max attempts
-            return (
-                jsonify(
-                    {
-                        "id": str(user_id),
-                        "email": email,
-                        "name": data.get("name", ""),
-                        "is_admin": False,
-                        "existing_user": True,
-                        "submission_count": submission_count,
-                        "max_submissions": max_submissions,
-                        "campaign_title": campaign_title,
-                        "max_attempts_reached": False,
-                    }
-                ),
-                200,
-            )
-
-        # Generate a UUID for the user
-        user_id = str(uuid.uuid4())
-
-        # Generate a default password if not provided
-        password = data.get("password", "changeme123")
-        password_hash = generate_password_hash(password, method="pbkdf2:sha256")
-
-        # Insert the new user
-        cursor.execute(
-            """
-            INSERT INTO users (id, email, name, password_hash, is_admin)
-            VALUES (?, ?, ?, ?, ?) RETURNING *
-        """,
-            (
-                user_id,
-                email,
-                data.get("name", ""),
-                password_hash,
-                data.get("is_admin", False),
-            ),
+            (submission_id,),
         )
 
-        # Get the newly created user
-        new_user = cursor.fetchone()
-        conn.commit()
-
-        # Get campaign details for the response
-        cursor.execute(
-            "SELECT title, max_user_submissions FROM campaigns WHERE id = ?",
-            (campaign_id,),
-        )
-        campaign = cursor.fetchone()
-        campaign_title = campaign[0] if campaign else "Unknown Campaign"
-        max_submissions = campaign[1] if campaign else 1
-
-        # Prepare response with string IDs and exclude sensitive information
-        columns = ["id", "email", "name", "is_admin"]
-        result = map_row_to_dict(new_user, columns)
-        result["existing_user"] = False
-        result["submission_count"] = 0
-        result["max_submissions"] = max_submissions
-        result["campaign_title"] = campaign_title
-
-        # If we generated a temporary password, include it in the response
-        if data.get("password") is None:
-            result["temporary_password"] = password
-
-        return jsonify(result), 201
-
-    except sqlite3.Error as e:
-        conn.rollback()
-        return jsonify({"error": f"Error: {str(e)}"}), 400
-    finally:
-        conn.close()
-
-
-@api_bp.route("/users/create", methods=["POST"])
-# @admin_required
-def create_new_user():
-    data = request.json
-    conn = get_db_connection()
-    cursor = conn.cursor()
-
-    # Generate a temporary password
-    password = "".join(random.choices(string.ascii_letters + string.digits, k=12))
-    password_hash = generate_password_hash(password, method="pbkdf2:sha256")
-
-    try:
-        cursor.execute(
-            """
-            INSERT INTO users (id, email, name, password_hash, is_admin)
-            VALUES (UUID_SHORT(), ?, ?, ?, ?)
-        """,
-            (data["email"], data["name"], password_hash, data["is_admin"]),
-        )
-        conn.commit()
-
-        return (
-            jsonify(
-                {
-                    "message": "User created successfully",
-                    "temporaryPassword": password,
-                }
-            ),
-            201,
-        )
-    except Exception as e:
-        conn.rollback()
-        return jsonify({"error": f"Failed to create user: {str(e)}"}), 500
-    finally:
-        conn.close()
-
-
-# Update POST /campaigns to include job_description
-@api_bp.route("/campaigns", methods=["POST"])
-# @admin_required
-def create_campaign():
-    data = request.json
-    user_id = session.get("user_id")  # Get the current user's ID
-
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-
-        # Calculate the total max points from all questions
-        total_max_points = sum(
-            question.get("max_points", 0) for question in data.get("questions", [])
-        )
-
-        # Insert the campaign using MariaDB's UUID_SHORT() function
-        cursor.execute(
-            """
-            INSERT INTO campaigns (id, title, max_user_submissions, max_points, is_public, campaign_context, job_description, created_by)
-            VALUES (UUID_SHORT(), ?, ?, ?, ?, ?, ?, ?) RETURNING *
-        """,
-            (
-                data.get("title"),
-                data.get("max_user_submissions", 1),
-                total_max_points,
-                data.get("is_public", False),
-                data.get("campaign_context", ""),
-                data.get("job_description", ""),
-                user_id,  # Add the creator's user ID
-            ),
-        )
-
-        # Get the newly created campaign
-        new_campaign = cursor.fetchone()
-
-        # Create questions if provided
-        questions_created = []
-        for question in data.get("questions", []):
-            cursor.execute(
-                """
-                INSERT INTO questions (id, campaign_id, title, body, scoring_prompt, max_points)
-                VALUES (UUID_SHORT(), ?, ?, ?, ?, ?) RETURNING *
-            """,
-                (
-                    new_campaign[0],
-                    question.get("title", ""),
-                    question.get("body", ""),
-                    question.get("scoring_prompt", ""),
-                    question.get("max_points", 0),
-                ),
-            )
-            new_question = cursor.fetchone()
-            questions_created.append(
-                map_row_to_dict(
-                    new_question,
-                    [
-                        "id",
-                        "campaign_id",
-                        "title",
-                        "body",
-                        "scoring_prompt",
-                        "max_points",
-                    ],
-                )
-            )
-
-        conn.commit()
-
-        # Prepare the response
-        campaign_columns = [
-            "id",
-            "title",
-            "max_user_submissions",
-            "max_points",
-            "is_public",
-            "campaign_context",
-            "job_description",
-            "created_by",
-        ]
-        result = map_row_to_dict(new_campaign, campaign_columns)
-        result["questions"] = questions_created
-
-        conn.close()
-        return jsonify(result), 201
-
-    except Exception as e:
-        if conn:
-            conn.rollback()
-            conn.close()
-        return jsonify({"error": f"Failed to create campaign: {str(e)}"}), 500
-
-
-@api_bp.route("/questions", methods=["POST"])
-# @admin_required
-def create_question():
-    data = request.json
-
-    # Validate required fields
-    if not data or "campaign_id" not in data or "title" not in data:
-        return jsonify({"error": "Required fields missing: campaign_id, title"}), 400
-
-    # Ensure ID is a string
-    campaign_id = str(data.get("campaign_id"))
-
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-
-        # Verify that the campaign exists
-        cursor.execute("SELECT id FROM campaigns WHERE id = ?", (campaign_id,))
-        if not cursor.fetchone():
-            conn.close()
-            return jsonify({"error": "Campaign not found"}), 404
-
-        # Generate a unique ID for the question
-        question_id = str(uuid.uuid4())
-
-        # Insert the question
-        cursor.execute(
-            """
-            INSERT INTO questions (id, campaign_id, title, body, scoring_prompt, max_points)
-            VALUES (?, ?, ?, ?, ?, ?) RETURNING *
-        """,
-            (
-                question_id,
-                campaign_id,
-                data.get("title", ""),
-                data.get("body", ""),
-                data.get("scoring_prompt", ""),
-                data.get("max_points", 0),
-            ),
-        )
-
-        # Get the newly created question
-        new_question = cursor.fetchone()
-        conn.commit()
-
-        # Prepare response with string IDs
-        columns = ["id", "campaign_id", "title", "body", "scoring_prompt", "max_points"]
-        result = map_row_to_dict(new_question, columns)
-
-        conn.close()
-        return jsonify(result), 201
-
-    except Exception as e:
-        if conn:
-            conn.rollback()
-            conn.close()
-        return jsonify({"error": f"Failed to create question: {str(e)}"}), 500
-
-
-@api_bp.route("/submissions", methods=["POST"])
-def create_submission():
-    # Validate request data
-    data = request.get_json()
-    if not data or "campaign_id" not in data or "user_id" not in data:
-        return jsonify({"error": "campaign_id and user_id are required"}), 400
-
-    # Ensure IDs are strings
-    campaign_id = str(data["campaign_id"])
-    user_id = str(data["user_id"])
-
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-
-        # Check if campaign exists
-        cursor.execute("SELECT * FROM campaigns WHERE id = ?", (campaign_id,))
-        campaign = cursor.fetchone()
-        if not campaign:
-            conn.close()
-            return jsonify({"error": "Campaign not found"}), 404
-
-        # Check if user exists
-        cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
-        user = cursor.fetchone()
-        if not user:
-            conn.close()
-            return jsonify({"error": "User not found"}), 404
-
-        # Generate UUID using Python's uuid module
-        submission_id = str(uuid.uuid4())
-
-        # Create submission with UUID, campaign_id, and user_id
-        cursor.execute(
-            """
-            INSERT INTO submissions 
-            (id, campaign_id, user_id, resume_text) 
-            VALUES (?, ?, ?, ?) 
-            RETURNING *
-            """,
-            (submission_id, campaign_id, user_id, data.get("resume_text", "")),
-        )
         submission = cursor.fetchone()
-        conn.commit()
 
-        # Map to dictionary with string IDs
-        columns = [
-            "id",
-            "campaign_id",
-            "user_id",
-            "created_at",
-            "is_complete",
-            "completed_at",
-            "total_points",
-            "resume_path",
-            "resume_text",
-        ]
-        result = map_row_to_dict(submission, columns)
+        if not submission:
+            return jsonify({"error": "Submission not found"}), 404
+
+        # Get submission answers with question details
+        cursor.execute(
+            """
+            SELECT sa.*, q.title as question_title, q.max_points
+            FROM submission_answers sa
+            JOIN questions q ON sa.question_id = q.id
+            WHERE sa.submission_id = ?
+            ORDER BY q.id
+            """,
+            (submission_id,),
+        )
+
+        answers = cursor.fetchall()
 
         conn.close()
-        return jsonify(result), 201
+
+        # Return combined data
+        return jsonify({"submission": submission, "answers": answers})
+
     except Exception as e:
-        if conn:
-            conn.rollback()
-            conn.close()
-        return jsonify({"error": str(e)}), 500
+        print(f"Error getting submission: {e}")
+        return jsonify({"error": "Failed to get submission"}), 500
 
 
 @api_bp.route("/submission_answers", methods=["POST"])
@@ -1736,58 +1299,82 @@ def debug_session():
 @api_bp.route("/login", methods=["POST"])
 def login():
     """
-    Handle user login and establish session-based authentication
+    Handle user login and establish session-based authentication.
+    Always returns 200 status code with success flag in response body.
     """
-    data = request.json
-    email = data.get("email")
-    password = data.get("password")
+    try:
+        data = request.json
+        email = data.get("email")
+        password = data.get("password")
 
-    print(f"Login attempt: {email}")
+        print(f"Login attempt: {email}")
 
-    if not email or not password:
-        return jsonify({"error": "Email and password are required"}), 400
+        if not email or not password:
+            return (
+                jsonify(
+                    {"success": False, "message": "Email and password are required"}
+                ),
+                200,
+            )
 
-    conn = get_db_connection()
-    # Set row factory to return dictionaries
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
+        conn = get_db_connection()
+        # Set row factory to return dictionaries
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
 
-    cursor.execute("SELECT * FROM users WHERE email = ?", (email,))
-    user = cursor.fetchone()
-    conn.close()
+        cursor.execute("SELECT * FROM users WHERE email = ?", (email,))
+        user = cursor.fetchone()
+        conn.close()
 
-    if not user:
-        print(f"User not found: {email}")
-        return jsonify({"error": "Invalid credentials"}), 401
+        if not user:
+            print(f"User not found: {email}")
+            return (
+                jsonify({"success": False, "message": "Invalid email or password"}),
+                200,
+            )
 
-    # Use check_password_hash for secure password verification
-    if not check_password_hash(user["password_hash"], password):
-        print(f"Invalid password for: {email}")
-        return jsonify({"error": "Invalid credentials"}), 401
+        # Use check_password_hash for secure password verification
+        if not check_password_hash(user["password_hash"], password):
+            print(f"Invalid password for: {email}")
+            return (
+                jsonify({"success": False, "message": "Invalid email or password"}),
+                200,
+            )
 
-    # Make session permanent
-    session.permanent = True
+        # Make session permanent
+        session.permanent = True
 
-    # Store user info in session
-    session["user_id"] = str(user["id"])
-    session["email"] = user["email"]
-    session["name"] = user["name"]
-    session["is_admin"] = bool(user["is_admin"])  # Ensure boolean value
+        # Store user info in session
+        session["user_id"] = str(user["id"])
+        session["email"] = user["email"]
+        session["name"] = user["name"]
+        session["is_admin"] = bool(user["is_admin"])  # Ensure boolean value
 
-    print(f"Login successful for: {email}")
-    print(f"Session after login: {session}")
-    print(f"Admin status: {session.get('is_admin')}")  # Debug log
+        print(f"Login successful for: {email}")
+        print(f"Session after login: {session}")
+        print(f"Admin status: {session.get('is_admin')}")  # Debug log
 
-    # Return user data with redirect URL
-    return jsonify(
-        {
-            "id": str(user["id"]),
-            "email": user["email"],
-            "name": user["name"],
-            "is_admin": bool(user["is_admin"]),
-            "redirect_to": "/admin" if bool(user["is_admin"]) else "/candidate",
-        }
-    )
+        # Return user data with redirect URL
+        return (
+            jsonify(
+                {
+                    "success": True,
+                    "id": str(user["id"]),
+                    "email": user["email"],
+                    "name": user["name"],
+                    "is_admin": bool(user["is_admin"]),
+                    "redirect_to": "/admin" if bool(user["is_admin"]) else "/candidate",
+                }
+            ),
+            200,
+        )
+
+    except Exception as e:
+        print(f"Error during login: {str(e)}")
+        return (
+            jsonify({"success": False, "message": "An error occurred during login"}),
+            200,
+        )
 
 
 @api_bp.route("/profile", methods=["PUT"])
@@ -2514,10 +2101,14 @@ def get_livekit_token():
 @api_bp.route("/test-campaigns", methods=["POST", "OPTIONS"])
 def test_create_campaign():
     if request.method == "OPTIONS":
-        response = jsonify({})
-        response.headers.add("Access-Control-Allow-Origin", "*")
-        response.headers.add("Access-Control-Allow-Headers", "Content-Type")
-        response.headers.add("Access-Control-Allow-Methods", "POST, OPTIONS")
+        response = jsonify({"status": "ok"})
+        response.headers.add("Access-Control-Allow-Origin", "http://localhost:3000")
+        response.headers.add(
+            "Access-Control-Allow-Headers",
+            "Content-Type,Authorization,X-Requested-With,Accept",
+        )
+        response.headers.add("Access-Control-Allow-Methods", "POST,OPTIONS")
+        response.headers.add("Access-Control-Allow-Credentials", "true")
         return response, 200
 
     try:
@@ -2627,7 +2218,8 @@ def test_create_campaign():
                     },
                 }
             )
-            response.headers.add("Access-Control-Allow-Origin", "*")
+            response.headers.add("Access-Control-Allow-Origin", "http://localhost:3000")
+            response.headers.add("Access-Control-Allow-Credentials", "true")
             return response, 201
 
         except Exception as e:
@@ -2642,7 +2234,8 @@ def test_create_campaign():
         response = jsonify(
             {"success": False, "message": f"Failed to create campaign: {str(e)}"}
         )
-        response.headers.add("Access-Control-Allow-Origin", "*")
+        response.headers.add("Access-Control-Allow-Origin", "http://localhost:3000")
+        response.headers.add("Access-Control-Allow-Credentials", "true")
         return response, 400
 
 
