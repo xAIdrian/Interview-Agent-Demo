@@ -114,9 +114,9 @@ const EditCampaignPage = () => {
         `${API_URL}/api/campaigns/${campaignId}`
       );
       
-      // Fetch questions for this campaign
+      // Fetch questions for this campaign using submission_answers
       const questionsResponse = await axios.get(
-        `${API_URL}/api/questions?campaign_id=${campaignId}`
+        `${API_URL}/api/submission_answers?campaign_id=${campaignId}`
       );
 
       // Fetch submissions for this campaign
@@ -125,7 +125,13 @@ const EditCampaignPage = () => {
       );
       
       const campaignData = campaignResponse.data;
-      const questionsData = questionsResponse.data;
+      const questionsData = questionsResponse.data.map((answer: any) => ({
+        id: answer.question_id,
+        title: answer.question_title,
+        body: answer.body || answer.question_title,
+        scoring_prompt: answer.scoring_prompt || '',
+        max_points: parseInt(answer.max_points) || 10
+      }));
       const submissionsData = submissionsResponse.data.map((submission: any) => ({
         ...submission,
         id: String(submission.id),
@@ -140,13 +146,7 @@ const EditCampaignPage = () => {
         job_description: campaignData.job_description || '',
         max_user_submissions: parseInt(campaignData.max_user_submissions),
         is_public: Boolean(campaignData.is_public),
-        questions: questionsData.map((q: any) => ({
-          id: q.id.toString(),
-          title: q.title,
-          body: q.body || '',
-          scoring_prompt: q.scoring_prompt || '',
-          max_points: parseInt(q.max_points) || 10
-        }))
+        questions: questionsData
       });
 
       setSubmissions(submissionsData);

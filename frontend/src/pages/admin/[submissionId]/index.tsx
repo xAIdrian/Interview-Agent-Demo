@@ -85,14 +85,20 @@ const SubmissionPage = () => {
             // Use the explicit submission_id parameter to avoid ambiguity
             const answersResponse = await axios.get(`/api/submission_answers?submission_id=${submissionId}`);
             
-            // Fetch questions for the campaign to get question titles
-            const questionsResponse = await axios.get(`/api/questions?campaign_id=${submissionData.campaign_id}`);
+            // Get question details from the answers
+            const questionsData = answersResponse.data.map((answer: any) => ({
+              id: answer.question_id,
+              title: answer.question_title,
+              body: answer.body || answer.question_title,
+              scoring_prompt: answer.scoring_prompt || '',
+              max_points: answer.max_points
+            }));
             
-            setQuestions(questionsResponse.data);
+            setQuestions(questionsData);
             
             // Merge question titles with submission answers
             const answersWithQuestionTitles = answersResponse.data.map((answer: SubmissionAnswer) => {
-              const matchingQuestion = questionsResponse.data.find(
+              const matchingQuestion = questionsData.find(
                 (q: Question) => q.id === answer.question_id
               );
               return {

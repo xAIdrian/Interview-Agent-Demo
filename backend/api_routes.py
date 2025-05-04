@@ -114,95 +114,68 @@ def build_filter_query(args):
 @api_bp.route("/users", methods=["GET", "POST"])
 def handle_users():
     if request.method == "GET":
-        conn = get_db_connection()
-        cursor = conn.cursor()
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
 
-        filter_query, filter_values = build_filter_query(request.args)
-        cursor.execute(f"SELECT * FROM users {filter_query}", filter_values)
+            filter_query, filter_values = build_filter_query(request.args)
+            cursor.execute(f"SELECT * FROM users {filter_query}", filter_values)
 
-        users = cursor.fetchall()
-        columns = ["id", "email", "name", "password_hash", "is_admin"]
-        result = [map_row_to_dict(user, columns) for user in users]
+            users = cursor.fetchall()
+            columns = ["id", "email", "name", "password_hash", "is_admin"]
+            result = [map_row_to_dict(user, columns) for user in users]
 
-        conn.close()
-        return jsonify(result)
+            conn.close()
+            return jsonify(result)
+        except Exception as e:
+            if "conn" in locals():
+                conn.close()
+            return jsonify({"error": str(e)}), 500
 
     elif request.method == "POST":
         try:
             data = request.json
-
-            # Validate required fields
-            required_fields = ["name", "email"]
-            for field in required_fields:
-                if not data.get(field):
-                    return jsonify({"error": f"{field} is required"}), 400
-
             conn = get_db_connection()
             cursor = conn.cursor()
 
-            # Check if user with this email already exists
-            cursor.execute("SELECT * FROM users WHERE email = ?", (data["email"],))
-            existing_user = cursor.fetchone()
+            # Validate required fields
+            required_fields = ["email", "password", "name"]
+            for field in required_fields:
+                if field not in data:
+                    return jsonify({"error": f"Missing required field: {field}"}), 400
 
-            if existing_user:
-                # Return existing user data with 200 status code
-                columns = [
-                    "id",
-                    "email",
-                    "name",
-                    "is_admin",
-                ]  # Removed phone_number from columns
-                result = map_row_to_dict(existing_user, columns)
-                conn.close()
-                return jsonify({"user": result, "message": "User already exists"}), 200
+            # Check if email already exists
+            cursor.execute("SELECT id FROM users WHERE email = ?", (data["email"],))
+            if cursor.fetchone():
+                return jsonify({"error": "Email already exists"}), 400
 
-            # Generate a random password if not provided
-            if not data.get("password"):
-                password = "".join(
-                    random.choices(string.ascii_letters + string.digits, k=12)
-                )
-                data["password"] = password
+            # Hash password
+            password_hash = generate_password_hash(data["password"])
 
-            # Generate UUID for new user
+            # Generate UUID in Python
             user_id = str(uuid.uuid4())
 
             # Insert new user
             cursor.execute(
                 """
-                INSERT INTO users (id, name, email, password_hash, is_admin)
+                INSERT INTO users (id, email, name, password_hash, is_admin)
                 VALUES (?, ?, ?, ?, ?)
                 """,
                 (
                     user_id,
-                    data["name"],
                     data["email"],
-                    generate_password_hash(data["password"], method="pbkdf2:sha256"),
+                    data["name"],
+                    password_hash,
                     data.get("is_admin", False),
                 ),
             )
 
             conn.commit()
-
-            # Fetch the created user
-            cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
-            new_user = cursor.fetchone()
-            columns = ["id", "email", "name", "is_admin"]
-            result = map_row_to_dict(new_user, columns)
-
-            conn.close()
-
-            # Include the generated password in response if one was generated
-            if not data.get("password"):
-                result["generated_password"] = password
-
-            return (
-                jsonify({"user": result, "message": "User created successfully"}),
-                201,
-            )
-
+            return jsonify({"message": "User created successfully", "id": user_id}), 201
         except Exception as e:
             print(f"Error creating user: {e}")
             if "conn" in locals():
+                conn.rollback()
                 conn.close()
             return jsonify({"error": f"Failed to create user: {str(e)}"}), 500
 
@@ -244,37 +217,40 @@ def handle_campaigns():
         cursor = conn.cursor()
 
         try:
-            # Only fetch campaigns created by or assigned to the specified user
             if user_id:
+                # Only fetch campaigns created by or assigned to the specified user
                 cursor.execute(
                     """
                     SELECT DISTINCT c.* 
                     FROM campaigns c
                     LEFT JOIN campaign_assignments ca ON c.id = ca.campaign_id
-                    WHERE c.created_by = ? OR ca.user_id = ?
-                """,
+                    WHERE c.creator_id = ? OR ca.user_id = ?
+                    """,
                     (user_id, user_id),
                 )
             else:
                 # If no user_id, fetch all campaigns
                 cursor.execute("SELECT * FROM campaigns")
 
-            campaigns = cursor.fetchall()
-            columns = [
-                "id",
-                "title",
-                "max_user_submissions",
-                "max_points",
-                "is_public",
-                "campaign_context",
-                "job_description",
-                "created_by",
-                "created_at",
-                "updated_at",
-            ]
-            result = [map_row_to_dict(campaign, columns) for campaign in campaigns]
-            conn.close()
-            return jsonify(result)
+                campaigns = cursor.fetchall()
+                columns = [
+                    "id",
+                    "title",
+                    "max_user_submissions",
+                    "max_points",
+                    "is_public",
+                    "campaign_context",
+                    "job_description",
+                    "creator_id",
+                    "created_at",
+                    "updated_at",
+                ]
+
+                # Map rows to dictionaries with string IDs
+                result = [map_row_to_dict(campaign, columns) for campaign in campaigns]
+
+                conn.close()
+                return jsonify(result)
         except Exception as e:
             conn.close()
             return jsonify({"error": str(e)}), 500
@@ -460,7 +436,7 @@ def handle_submissions():
             if where_clause:
                 query += " " + where_clause
 
-            # Execute query with parameters
+                # Execute query with parameters
             cursor.execute(query, list(params) if params else [])
             rows = cursor.fetchall()
 
@@ -475,7 +451,6 @@ def handle_submissions():
 
             conn.close()
             return jsonify(submissions)
-
         except Exception as e:
             print("Error in get_submissions:", str(e))
             if "conn" in locals():
@@ -488,59 +463,25 @@ def handle_submissions():
             conn = get_db_connection()
             cursor = conn.cursor()
 
-            # First, check if user exists with the provided email
-            cursor.execute("SELECT id FROM users WHERE email = ?", (data.get("email"),))
-            user = cursor.fetchone()
-
-            if user:
-                user_id = user[0]
-            else:
-                # Create new user if doesn't exist
-                user_id = str(uuid.uuid4())
-                cursor.execute(
-                    """
-                    INSERT INTO users (id, email, name, password_hash, is_admin)
-                    VALUES (?, ?, ?, ?, ?)
-                    """,
-                    (
-                        user_id,
-                        data.get("email"),
-                        data.get("name"),
-                        generate_password_hash(
-                            "defaultpassword", method="pbkdf2:sha256"
-                        ),
-                        False,
-                    ),
-                )
-
             # Generate UUID for new submission
             submission_id = str(uuid.uuid4())
 
-            # Insert new submission with the user_id
+            # Insert new submission
             cursor.execute(
                 """
-                INSERT INTO submissions (id, campaign_id, user_id, created_at, is_complete, total_points)
-                VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?, ?)
+                INSERT INTO submissions (id, campaign_id, user_id, created_at, updated_at)
+                VALUES (?, ?, ?, datetime('now'), datetime('now'))
                 """,
-                (
-                    submission_id,
-                    data.get("campaign_id"),
-                    user_id,
-                    False,
-                    None,
-                ),
+                (submission_id, data["campaign_id"], data["user_id"]),
             )
 
             conn.commit()
-            conn.close()
-
             return (
                 jsonify(
                     {"message": "Submission created successfully", "id": submission_id}
                 ),
                 201,
             )
-
         except Exception as e:
             print(f"Error creating submission: {e}")
             if "conn" in locals():
@@ -550,53 +491,72 @@ def handle_submissions():
 
 
 @api_bp.route("/submission_answers", methods=["GET"])
-# @admin_required
 def get_submission_answers():
-    # Get user identity from session
-    user_id = session.get("user_id")
-    is_admin = session.get("is_admin", False)
+    try:
+        # Get user identity from session
+        user_id = session.get("user_id")
+        is_admin = session.get("is_admin", False)
 
-    conn = get_db_connection()
-    cursor = conn.cursor()
+        conn = get_db_connection()
+        cursor = conn.cursor()
 
-    # Build query with filters
-    args = request.args.to_dict()
+        # Build query with filters
+        args = request.args.to_dict()
 
-    # If not admin, validate ownership of submissions before fetching answers
-    if not is_admin and "submission_id" in args:
-        # Check if the submission belongs to the current user
-        submission_id = args["submission_id"]
-        cursor.execute("SELECT user_id FROM submissions WHERE id = ?", (submission_id,))
-        submission = cursor.fetchone()
+        # If not admin, validate ownership of submissions before fetching answers
+        if not is_admin and "submission_id" in args:
+            # Check if the submission belongs to the current user
+            submission_id = args["submission_id"]
+            cursor.execute(
+                "SELECT user_id FROM submissions WHERE id = ?", (submission_id,)
+            )
+            submission = cursor.fetchone()
 
-        if not submission or submission[0] != user_id:
+        # Build base query with proper table aliases
+        base_query = """
+            SELECT sa.*, q.title as question_title, q.max_points, q.body
+            FROM submission_answers sa
+            JOIN questions q ON sa.question_id = q.id
+        """
+
+        # Add WHERE clause based on filters
+        where_clauses = []
+        filter_values = []
+
+        if "submission_id" in args:
+            where_clauses.append("sa.submission_id = ?")
+            filter_values.append(args["submission_id"])
+
+        if where_clauses:
+            base_query += " WHERE " + " AND ".join(where_clauses)
+
+        # Execute the query
+        cursor.execute(base_query, filter_values)
+        submission_answers = cursor.fetchall()
+
+        columns = [
+            "id",
+            "submission_id",
+            "question_id",
+            "video_path",
+            "transcript",
+            "score",
+            "score_rationale",
+            "question_title",
+            "max_points",
+            "body",
+        ]
+
+        # Map rows to dictionaries with string IDs
+        result = [map_row_to_dict(answer, columns) for answer in submission_answers]
+
+        conn.close()
+        return jsonify(result)
+    except Exception as e:
+        print(f"Error getting submission answers: {e}")
+        if "conn" in locals():
             conn.close()
-            return jsonify({"error": "Access denied"}), 403
-
-    # Build and execute query
-    base_query = "SELECT * FROM submission_answers"
-    if args:
-        filter_query, filter_values = build_filter_query(args)
-        cursor.execute(f"{base_query} {filter_query}", filter_values)
-    else:
-        cursor.execute(base_query)
-
-    submission_answers = cursor.fetchall()
-    columns = [
-        "id",
-        "submission_id",
-        "question_id",
-        "video_path",
-        "transcript",
-        "score",
-        "score_rationale",
-    ]
-
-    # Map rows to dictionaries with string IDs
-    result = [map_row_to_dict(answer, columns) for answer in submission_answers]
-
-    conn.close()
-    return jsonify(result)
+        return jsonify({"error": f"Failed to get submission answers: {str(e)}"}), 500
 
 
 @api_bp.route("/public_campaigns", methods=["GET"])
@@ -622,8 +582,8 @@ def get_public_campaigns():
     return jsonify(result)
 
 
-@api_bp.route("/submissions/<submission_id>", methods=["GET"])
-def get_submission_by_id(submission_id):
+@api_bp.route("/submissions/<string:id>", methods=["GET"])
+def get_submission_by_id(id):
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -631,12 +591,12 @@ def get_submission_by_id(submission_id):
         # Get submission with user information
         cursor.execute(
             """
-            SELECT s.*, u.email as user_email, u.name as user_name
+                SELECT s.*, u.email as user_email, u.name as user_name
             FROM submissions s
             JOIN users u ON s.user_id = u.id
             WHERE s.id = ?
-            """,
-            (submission_id,),
+        """,
+            (id,),
         )
 
         submission = cursor.fetchone()
@@ -644,16 +604,16 @@ def get_submission_by_id(submission_id):
         if not submission:
             return jsonify({"error": "Submission not found"}), 404
 
-        # Get submission answers with question details
+            # Get submission answers with question details
         cursor.execute(
             """
-            SELECT sa.*, q.title as question_title, q.max_points
+                SELECT sa.*, q.title as question_title, q.max_points
             FROM submission_answers sa
             JOIN questions q ON sa.question_id = q.id
             WHERE sa.submission_id = ?
-            ORDER BY q.id
-            """,
-            (submission_id,),
+                ORDER BY q.id
+        """,
+            (id,),
         )
 
         answers = cursor.fetchall()
@@ -662,9 +622,10 @@ def get_submission_by_id(submission_id):
 
         # Return combined data
         return jsonify({"submission": submission, "answers": answers})
-
     except Exception as e:
         print(f"Error getting submission: {e}")
+        if "conn" in locals():
+            conn.close()
         return jsonify({"error": "Failed to get submission"}), 500
 
 
@@ -797,83 +758,31 @@ def update_table(table, id, data):
 # PUT routes
 @api_bp.route("/users/<string:id>", methods=["PUT"])
 def update_user(id):
-    data = request.json
-
-    # Ensure ID is a string
-    user_id = str(id)
-
-    if not data:
-        return jsonify({"error": "No data provided"}), 400
-
-    # Extract user data
-    email = data.get("email")
-    name = data.get("name")
-    password = data.get("password")
-    is_admin = data.get("is_admin")
-
-    # Validate email
-    if email and not re.match(r"[^@]+@[^@]+\.[^@]+", email):
-        return jsonify({"error": "Invalid email format"}), 400
-
     try:
+        data = request.json
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        # First check if user exists
-        cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
-        existing_user = cursor.fetchone()
-        if not existing_user:
+        # First check if the user exists
+        cursor.execute("SELECT id FROM users WHERE id = ?", (id,))
+        if not cursor.fetchone():
             conn.close()
             return jsonify({"error": "User not found"}), 404
 
-        # Start building the update query
-        update_parts = []
-        params = []
+        # Update the user fields
+        if data:
+            set_clause = ", ".join([f"{key} = ?" for key in data.keys()])
+            values = list(data.values()) + [id]
+            sql = f"UPDATE users SET {set_clause} WHERE id = ?"
+            cursor.execute(sql, values)
 
-        if email:
-            update_parts.append("email = ?")
-            params.append(email)
-
-        if name:
-            update_parts.append("name = ?")
-            params.append(name)
-
-        if password:
-            password_hash = generate_password_hash(password, method="pbkdf2:sha256")
-            update_parts.append("password_hash = ?")
-            params.append(password_hash)
-
-        if is_admin is not None:
-            update_parts.append("is_admin = ?")
-            params.append(is_admin)
-
-        if not update_parts:
-            conn.close()
-            return jsonify({"error": "No fields to update"}), 400
-
-        # Finalize and execute the update query
-        query = f"UPDATE users SET {', '.join(update_parts)} WHERE id = ?"
-        params.append(user_id)
-
-        cursor.execute(query, params)
         conn.commit()
-
-        # Fetch the updated user
-        cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
-        updated_user = cursor.fetchone()
-        conn.close()
-
-        if updated_user:
-            columns = ["id", "email", "name", "password_hash", "is_admin"]
-            result = map_row_to_dict(updated_user, columns)
-            return jsonify(result)
-        else:
-            return jsonify({"error": "User not found after update"}), 404
-
+        return jsonify({"message": "User updated successfully"}), 200
     except Exception as e:
-        if conn:
-            conn.close()
-        return jsonify({"error": f"Failed to update user: {str(e)}"}), 500
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
 
 
 @api_bp.route("/campaigns/<string:id>", methods=["PUT"])

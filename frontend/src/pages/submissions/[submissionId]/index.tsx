@@ -65,6 +65,19 @@ interface Submission {
   resume_analysis?: ResumeAnalysis;
 }
 
+interface SubmissionAnswer {
+  id: string;
+  submission_id: string;
+  question_id: string;
+  video_path: string;
+  transcript: string;
+  score: number | null;
+  score_rationale: string;
+  question_title: string;
+  max_points: number;
+  body: string;
+}
+
 // Scoring Display component
 function ScoringDisplay({ submission }: { submission: Submission }) {
   return (
@@ -174,139 +187,56 @@ function ScoringDisplay({ submission }: { submission: Submission }) {
 
 const SubmissionDetailsPage = () => {
   const router = useRouter();
-  const [returnToCampaign, setReturnToCampaign] = useState<string | null>(null);
-  const [submissionId, setSubmissionId] = useState<string | null>(null);
-  
-  // Handle router query updates
-  useEffect(() => {
-    if (router.isReady) {
-      const { submissionId: sid, returnToCampaign: cid } = router.query;
-      console.log('🚀 ~ Router query params:', router.query);
-      console.log('🚀 ~ submissionId:', sid);
-      console.log('🚀 ~ returnToCampaign:', cid);
-      
-      setSubmissionId(sid as string);
-      setReturnToCampaign(cid as string);
-    }
-  }, [router.isReady, router.query]);
-  
+  const { submissionId, returnToCampaign } = router.query;
   const [submission, setSubmission] = useState<Submission | null>(null);
+  const [submissionAnswers, setSubmissionAnswers] = useState<Answer[]>([]);
+  const [detailedAnswers, setDetailedAnswers] = useState<SubmissionAnswer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [isDirty, setIsDirty] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [savingError, setSavingError] = useState('');
+  const [questions, setQuestions] = useState<Question[]>([]);
 
-  // Fetch submission data
-  useEffect(() => {
-    const fetchSubmission = async () => {
-      if (!submissionId) return;
-      
-      try {
-        setIsLoading(true);
-        setError('');
-        
-        // Fetch submission details with related data
-        const response = await axios.get(`${API_BASE_URL}/api/submissions/${submissionId}?include=user,campaign,answers`);
-        
-        // Ensure all IDs are strings for consistent handling
-        const submissionWithStringIds = {
-          ...response.data,
-          id: String(response.data.id),
-          campaign_id: String(response.data.campaign_id),
-          user_id: String(response.data.user_id),
-        };
-        
-        if (submissionWithStringIds.user) {
-          submissionWithStringIds.user.id = String(submissionWithStringIds.user.id);
-        }
-        
-        if (submissionWithStringIds.campaign) {
-          submissionWithStringIds.campaign.id = String(submissionWithStringIds.campaign.id);
-        }
-        
-        // Fetch resume analysis data
-        try {
-          const resumeAnalysisResponse = await axios.get(`${API_BASE_URL}/api/resume_analysis/${submissionId}`);
-          if (resumeAnalysisResponse.data) {
-            submissionWithStringIds.resume_analysis = {
-              strengths: resumeAnalysisResponse.data.strengths || [],
-              weaknesses: resumeAnalysisResponse.data.weaknesses || [],
-              overall_fit: resumeAnalysisResponse.data.overall_fit || '',
-              percent_match: resumeAnalysisResponse.data.percent_match || 0,
-              percent_match_reason: resumeAnalysisResponse.data.percent_match_reason || ''
-            };
-          }
-        } catch (resumeError) {
-          if (axios.isAxiosError(resumeError) && resumeError.response?.status === 404) {
-            // 404 is expected when no resume analysis exists
-            console.log('No resume analysis found for this submission');
-          } else {
-            console.error('Error fetching resume analysis:', resumeError);
-          }
-          // Don't set error state here, just log it as resume analysis is optional
-        }
-        
-        // Process answers
-        if (submissionWithStringIds.answers) {
-          submissionWithStringIds.answers = await Promise.all(submissionWithStringIds.answers.map(async (answer: any) => {
-            // Convert IDs to strings
-            const answerWithStringIds = {
-              ...answer,
-              id: String(answer.id),
-              question_id: answer.question_id ? String(answer.question_id) : null,
-            };
-            
-            // Only fetch question details if we have a valid question_id
-            if (answerWithStringIds.question_id) {
-              try {
-                const questionResponse = await axios.get(`${API_BASE_URL}/api/questions/${answerWithStringIds.question_id}`);
-                answerWithStringIds.question = {
-                  ...questionResponse.data,
-                  id: String(questionResponse.data.id)
-                };
-              } catch (err) {
-                console.error(`Error fetching question ${answerWithStringIds.question_id}:`, err);
-                // Set a default question object if fetch fails
-                answerWithStringIds.question = {
-                  id: answerWithStringIds.question_id,
-                  title: 'Question Not Found',
-                  body: 'The question details could not be loaded.',
-                  max_points: 0
-                };
-              }
-            } else {
-              // Set a default question object for answers without question_id
-              answerWithStringIds.question = {
-                id: 'unknown',
-                title: 'Untitled Question',
-                body: 'Question details not available',
-                max_points: 0
-              };
-            }
-            
-            return answerWithStringIds;
-          }));
-        }
-        
-        setSubmission(submissionWithStringIds);
-        AuthLogger.info(`Loaded submission ${submissionId} details successfully`);
-      } catch (err) {
-        console.error('Error fetching submission details:', err);
-        
-        if (axios.isAxiosError(err)) {
-          setError(err.response?.data?.error || 'Failed to load submission details.');
-          AuthLogger.error('Error fetching submission:', err.response?.status, err.response?.data);
-        } else {
-          setError('An unexpected error occurred.');
-          AuthLogger.error('Unexpected error fetching submission details:', err);
-        }
-      } finally {
-        setIsLoading(false);
+  const fetchSubmissionData = async () => {
+    if (!submissionId) return;
+    try {
+      setIsLoading(true);
+      const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/submissions/${submissionId}`);
+      setSubmission(response.data);
+      if (response.data.answers) {
+        setSubmissionAnswers(response.data.answers);
       }
-    };
+    } catch (err) {
+      setError('Failed to fetch submission data');
+      console.error('Error fetching submission:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-    fetchSubmission();
+  const fetchDetailedAnswers = async () => {
+    if (!submissionId) return;
+    try {
+      const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/submission_answers`, {
+        params: { submission_id: submissionId }
+      });
+      setDetailedAnswers(response.data);
+    } catch (error) {
+      console.error('Error fetching detailed answers:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (submissionId) {
+      const fetchData = async () => {
+        await Promise.all([
+          fetchSubmissionData(),
+          fetchDetailedAnswers()
+        ]);
+      };
+      fetchData();
+    }
   }, [submissionId]);
 
   // Update score for a specific answer
@@ -573,78 +503,88 @@ const SubmissionDetailsPage = () => {
             </div>
           )}
           
-          {/* Answers and scoring */}
-          <div className="flex items-center gap-2">
-            <h2 className="text-xl font-bold mb-4">Questions & Answers</h2>
-            <div className="relative group">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400 cursor-help" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <div className="absolute left-0 mt-2 w-64 bg-white p-2 rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10">
-                <p className="text-xs text-gray-600">Detailed scoring of your responses to each interview question, evaluating technical knowledge, problem-solving, and communication skills.</p>
+          {/* Detailed Answers Section */}
+          <div className="mt-8">
+            <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+              <div className="px-4 py-5 sm:px-6">
+                <h2 className="text-lg leading-6 font-medium text-gray-900">Detailed Answer Analysis</h2>
+                <p className="mt-1 text-sm text-gray-500">
+                  Comprehensive view of all answers with transcripts and scoring details
+                </p>
+              </div>
+              
+              <div className="border-t border-gray-200">
+                {detailedAnswers.length > 0 ? (
+                  <div className="divide-y divide-gray-200">
+                    {detailedAnswers.map((answer, index) => (
+                      <div key={answer.id} className="p-6">
+                        <div className="mb-4">
+                          <h3 className="text-lg font-medium text-gray-900">
+                            Question {index + 1}: {answer.question_title}
+                          </h3>
+                          <p className="mt-2 text-sm text-gray-600">{answer.body}</p>
+                        </div>
+                        
+                        <div className="bg-gray-50 rounded-lg p-4 mt-4">
+                          <div className="mb-4">
+                            <h4 className="text-sm font-medium text-gray-700">Transcript:</h4>
+                            <p className="mt-2 text-sm text-gray-600 whitespace-pre-wrap">
+                              {answer.transcript || 'No transcript available'}
+                            </p>
+                          </div>
+                          
+                          {answer.video_path && (
+                            <div className="mb-4">
+                              <h4 className="text-sm font-medium text-gray-700">Video Response:</h4>
+                              <div className="mt-2">
+                                <video 
+                                  src={answer.video_path} 
+                                  controls 
+                                  className="max-w-full h-auto rounded"
+                                >
+                                  Your browser does not support the video tag.
+                                </video>
+                              </div>
+                            </div>
+                          )}
+                          
+                          <div className="border-t border-gray-200 pt-4 mt-4">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <h4 className="text-sm font-medium text-gray-700">Score:</h4>
+                                <p className="mt-1 text-lg font-semibold text-gray-900">
+                                  {answer.score !== null ? (
+                                    <span>
+                                      {answer.score} / {answer.max_points}
+                                      <span className="ml-2 text-sm font-normal text-gray-500">
+                                        ({((answer.score / answer.max_points) * 100).toFixed(1)}%)
+                                      </span>
+                                    </span>
+                                  ) : (
+                                    'Not scored'
+                                  )}
+                                </p>
+                              </div>
+                              {answer.score_rationale && (
+                                <div className="ml-6 flex-1">
+                                  <h4 className="text-sm font-medium text-gray-700">Scoring Rationale:</h4>
+                                  <p className="mt-1 text-sm text-gray-600">{answer.score_rationale}</p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="px-4 py-5 sm:px-6 text-center text-gray-500">
+                    No detailed answers available for this submission.
+                  </div>
+                )}
               </div>
             </div>
           </div>
-          
-          {submission.answers && submission.answers.length > 0 ? (
-            <div className="space-y-6">
-              {submission.answers.map((answer, index) => (
-                <div key={answer.id} className="border rounded-md p-4">
-                  <h3 className="text-lg font-semibold mb-2">
-                    {index + 1}. {answer.question?.title || 'Question'}
-                  </h3>
-                  
-                  {answer.question?.body && (
-                    <div className="mb-4 text-gray-700 bg-gray-50 p-3 rounded">
-                      <p className="font-medium mb-1">Question:</p>
-                      <p>{answer.question.body}</p>
-                    </div>
-                  )}
-                  
-                  <div className="mb-4">
-                    <p className="font-medium mb-1">Answer:</p>
-                    <div className="bg-gray-50 p-3 rounded whitespace-pre-wrap">
-                      {answer.transcript || 'No answer provided'}
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block font-medium mb-1">Score:</label>
-                      <input 
-                        type="number" 
-                        min="0" 
-                        max={answer.question?.max_points || 100} 
-                        value={answer.score === null ? '' : answer.score} 
-                        onChange={(e) => {
-                          const value = e.target.value === '' ? null : parseInt(e.target.value, 10);
-                          updateAnswerScore(answer.id, value, answer.score_rationale);
-                        }}
-                        className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                      <p className="mt-1 text-sm text-gray-500">
-                        Max: {answer.question?.max_points || 'N/A'} points
-                      </p>
-                    </div>
-                    
-                    <div>
-                      <label className="block font-medium mb-1">Score Rationale:</label>
-                      <textarea 
-                        value={answer.score_rationale || ''}
-                        onChange={(e) => updateAnswerScore(answer.id, answer.score, e.target.value)}
-                        className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 h-32"
-                        placeholder="Explain why this score was given..."
-                      />
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-md">
-              No answers available for this submission.
-            </div>
-          )}
           
           {/* Bottom save button when dirty */}
           {isDirty && (
