@@ -254,18 +254,35 @@ const SubmissionDetailsPage = () => {
             const answerWithStringIds = {
               ...answer,
               id: String(answer.id),
-              question_id: String(answer.question_id),
+              question_id: answer.question_id ? String(answer.question_id) : null,
             };
             
-            // Fetch question details for this answer
-            try {
-              const questionResponse = await axios.get(`${API_BASE_URL}/api/questions/${answerWithStringIds.question_id}`);
+            // Only fetch question details if we have a valid question_id
+            if (answerWithStringIds.question_id) {
+              try {
+                const questionResponse = await axios.get(`${API_BASE_URL}/api/questions/${answerWithStringIds.question_id}`);
+                answerWithStringIds.question = {
+                  ...questionResponse.data,
+                  id: String(questionResponse.data.id)
+                };
+              } catch (err) {
+                console.error(`Error fetching question ${answerWithStringIds.question_id}:`, err);
+                // Set a default question object if fetch fails
+                answerWithStringIds.question = {
+                  id: answerWithStringIds.question_id,
+                  title: 'Question Not Found',
+                  body: 'The question details could not be loaded.',
+                  max_points: 0
+                };
+              }
+            } else {
+              // Set a default question object for answers without question_id
               answerWithStringIds.question = {
-                ...questionResponse.data,
-                id: String(questionResponse.data.id)
+                id: 'unknown',
+                title: 'Untitled Question',
+                body: 'Question details not available',
+                max_points: 0
               };
-            } catch (err) {
-              console.error(`Error fetching question ${answerWithStringIds.question_id}:`, err);
             }
             
             return answerWithStringIds;

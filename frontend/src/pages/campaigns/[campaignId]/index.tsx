@@ -29,6 +29,7 @@ interface Question {
   body: string;
   scoring_prompt: string;
   max_points: number;
+  order_index?: number;
 }
 
 interface SubmissionStatus {
@@ -88,14 +89,33 @@ const CampaignDetailsPage = () => {
 
       try {
         setIsLoading(true);
+        setError('');
+        
         // Fetch campaign details
         const campaignResponse = await axios.get(`${API_BASE_URL}/api/campaigns/${campaignId}`);
         setCampaign(campaignResponse.data);
         
-        // Fetch questions for this campaign
-        const questionsResponse = await axios.get(`${API_BASE_URL}/api/questions?campaign_id=${campaignId}`);
-        setQuestions(questionsResponse.data || []);
-        
+        // Fetch questions for this campaign with proper error handling
+        try {
+          const questionsResponse = await axios.get(`${API_BASE_URL}/api/questions`, {
+            params: { campaign_id: campaignId }
+          });
+          
+          if (questionsResponse.data && Array.isArray(questionsResponse.data)) {
+            // Sort questions by their order if available
+            const sortedQuestions = questionsResponse.data.sort((a, b) => 
+              (a.order_index || 0) - (b.order_index || 0)
+            );
+            setQuestions(sortedQuestions);
+          } else {
+            console.error('Invalid questions data format:', questionsResponse.data);
+            setQuestions([]);
+          }
+        } catch (questionsError) {
+          console.error('Error fetching questions:', questionsError);
+          setQuestions([]);
+        }
+
         // If admin, fetch submission count
         if (isAdmin) {
           const submissionsResponse = await axios.get(`${API_BASE_URL}/api/submissions?campaign_id=${campaignId}`);
@@ -310,30 +330,56 @@ const CampaignDetailsPage = () => {
             </div>
           )}
 
-          {isAdmin && (
-            <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-              <div className="px-4 py-5 sm:px-6">
-                <h2 className="text-lg leading-6 font-medium text-gray-900">Interview Questions</h2>
-              </div>
-              <div className="border-t border-gray-200">
+          {/* Questions Section - Show for both admin and candidates */}
+          <div className="bg-white shadow overflow-hidden sm:rounded-lg mt-6">
+            <div className="px-4 py-5 sm:px-6">
+              <h2 className="text-lg leading-6 font-medium text-gray-900">
+                {isAdmin ? 'Interview Questions' : 'Position Questions'}
+              </h2>
+              <p className="mt-1 text-sm text-gray-500">
+                {isAdmin 
+                  ? 'Review and manage the questions for this campaign.' 
+                  : 'Preview of the questions you will be asked during the interview.'}
+              </p>
+            </div>
+            <div className="border-t border-gray-200">
+              {questions.length > 0 ? (
                 <ul className="divide-y divide-gray-200">
                   {questions.map((question, index) => (
                     <li key={question.id} className="px-4 py-4 sm:px-6">
                       <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">Question {index + 1}</p>
-                          <p className="text-sm text-gray-500">{question.body}</p>
+                        <div className="flex-grow">
+                          <p className="text-sm font-medium text-gray-900">
+                            Question {index + 1}: {question.title}
+                          </p>
+                          {isAdmin && (
+                            <p className="mt-1 text-xs text-gray-400">
+                              Scoring Prompt: {question.scoring_prompt}
+                            </p>
+                          )}
                         </div>
-                        <div className="text-sm text-gray-500">
-                          Max Points: {question.max_points}
-                        </div>
+                        {isAdmin && (
+                          <div className="ml-4 flex-shrink-0 text-sm text-gray-500">
+                            Max Points: {question.max_points}
+                          </div>
+                        )}
                       </div>
                     </li>
                   ))}
                 </ul>
-              </div>
+              ) : (
+                <div className="px-4 py-5 sm:px-6 text-center text-gray-500">
+                  {isLoading ? (
+                    <div className="flex justify-center items-center py-4">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-700"></div>
+                    </div>
+                  ) : (
+                    <p>No questions available for this {isAdmin ? 'campaign' : 'position'}.</p>
+                  )}
+                </div>
+              )}
             </div>
-          )}
+          </div>
         </>
       ) : null}
 
