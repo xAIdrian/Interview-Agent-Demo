@@ -122,8 +122,6 @@ def handle_users():
 
         users = cursor.fetchall()
         columns = ["id", "email", "name", "password_hash", "is_admin"]
-
-        # Use the helper function to map rows to dictionaries with string IDs
         result = [map_row_to_dict(user, columns) for user in users]
 
         conn.close()
@@ -490,10 +488,35 @@ def handle_submissions():
             conn = get_db_connection()
             cursor = conn.cursor()
 
+            # First, check if user exists with the provided email
+            cursor.execute("SELECT id FROM users WHERE email = ?", (data.get("email"),))
+            user = cursor.fetchone()
+
+            if user:
+                user_id = user[0]
+            else:
+                # Create new user if doesn't exist
+                user_id = str(uuid.uuid4())
+                cursor.execute(
+                    """
+                    INSERT INTO users (id, email, name, password_hash, is_admin)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (
+                        user_id,
+                        data.get("email"),
+                        data.get("name"),
+                        generate_password_hash(
+                            "defaultpassword", method="pbkdf2:sha256"
+                        ),
+                        False,
+                    ),
+                )
+
             # Generate UUID for new submission
             submission_id = str(uuid.uuid4())
 
-            # Insert new submission
+            # Insert new submission with the user_id
             cursor.execute(
                 """
                 INSERT INTO submissions (id, campaign_id, user_id, created_at, is_complete, total_points)
@@ -502,9 +525,9 @@ def handle_submissions():
                 (
                     submission_id,
                     data.get("campaign_id"),
-                    data.get("user_id"),
-                    data.get("is_complete", False),
-                    data.get("total_points"),
+                    user_id,
+                    False,
+                    None,
                 ),
             )
 
@@ -1338,10 +1361,6 @@ def debug_session():
 # Add a route to handle the proper login (if not already present)
 @api_bp.route("/login", methods=["POST"])
 def login():
-    """
-    Handle user login and establish session-based authentication.
-    Always returns 200 status code with success flag in response body.
-    """
     try:
         data = request.json
         email = data.get("email")
@@ -1358,7 +1377,6 @@ def login():
             )
 
         conn = get_db_connection()
-        # Set row factory to return dictionaries
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
 
@@ -1373,7 +1391,6 @@ def login():
                 200,
             )
 
-        # Use check_password_hash for secure password verification
         if not check_password_hash(user["password_hash"], password):
             print(f"Invalid password for: {email}")
             return (
@@ -1381,20 +1398,16 @@ def login():
                 200,
             )
 
-        # Make session permanent
         session.permanent = True
-
-        # Store user info in session
         session["user_id"] = str(user["id"])
         session["email"] = user["email"]
         session["name"] = user["name"]
-        session["is_admin"] = bool(user["is_admin"])  # Ensure boolean value
+        session["is_admin"] = bool(user["is_admin"])
 
         print(f"Login successful for: {email}")
         print(f"Session after login: {session}")
-        print(f"Admin status: {session.get('is_admin')}")  # Debug log
+        print(f"Admin status: {session.get('is_admin')}")
 
-        # Return user data with redirect URL
         return (
             jsonify(
                 {
