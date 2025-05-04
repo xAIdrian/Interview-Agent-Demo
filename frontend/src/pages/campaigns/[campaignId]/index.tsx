@@ -24,7 +24,6 @@ interface Campaign {
 
 interface Question {
   id: string;
-  campaign_id: string;
   title: string;
   body: string;
   scoring_prompt: string;
@@ -95,24 +94,34 @@ const CampaignDetailsPage = () => {
         const campaignResponse = await axios.get(`${API_BASE_URL}/api/campaigns/${campaignId}`);
         setCampaign(campaignResponse.data);
         
-        // Fetch questions for this campaign with proper error handling
+        // Fetch submission answers for this campaign with proper error handling
         try {
-          const questionsResponse = await axios.get(`${API_BASE_URL}/api/questions`, {
+          const answersResponse = await axios.get(`${API_BASE_URL}/api/submission_answers`, {
             params: { campaign_id: campaignId }
           });
           
-          if (questionsResponse.data && Array.isArray(questionsResponse.data)) {
-            // Sort questions by their order if available
-            const sortedQuestions = questionsResponse.data.sort((a, b) => 
+          if (answersResponse.data && Array.isArray(answersResponse.data)) {
+            // Sort answers by their order if available
+            const sortedAnswers = answersResponse.data.sort((a, b) => 
               (a.order_index || 0) - (b.order_index || 0)
             );
-            setQuestions(sortedQuestions);
+            
+            // Transform the answers to match the questions format
+            const transformedQuestions = sortedAnswers.map(answer => ({
+              id: answer.question_id,
+              title: answer.question_title,
+              max_points: answer.max_points,
+              scoring_prompt: answer.scoring_prompt || '',
+              body: answer.body || answer.question_title
+            }));
+            
+            setQuestions(transformedQuestions);
           } else {
-            console.error('Invalid questions data format:', questionsResponse.data);
+            console.error('Invalid answers data format:', answersResponse.data);
             setQuestions([]);
           }
-        } catch (questionsError) {
-          console.error('Error fetching questions:', questionsError);
+        } catch (answersError) {
+          console.error('Error fetching answers:', answersError);
           setQuestions([]);
         }
 
