@@ -135,8 +135,135 @@ const SimpleVoiceAssistant: React.FC<{ onTranscriptUpdate: (transcript: any[]) =
   );
 };
 
+const InstructionsModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => {
+  const [currentStep, setCurrentStep] = useState(1);
+  const totalSteps = 3;
+
+  const handleNext = () => {
+    if (currentStep < totalSteps) {
+      setCurrentStep(currentStep + 1);
+    } else {
+      onClose();
+    }
+  };
+
+  const handleBack = () => {
+    if (currentStep > 1) {
+      setCurrentStep(currentStep - 1);
+    }
+  };
+
+  const renderStepContent = () => {
+    switch (currentStep) {
+      case 1:
+        return (
+          <div className="space-y-4">
+            <h3 className="text-xl font-semibold text-blue-800 mb-3">Welcome to Your AI Interview! 🎯</h3>
+            <p className="text-lg text-gray-700">
+              Before we begin, let's make sure you're set up for success. This interview will be conducted by our AI interviewer,
+              who will ask you questions and evaluate your responses.
+            </p>
+            <div className="bg-blue-50 p-4 rounded-lg">
+              <h4 className="text-lg font-semibold text-blue-800 mb-2">Quick Tips for a Great Interview:</h4>
+              <ul className="space-y-3 text-blue-700">
+                <li className="flex items-start">
+                  <span className="mr-2">🎙️</span>
+                  Find a quiet space where you won't be interrupted
+                </li>
+                <li className="flex items-start">
+                  <span className="mr-2">💡</span>
+                  Take your time to provide complete, thoughtful answers
+                </li>
+                <li className="flex items-start">
+                  <span className="mr-2">🎯</span>
+                  Be yourself - we want to get to know the real you!
+                </li>
+              </ul>
+            </div>
+          </div>
+        );
+      case 2:
+        return (
+          <div className="space-y-4">
+            <h3 className="text-xl font-semibold text-blue-800 mb-3">How the Interview Works</h3>
+            <div className="space-y-4">
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <h4 className="text-lg font-semibold text-blue-800 mb-2">Interview Process:</h4>
+                <ol className="space-y-3 text-blue-700 list-decimal list-inside">
+                  <li>The AI interviewer will ask you a series of questions</li>
+                  <li>Take your time to think and respond naturally</li>
+                  <li>Your responses will be evaluated for content and clarity</li>
+                  <li>The interview will last approximately 15-20 minutes</li>
+                </ol>
+              </div>
+              <p className="text-gray-600">
+                You'll see a transcript of the conversation in real-time, helping you track the discussion.
+              </p>
+            </div>
+          </div>
+        );
+      case 3:
+        return (
+          <div className="space-y-4">
+            <h3 className="text-xl font-semibold text-blue-800 mb-3">Ready to Begin?</h3>
+            <div className="space-y-4">
+              <p className="text-lg text-gray-700">
+                You're all set to start your interview! Remember:
+              </p>
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <ul className="space-y-3 text-blue-700">
+                  <li>✓ Speak clearly and at a normal pace</li>
+                  <li>✓ Answer questions thoroughly</li>
+                  <li>✓ Stay focused and engaged</li>
+                </ul>
+              </div>
+              <p className="text-gray-600 italic">
+                "This is your moment to shine. We're here to help you showcase your best self!"
+              </p>
+            </div>
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose}>
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <h2 className="text-2xl font-bold text-gray-900">Step {currentStep} of {totalSteps}</h2>
+        </div>
+        
+        {renderStepContent()}
+        
+        <div className="flex justify-between mt-8">
+          <button
+            onClick={handleBack}
+            disabled={currentStep === 1}
+            className={`px-4 py-2 rounded ${
+              currentStep === 1
+                ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            Back
+          </button>
+          <button
+            onClick={handleNext}
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            {currentStep === totalSteps ? 'Start Interview' : 'Next'}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
 const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, room, submissionId, onDisconnect }: LiveKitInterviewComponentProps) => {
   const livekitUrl = 'wss://default-test-oyjqa9xh.livekit.cloud';
+  const [showInstructions, setShowInstructions] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isProcessingSubmission, setIsProcessingSubmission] = useState(false);
   const [transcript, setTranscript] = useState<any[]>([]);
@@ -343,38 +470,10 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
         />
       )}
       
-      {/* Interview Instructions */}
-      <div className="bg-white rounded-lg p-8 shadow-lg">
-        <h2 className="text-3xl font-bold text-blue-600 mb-6">Welcome to Your AI Interview! 🎯</h2>
-        
-        <div className="space-y-4">
-          <p className="text-lg text-gray-700">
-            Before we begin, let's make sure you're set up for success:
-          </p>
-          
-          <div className="bg-blue-50 p-4 rounded-lg">
-            <h3 className="text-xl font-semibold text-blue-800 mb-3">Quick Tips for a Great Interview:</h3>
-            <ul className="space-y-3 text-blue-700">
-              <li className="flex items-start">
-                <span className="mr-2">🎙️</span>
-                Find a quiet space where you won't be interrupted and there is no extra noise
-              </li>
-              <li className="flex items-start">
-                <span className="mr-2">💡</span>
-                Take your time to provide complete, thoughtful answers
-              </li>
-              <li className="flex items-start">
-                <span className="mr-2">🎯</span>
-                Be yourself - we want to get to know the real you!
-              </li>
-            </ul>
-          </div>
-
-          <p className="text-gray-600 italic">
-            "Remember: This is your moment to shine. We're here to help you showcase your best self!"
-          </p>
-        </div>
-      </div>
+      <InstructionsModal 
+        isOpen={showInstructions} 
+        onClose={() => setShowInstructions(false)} 
+      />
 
       {/* Interview Interface */}
       <div className="bg-white rounded-lg overflow-hidden shadow-lg">
@@ -419,7 +518,7 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
       {/* Processing Modal */}
       <Modal 
         isOpen={isProcessingSubmission}
-        title="Processing Interview"
+        onClose={() => {}}
       >
         <div className="flex flex-col items-center space-y-4">
           <Spinner size="large" />
