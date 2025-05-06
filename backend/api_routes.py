@@ -2544,3 +2544,112 @@ def get_campaign_access_code(campaign_id):
     finally:
         if conn:
             conn.close()
+
+
+@api_bp.route(
+    "/campaigns/<string:campaign_id>/validate-access-code", methods=["POST", "OPTIONS"]
+)
+def validate_submitted_access_code(campaign_id):
+    """Validate a submitted access code for a campaign."""
+    if request.method == "OPTIONS":
+        response = jsonify({"status": "ok"})
+        response.headers.add("Access-Control-Allow-Origin", "http://localhost:3000")
+        response.headers.add(
+            "Access-Control-Allow-Headers",
+            "Content-Type,Authorization,X-Requested-With,Accept",
+        )
+        response.headers.add("Access-Control-Allow-Methods", "POST,OPTIONS")
+        response.headers.add("Access-Control-Allow-Credentials", "true")
+        return response, 200
+
+    try:
+        data = request.get_json()
+        submitted_code = data.get("access_code")
+
+        if not submitted_code:
+            response = jsonify(
+                {
+                    "success": False,
+                    "message": "Access code is required",
+                    "status": "rejected",
+                }
+            )
+            response.headers.add("Access-Control-Allow-Origin", "http://localhost:3000")
+            response.headers.add("Access-Control-Allow-Credentials", "true")
+            return response, 200
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # First check if campaign exists
+        cursor.execute("SELECT id FROM campaigns WHERE id = ?", (campaign_id,))
+        if not cursor.fetchone():
+            response = jsonify(
+                {
+                    "success": False,
+                    "message": "Campaign not found",
+                    "status": "rejected",
+                }
+            )
+            response.headers.add("Access-Control-Allow-Origin", "http://localhost:3000")
+            response.headers.add("Access-Control-Allow-Credentials", "true")
+            return response, 200
+
+        # Get the stored access code
+        cursor.execute(
+            """
+            SELECT access_code 
+            FROM campaign_access_codes 
+            WHERE campaign_id = ? 
+            ORDER BY created_at DESC 
+            LIMIT 1
+            """,
+            (campaign_id,),
+        )
+        result = cursor.fetchone()
+
+        if not result:
+            response = jsonify(
+                {
+                    "success": False,
+                    "message": "No access code found for this campaign",
+                    "status": "rejected",
+                }
+            )
+            response.headers.add("Access-Control-Allow-Origin", "http://localhost:3000")
+            response.headers.add("Access-Control-Allow-Credentials", "true")
+            return response, 200
+
+        stored_code = result[0]
+        is_valid = submitted_code.strip().upper() == stored_code.strip().upper()
+
+        response = jsonify(
+            {
+                "success": True,
+                "message": (
+                    "Access code validated successfully"
+                    if is_valid
+                    else "Invalid access code"
+                ),
+                "status": "accepted" if is_valid else "rejected",
+            }
+        )
+        response.headers.add("Access-Control-Allow-Origin", "http://localhost:3000")
+        response.headers.add("Access-Control-Allow-Credentials", "true")
+        return response, 200
+
+    except Exception as e:
+        logger.error(f"Error validating access code: {str(e)}")
+        response = jsonify(
+            {
+                "success": False,
+                "message": f"Error validating access code: {str(e)}",
+                "status": "rejected",
+            }
+        )
+        response.headers.add("Access-Control-Allow-Origin", "http://localhost:3000")
+        response.headers.add("Access-Control-Allow-Credentials", "true")
+        return response, 200
+    finally:
+        if conn:
+            conn.close()
