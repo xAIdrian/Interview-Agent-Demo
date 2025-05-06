@@ -145,6 +145,18 @@ const InstructionsModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () =
   const router = useRouter();
   const { campaignId } = router.query;
 
+  // Prevent closing modal with escape key
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, []);
+
   const handleNext = async () => {
     if (currentStep === 1) {
       if (!interviewCode.trim()) {
@@ -293,45 +305,49 @@ const InstructionsModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () =
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose}>
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <h2 className="text-2xl font-bold text-gray-900">Step {currentStep} of {totalSteps}</h2>
-        </div>
-        
-        {renderStepContent()}
-        
-        <div className="flex justify-between mt-8">
-          <button
-            onClick={handleBack}
-            disabled={currentStep === 1}
-            className={`px-4 py-2 rounded ${
-              currentStep === 1
-                ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            Back
-          </button>
-          <button
-            onClick={handleNext}
-            disabled={currentStep === 1 && (isValidating || !interviewCode.trim())}
-            className={`px-4 py-2 rounded ${
-              currentStep === 1 && (isValidating || !interviewCode.trim())
-                ? 'bg-blue-400 cursor-not-allowed'
-                : 'bg-blue-600 hover:bg-blue-700'
-            } text-white`}
-          >
-            {isValidating 
-              ? 'Validating...' 
-              : currentStep === totalSteps 
-                ? 'Start Interview' 
-                : 'Next'
-            }
-          </button>
-        </div>
+    <div className="fixed inset-0 z-50" style={{ pointerEvents: 'none' }}>
+      <div style={{ pointerEvents: 'auto' }}>
+        <Modal 
+          isOpen={isOpen} 
+          onClose={() => {}} // Empty function to prevent closing
+          title={`Step ${currentStep} of ${totalSteps}`}
+        >
+          <div className="space-y-6">
+            {renderStepContent()}
+            
+            <div className="flex justify-between mt-8">
+              <button
+                onClick={handleBack}
+                disabled={currentStep === 1}
+                className={`px-4 py-2 rounded ${
+                  currentStep === 1
+                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Back
+              </button>
+              <button
+                onClick={handleNext}
+                disabled={currentStep === 1 && (isValidating || !interviewCode.trim())}
+                className={`px-4 py-2 rounded ${
+                  currentStep === 1 && (isValidating || !interviewCode.trim())
+                    ? 'bg-blue-400 cursor-not-allowed'
+                    : 'bg-blue-600 hover:bg-blue-700'
+                } text-white`}
+              >
+                {isValidating 
+                  ? 'Validating...' 
+                  : currentStep === totalSteps 
+                    ? 'Start Interview' 
+                    : 'Next'
+                }
+              </button>
+            </div>
+          </div>
+        </Modal>
       </div>
-    </Modal>
+    </div>
   );
 };
 
