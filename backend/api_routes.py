@@ -46,6 +46,7 @@ import sqlite3
 import random
 import string
 import logging
+from access_code_manager import AccessCodeManager
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -227,7 +228,7 @@ def handle_campaigns():
                     SELECT DISTINCT c.* 
                     FROM campaigns c
                     LEFT JOIN campaign_assignments ca ON c.id = ca.campaign_id
-                    WHERE c.creator_id = ? OR ca.user_id = ?
+                    WHERE c.created_by = ? OR ca.user_id = ?
                     """,
                     (user_id, user_id),
                 )
@@ -235,25 +236,25 @@ def handle_campaigns():
                 # If no user_id, fetch all campaigns
                 cursor.execute("SELECT * FROM campaigns")
 
-                campaigns = cursor.fetchall()
-                columns = [
-                    "id",
-                    "title",
-                    "max_user_submissions",
-                    "max_points",
-                    "is_public",
-                    "campaign_context",
-                    "job_description",
-                    "creator_id",
-                    "created_at",
-                    "updated_at",
-                ]
+            campaigns = cursor.fetchall()
+            columns = [
+                "id",
+                "title",
+                "max_user_submissions",
+                "max_points",
+                "is_public",
+                "campaign_context",
+                "job_description",
+                "created_by",
+                "created_at",
+                "updated_at",
+            ]
 
-                # Map rows to dictionaries with string IDs
-                result = [map_row_to_dict(campaign, columns) for campaign in campaigns]
+            # Map rows to dictionaries with string IDs
+            result = [map_row_to_dict(campaign, columns) for campaign in campaigns]
 
-                conn.close()
-                return jsonify(result)
+            conn.close()
+            return jsonify(result)
         except Exception as e:
             conn.close()
             return jsonify({"error": str(e)}), 500
@@ -1097,12 +1098,26 @@ def delete_user(id):
 def delete_campaign(id):
     """
     Delete a campaign and all associated questions, submissions, and submission answers.
+    Access codes will be automatically deleted due to ON DELETE CASCADE.
     """
     conn = get_db_connection()
     cursor = conn.cursor()
 
     try:
+        # First verify the campaign exists
+        cursor.execute("SELECT id FROM campaigns WHERE id = ?", (id,))
+        if not cursor.fetchone():
+            return jsonify({"success": False, "message": "Campaign not found"}), 404
+
+        # Delete the campaign - this will cascade to questions, submissions, and access codes
         cursor.execute("DELETE FROM campaigns WHERE id = ?", (id,))
+
+        if cursor.rowcount == 0:
+            return (
+                jsonify({"success": False, "message": "Failed to delete campaign"}),
+                400,
+            )
+
         conn.commit()
         return jsonify({"success": True, "message": "Campaign deleted successfully"})
     except Exception as e:
@@ -2151,6 +2166,10 @@ def test_create_campaign():
                     }
                 )
 
+            # Generate access code for the campaign
+            access_manager = AccessCodeManager(conn)
+            access_code = access_manager.create_access_code(campaign_id)
+
             # Commit the transaction
             conn.commit()
 
@@ -2163,7 +2182,7 @@ def test_create_campaign():
 
             # Generate direct access URL
             base_url = request.host_url.rstrip("/")
-            direct_access_url = f"{base_url}/campaigns/{campaign_id}"
+            direct_access_url = f"{base_url}/live-interview/{campaign_id}"
 
             # Prepare response
             response = jsonify(
@@ -2180,6 +2199,7 @@ def test_create_campaign():
                         "is_public": data.get("is_public", False),
                         "questions": questions_created,
                         "direct_access_url": direct_access_url,
+                        "access_code": access_code,
                     },
                 }
             )

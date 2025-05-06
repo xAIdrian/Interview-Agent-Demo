@@ -45,6 +45,7 @@ const CreateCampaignPage = () => {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [campaignId, setCampaignId] = useState<string>('');
   const [directAccessUrl, setDirectAccessUrl] = useState<string>('');
+  const [response, setResponse] = useState<any>(null);
   
   // Campaign state
   const [campaign, setCampaign] = useState<Campaign>({
@@ -300,6 +301,7 @@ const CreateCampaignPage = () => {
         // Construct the direct access URL using localhost:3000
         const directUrl = `${API_BASE_URL}/live-interview/${campaignId}`;
         setDirectAccessUrl(directUrl);
+        setResponse(response.data);
         setShowSuccessModal(true);
       } else {
         setError(response.data.message || 'Failed to create campaign');
@@ -502,10 +504,14 @@ const CreateCampaignPage = () => {
         title="Campaign Created Successfully"
         shareUrl={typeof window !== 'undefined' ? `${window.location.origin}/live-interview/${campaignId}` : ''}
       >
-        <div className="flex flex-col items-center space-y-4">
-          <CheckCircleIcon className="h-12 w-12 text-green-500" />
-          <div className="text-center">
-            <p className="text-gray-600 mb-4">
+        <div className="flex flex-col items-center space-y-4 w-full">
+            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 w-full">
+              <p className="text-sm text-gray-500 mb-2">Access Code:</p>
+              <p className="text-lg font-mono font-semibold text-gray-800">{directAccessUrl && response?.data?.access_code}</p>
+              <p className="text-xs text-gray-500 mt-2">Share this code with candidates to access the interview</p>
+            </div>
+          <div className="text-center space-y-4">
+            <p className="text-gray-600">
               Your campaign has been created successfully!
             </p>
           </div>
