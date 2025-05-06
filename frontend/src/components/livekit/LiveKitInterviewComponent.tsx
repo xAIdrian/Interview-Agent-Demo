@@ -142,6 +142,8 @@ const InstructionsModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () =
   const [isCodeValid, setIsCodeValid] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
   const [codeError, setCodeError] = useState('');
+  const router = useRouter();
+  const { campaignId } = router.query;
 
   const handleNext = async () => {
     if (currentStep === 1) {
@@ -149,18 +151,31 @@ const InstructionsModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () =
         setCodeError('Please enter an interview code');
         return;
       }
+
+      // Validate code format (8 characters)
+      if (interviewCode.trim().length !== 8) {
+        setCodeError('Interview code must be 8 characters long');
+        return;
+      }
       
       setIsValidating(true);
       setCodeError('');
       
       try {
-        // Here you would validate the interview code with your backend
-        // For now, we'll simulate a validation
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        setIsCodeValid(true);
-        setCurrentStep(currentStep + 1);
+        const response = await axios.post(
+          `${API_URL}/api/campaigns/${campaignId}/validate-access-code`,
+          { access_code: interviewCode.trim() }
+        );
+
+        if (response.data.status === 'accepted') {
+          setIsCodeValid(true);
+          setCurrentStep(currentStep + 1);
+        } else {
+          setCodeError(response.data.message || 'Invalid interview code. Please try again.');
+        }
       } catch (error) {
-        setCodeError('Invalid interview code. Please try again.');
+        setCodeError('Error validating code. Please try again.');
+        console.error('Error validating access code:', error);
       } finally {
         setIsValidating(false);
       }
@@ -174,6 +189,14 @@ const InstructionsModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () =
   const handleBack = () => {
     if (currentStep > 1) {
       setCurrentStep(currentStep - 1);
+    }
+  };
+
+  const handleCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.toUpperCase();
+    if (value.length <= 8) {
+      setInterviewCode(value);
+      setCodeError('');
     }
   };
 
@@ -191,10 +214,7 @@ const InstructionsModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () =
                 <input
                   type="text"
                   value={interviewCode}
-                  onChange={(e) => {
-                    setInterviewCode(e.target.value);
-                    setCodeError('');
-                  }}
+                  onChange={handleCodeChange}
                   placeholder="Enter your interview code"
                   className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
                     codeError 
