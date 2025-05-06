@@ -2484,3 +2484,63 @@ def handle_campaign_link(id):
         return jsonify({"error": str(e)}), 500
     finally:
         conn.close()
+
+
+@api_bp.route("/campaigns/<string:campaign_id>/access-code", methods=["GET", "OPTIONS"])
+def get_campaign_access_code(campaign_id):
+    """Get the access code for a campaign."""
+    if request.method == "OPTIONS":
+        response = jsonify({"status": "ok"})
+        response.headers.add("Access-Control-Allow-Origin", "http://localhost:3000")
+        response.headers.add(
+            "Access-Control-Allow-Headers",
+            "Content-Type,Authorization,X-Requested-With,Accept",
+        )
+        response.headers.add("Access-Control-Allow-Methods", "GET,OPTIONS")
+        response.headers.add("Access-Control-Allow-Credentials", "true")
+        return response, 200
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Check if campaign exists
+        cursor.execute("SELECT id FROM campaigns WHERE id = ?", (campaign_id,))
+        if not cursor.fetchone():
+            response = jsonify({"error": "Campaign not found"})
+            response.headers.add("Access-Control-Allow-Origin", "http://localhost:3000")
+            response.headers.add("Access-Control-Allow-Credentials", "true")
+            return response, 404
+
+        # Get the access code
+        cursor.execute(
+            """
+            SELECT access_code 
+            FROM campaign_access_codes 
+            WHERE campaign_id = ? 
+            ORDER BY created_at DESC 
+            LIMIT 1
+            """,
+            (campaign_id,),
+        )
+        result = cursor.fetchone()
+
+        if not result:
+            response = jsonify({"error": "No access code found for this campaign"})
+            response.headers.add("Access-Control-Allow-Origin", "http://localhost:3000")
+            response.headers.add("Access-Control-Allow-Credentials", "true")
+            return response, 404
+
+        response = jsonify({"success": True, "data": {"access_code": result[0]}})
+        response.headers.add("Access-Control-Allow-Origin", "http://localhost:3000")
+        response.headers.add("Access-Control-Allow-Credentials", "true")
+        return response, 200
+
+    except Exception as e:
+        response = jsonify({"error": f"Error retrieving access code: {str(e)}"})
+        response.headers.add("Access-Control-Allow-Origin", "http://localhost:3000")
+        response.headers.add("Access-Control-Allow-Credentials", "true")
+        return response, 500
+    finally:
+        if conn:
+            conn.close()

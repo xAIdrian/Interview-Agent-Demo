@@ -20,6 +20,7 @@ interface Campaign {
   is_public: boolean;
   campaign_context: string;
   job_description: string;
+  access_code?: string;
 }
 
 interface Question {
@@ -90,9 +91,24 @@ const CampaignDetailsPage = () => {
         setIsLoading(true);
         setError('');
         
-        // Fetch campaign details
-        const campaignResponse = await axios.get(`${API_BASE_URL}/api/campaigns/${campaignId}`);
-        setCampaign(campaignResponse.data);
+        // Fetch campaign details and access code in parallel
+        const [campaignResponse, accessCodeResponse] = await Promise.all([
+          axios.get(`${API_BASE_URL}/api/campaigns/${campaignId}`),
+          axios.get(`${API_BASE_URL}/api/campaigns/${campaignId}/access-code`)
+        ]);
+
+        console.log('Access Code Response:', accessCodeResponse.data);
+        const accessCode = accessCodeResponse.data.data.access_code;
+        console.log('Extracted Access Code:', accessCode);
+
+        // Add access code to campaign data
+        const campaignData = {
+          ...campaignResponse.data,
+          access_code: accessCode
+        };
+        console.log('Campaign Data with Access Code:', campaignData);
+        
+        setCampaign(campaignData);
         
         // Fetch submission answers for this campaign with proper error handling
         try {
@@ -252,6 +268,13 @@ const CampaignDetailsPage = () => {
     router.push('/campaigns');
   };
 
+  // Debug effect for campaign state
+  useEffect(() => {
+    if (campaign) {
+      console.log('Campaign State Updated:', campaign);
+    }
+  }, [campaign]);
+
   return (
     <PageTemplate title={isAdmin ? "Campaign Details" : "Position Details"} maxWidth="lg">
       <div className="flex justify-end mb-4 items-center">
@@ -331,10 +354,21 @@ const CampaignDetailsPage = () => {
                   Copy Link
                 </button>
               </div>
-              <div className="bg-white border border-gray-200 rounded-lg p-3">
-                <p className="text-sm text-gray-600 break-all">
-                  {typeof window !== 'undefined' ? `${window.location.origin}/live-interview/${campaignId}` : ''}
-                </p>
+              <div className="space-y-4">
+                <div className="bg-white border border-gray-200 rounded-lg p-3">
+                  <p className="text-sm text-gray-600 break-all">
+                    {typeof window !== 'undefined' ? `${window.location.origin}/live-interview/${campaignId}` : ''}
+                  </p>
+                </div>
+                <div className="bg-white border border-gray-200 rounded-lg p-3">
+                  <div className="flex flex-col">
+                    <p className="text-sm font-medium text-gray-500 mb-1">Access Code:</p>
+                    <p className="text-base font-mono font-semibold text-gray-800">
+                      {campaign?.access_code || 'Loading...'}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">Share this code with candidates to access the interview</p>
+                  </div>
+                </div>
               </div>
             </div>
           )}
