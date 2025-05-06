@@ -38,6 +38,7 @@ const CreateCampaignFromDocPage = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [campaignId, setCampaignId] = useState<string>('');
+  const [response, setResponse] = useState<any>(null);
   const [file, setFile] = useState<File | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState('standard');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -396,6 +397,7 @@ const CreateCampaignFromDocPage = () => {
       if (response.data.success) {
         const newCampaignId = response.data.data.id;
         setCampaignId(newCampaignId);
+        setResponse(response.data);
         setShowSuccessModal(true);
       } else {
         setError(response.data.message || 'Failed to create campaign');
@@ -704,9 +706,16 @@ const CreateCampaignFromDocPage = () => {
       >
         <div className="flex flex-col items-center space-y-4">
           <CheckCircleIcon className="h-12 w-12 text-green-500" />
-          <p className="text-gray-600 text-center">
-            Your campaign has been created successfully! Click the button below to return to the campaigns page.
-          </p>
+          <div className="text-center space-y-4">
+            <p className="text-gray-600">
+              Your campaign has been created successfully!
+            </p>
+            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+              <p className="text-sm text-gray-500 mb-2">Access Code:</p>
+              <p className="text-lg font-mono font-semibold text-gray-800">{response?.data?.access_code}</p>
+              <p className="text-xs text-gray-500 mt-2">Share this code with candidates to access the interview</p>
+            </div>
+          </div>
           <PrimaryButton
             onClick={handleSuccessModalClose}
             className="mt-4"

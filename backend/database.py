@@ -86,7 +86,7 @@ def create_campaigns_table():
                 id TEXT PRIMARY KEY,
                 title VARCHAR(255) NOT NULL,
                 max_user_submissions INT NOT NULL DEFAULT 1,
-                max_points INT NOT NULL,
+                max_points INT NOT NULL DEFAULT 0,
                 is_public BOOLEAN NOT NULL DEFAULT FALSE,
                 campaign_context TEXT,
                 job_description TEXT,
@@ -242,6 +242,47 @@ def create_resume_analysis_table():
         session.close()
 
 
+def create_campaign_access_codes_table():
+    session = get_db_session()
+    try:
+        session.execute(
+            text(
+                """
+            CREATE TABLE IF NOT EXISTS campaign_access_codes (
+                id TEXT PRIMARY KEY,
+                campaign_id TEXT NOT NULL,
+                access_code TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                is_used BOOLEAN NOT NULL DEFAULT FALSE,
+                used_at TIMESTAMP,
+                FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE CASCADE,
+                UNIQUE (campaign_id, access_code)
+            )
+        """
+            )
+        )
+        # Create indexes for faster lookups
+        session.execute(
+            text(
+                """
+            CREATE INDEX IF NOT EXISTS idx_campaign_access_codes_campaign_id 
+            ON campaign_access_codes(campaign_id)
+        """
+            )
+        )
+        session.execute(
+            text(
+                """
+            CREATE INDEX IF NOT EXISTS idx_campaign_access_codes_access_code 
+            ON campaign_access_codes(access_code)
+        """
+            )
+        )
+        session.commit()
+    finally:
+        session.close()
+
+
 def migrate_campaigns_table_id_type():
     """Convert the campaigns table ID columns from BIGINT to TEXT"""
     conn = get_db_connection()
@@ -254,7 +295,7 @@ def migrate_campaigns_table_id_type():
                 id TEXT PRIMARY KEY,
                 title VARCHAR(255) NOT NULL,
                 max_user_submissions INT NOT NULL DEFAULT 1,
-                max_points INT NOT NULL,
+                max_points INT NOT NULL DEFAULT 0,
                 is_public BOOLEAN NOT NULL DEFAULT FALSE,
                 campaign_context TEXT,
                 job_description TEXT,
@@ -300,6 +341,7 @@ def create_tables():
     create_submission_answers_table()
     create_campaign_assignments_table()
     create_resume_analysis_table()
+    create_campaign_access_codes_table()
     migrate_campaigns_table_id_type()
     migrate_submissions_table_add_resume_columns()
 
