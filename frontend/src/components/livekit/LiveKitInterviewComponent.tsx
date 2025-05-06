@@ -354,6 +354,7 @@ const InstructionsModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () =
 const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, room, submissionId, onDisconnect }: LiveKitInterviewComponentProps) => {
   const livekitUrl = 'wss://default-test-oyjqa9xh.livekit.cloud';
   const [showInstructions, setShowInstructions] = useState(true);
+  const [isLivekitConnected, setIsLivekitConnected] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isProcessingSubmission, setIsProcessingSubmission] = useState(false);
   const [transcript, setTranscript] = useState<any[]>([]);
@@ -562,7 +563,10 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
       
       <InstructionsModal 
         isOpen={showInstructions} 
-        onClose={() => setShowInstructions(false)} 
+        onClose={() => {
+          setShowInstructions(false);
+          setIsLivekitConnected(true); // Start LiveKit connection when instructions are complete
+        }} 
       />
 
       {/* Interview Interface */}
@@ -594,7 +598,7 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
           <LiveKitRoom
             serverUrl={livekitUrl}
             token={token}
-            connect={true}
+            connect={isLivekitConnected}
             video={false}
             audio={true}
             onDisconnected={handleDisconnect}
