@@ -225,7 +225,7 @@ def register():
                     "redirect_to": "/admin",  # Redirect to candidate page by default
                 }
             ),
-            201,
+            200,
         )
 
     except sqlite3.Error as e:
