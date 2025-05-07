@@ -191,10 +191,11 @@ def register():
     try:
         cursor = conn.cursor()
         sql = "INSERT INTO users (id, email, name, password_hash, is_admin) VALUES (?, ?, ?, ?, ?)"
+        user_id = str(uuid.uuid4().int & (1 << 64) - 1)
         cursor.execute(
             sql,
             (
-                str(uuid.uuid4().int & (1 << 64) - 1),
+                user_id,
                 email,
                 name,
                 hashed_password,
@@ -203,13 +204,25 @@ def register():
         )
         conn.commit()
 
+        # Set up session data
+        session.permanent = True
+        session["user_id"] = user_id
+        session["email"] = email
+        session["name"] = name
+        session["is_admin"] = True
+
         return (
             jsonify(
                 {
                     "success": True,
-                    "message": "Registration successful! Please log in.",
-                    "user": {"email": email, "name": name, "is_admin": True},
-                    "redirect": "/",  # Add redirect path to home
+                    "message": "Registration successful!",
+                    "user": {
+                        "id": user_id,
+                        "email": email,
+                        "name": name,
+                        "is_admin": True,
+                    },
+                    "redirect_to": "/admin",  # Redirect to candidate page by default
                 }
             ),
             201,
