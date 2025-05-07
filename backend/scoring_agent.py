@@ -64,7 +64,10 @@ def generate_submission_scoring(campaign, questions, transcript):
     if current_question and current_response:
         candidate_responses[current_question] = "\n".join(current_response)
 
-    system_prompt = f"""# CONTEXT
+    system_prompt = f"""
+THE OUTPUT MUST ALWAYS BE IN FRENCH.
+    
+# CONTEXT
 
 You are an interview scoring agent.
 
@@ -102,6 +105,7 @@ Provide only the JSON array in plaintext. Do not use any markdown functionality.
 # CANDIDATE RESPONSES
 {json.dumps(candidate_responses, indent=2)}
 
+THE OUTPUT MUST ALWAYS BE IN FRENCH.
 \n\n"""
 
     user_prompt = format_questions(questions)
@@ -120,7 +124,10 @@ Provide only the JSON array in plaintext. Do not use any markdown functionality.
         raise ValueError("Invalid scoring response format")
 
 
-scoring_prompt_optimization_system = """Optimize this scoring prompt created by an admin to score a candidate's response.
+scoring_prompt_optimization_system = """
+THE OUTPUT MUST ALWAYS BE IN FRENCH.
+
+Optimize this scoring prompt created by an admin to score a candidate's response.
 
 Specify what criteria constitutes full points, half points, and no points. Be clear in your definition. Start your prompt with "Full points awarded with"
 
@@ -133,6 +140,7 @@ Role information: {campaign_context}
 Question: {question}
 Original scoring prompt: {scoring_prompt}
 
+THE OUTPUT MUST ALWAYS BE IN FRENCH.
 """
 
 
@@ -182,7 +190,10 @@ def analyze_strengths_weaknesses(campaign, resume_text):
         campaign_context = campaign["campaign_context"]
         job_description = campaign["job_description"]
 
-        system_prompt = f"""# CONTEXT
+        system_prompt = f"""
+THE OUTPUT MUST ALWAYS BE IN FRENCH.
+
+# CONTEXT
 You are an expert resume analyzer and career advisor.
 
 The company is hiring for a {campaign_title} position.
@@ -215,9 +226,14 @@ Format your response as a JSON object with the following structure:
 # RESUME
 {resume_text}
 
+THE OUTPUT MUST ALWAYS BE IN FRENCH.
 \n\n"""
 
-        user_prompt = "Analyze this resume against the job requirements and provide strengths, weaknesses, and overall fit assessment."
+        user_prompt = """
+Analyze this resume against the job requirements and provide strengths, weaknesses, and overall fit assessment.
+
+THE OUTPUT MUST ALWAYS BE IN FRENCH.
+"""
 
         analysis = openai_response(system_prompt, user_prompt)
         logger.info(f"Received analysis from OpenAI: {analysis}")
