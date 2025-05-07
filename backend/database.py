@@ -63,7 +63,7 @@ def create_users_table():
                 id TEXT PRIMARY KEY,
                 email VARCHAR(255) NOT NULL UNIQUE,
                 name VARCHAR(255) NOT NULL,
-                password_hash VARCHAR(255) NOT NULL,
+                password_hash VARCHAR(255),
                 is_admin BOOLEAN NOT NULL DEFAULT FALSE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
