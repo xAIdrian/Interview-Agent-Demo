@@ -2082,7 +2082,7 @@ def get_livekit_token():
 def test_create_campaign():
     if request.method == "OPTIONS":
         response = jsonify({"status": "ok"})
-        response.headers.add("Access-Control-Allow-Origin", "http://localhost:3000")
+        response.headers.add("Access-Control-Allow-Origin", "*")
         response.headers.add(
             "Access-Control-Allow-Headers",
             "Content-Type,Authorization,X-Requested-With,Accept",
@@ -2203,7 +2203,7 @@ def test_create_campaign():
                     },
                 }
             )
-            response.headers.add("Access-Control-Allow-Origin", "http://localhost:3000")
+            response.headers.add("Access-Control-Allow-Origin", "*")
             response.headers.add("Access-Control-Allow-Credentials", "true")
             return response, 201
 
@@ -2219,7 +2219,7 @@ def test_create_campaign():
         response = jsonify(
             {"success": False, "message": f"Failed to create campaign: {str(e)}"}
         )
-        response.headers.add("Access-Control-Allow-Origin", "http://localhost:3000")
+        response.headers.add("Access-Control-Allow-Origin", "*")
         response.headers.add("Access-Control-Allow-Credentials", "true")
         return response, 400
 
@@ -2491,7 +2491,7 @@ def get_campaign_access_code(campaign_id):
     """Get the access code for a campaign."""
     if request.method == "OPTIONS":
         response = jsonify({"status": "ok"})
-        response.headers.add("Access-Control-Allow-Origin", "http://localhost:3000")
+        response.headers.add("Access-Control-Allow-Origin", "*")
         response.headers.add(
             "Access-Control-Allow-Headers",
             "Content-Type,Authorization,X-Requested-With,Accept",
@@ -2508,7 +2508,7 @@ def get_campaign_access_code(campaign_id):
         cursor.execute("SELECT id FROM campaigns WHERE id = ?", (campaign_id,))
         if not cursor.fetchone():
             response = jsonify({"error": "Campaign not found"})
-            response.headers.add("Access-Control-Allow-Origin", "http://localhost:3000")
+            response.headers.add("Access-Control-Allow-Origin", "*")
             response.headers.add("Access-Control-Allow-Credentials", "true")
             return response, 404
 
@@ -2527,18 +2527,18 @@ def get_campaign_access_code(campaign_id):
 
         if not result:
             response = jsonify({"error": "No access code found for this campaign"})
-            response.headers.add("Access-Control-Allow-Origin", "http://localhost:3000")
+            response.headers.add("Access-Control-Allow-Origin", "*")
             response.headers.add("Access-Control-Allow-Credentials", "true")
             return response, 404
 
         response = jsonify({"success": True, "data": {"access_code": result[0]}})
-        response.headers.add("Access-Control-Allow-Origin", "http://localhost:3000")
+        response.headers.add("Access-Control-Allow-Origin", "*")
         response.headers.add("Access-Control-Allow-Credentials", "true")
         return response, 200
 
     except Exception as e:
         response = jsonify({"error": f"Error retrieving access code: {str(e)}"})
-        response.headers.add("Access-Control-Allow-Origin", "http://localhost:3000")
+        response.headers.add("Access-Control-Allow-Origin", "*")
         response.headers.add("Access-Control-Allow-Credentials", "true")
         return response, 500
     finally:
@@ -2553,7 +2553,7 @@ def validate_submitted_access_code(campaign_id):
     """Validate a submitted access code for a campaign."""
     if request.method == "OPTIONS":
         response = jsonify({"status": "ok"})
-        response.headers.add("Access-Control-Allow-Origin", "http://localhost:3000")
+        response.headers.add("Access-Control-Allow-Origin", "*")
         response.headers.add(
             "Access-Control-Allow-Headers",
             "Content-Type,Authorization,X-Requested-With,Accept",
@@ -2574,7 +2574,7 @@ def validate_submitted_access_code(campaign_id):
                     "status": "rejected",
                 }
             )
-            response.headers.add("Access-Control-Allow-Origin", "http://localhost:3000")
+            response.headers.add("Access-Control-Allow-Origin", "*")
             response.headers.add("Access-Control-Allow-Credentials", "true")
             return response, 200
 
@@ -2591,7 +2591,7 @@ def validate_submitted_access_code(campaign_id):
                     "status": "rejected",
                 }
             )
-            response.headers.add("Access-Control-Allow-Origin", "http://localhost:3000")
+            response.headers.add("Access-Control-Allow-Origin", "*")
             response.headers.add("Access-Control-Allow-Credentials", "true")
             return response, 200
 
@@ -2616,7 +2616,7 @@ def validate_submitted_access_code(campaign_id):
                     "status": "rejected",
                 }
             )
-            response.headers.add("Access-Control-Allow-Origin", "http://localhost:3000")
+            response.headers.add("Access-Control-Allow-Origin", "*")
             response.headers.add("Access-Control-Allow-Credentials", "true")
             return response, 200
 
@@ -2634,7 +2634,7 @@ def validate_submitted_access_code(campaign_id):
                 "status": "accepted" if is_valid else "rejected",
             }
         )
-        response.headers.add("Access-Control-Allow-Origin", "http://localhost:3000")
+        response.headers.add("Access-Control-Allow-Origin", "*")
         response.headers.add("Access-Control-Allow-Credentials", "true")
         return response, 200
 
@@ -2647,7 +2647,7 @@ def validate_submitted_access_code(campaign_id):
                 "status": "rejected",
             }
         )
-        response.headers.add("Access-Control-Allow-Origin", "http://localhost:3000")
+        response.headers.add("Access-Control-Allow-Origin", "*")
         response.headers.add("Access-Control-Allow-Credentials", "true")
         return response, 200
     finally:
