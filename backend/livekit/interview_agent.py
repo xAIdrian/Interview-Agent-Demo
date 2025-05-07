@@ -8,8 +8,8 @@ import os
 import requests
 from typing import Dict, Any
 
-# API_BASE_URL = "https://main-service-48k0.onrender.com"
-API_BASE_URL = "http://127.0.0.1:5001"
+API_BASE_URL = "https://main-service-48k0.onrender.com"
+# API_BASE_URL = "http://127.0.0.1:5001"
 
 # Add the backend directory to the Python path
 backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
