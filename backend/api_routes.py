@@ -175,7 +175,7 @@ def handle_users():
             )
 
             conn.commit()
-            return jsonify({"message": "User created successfully", "id": user_id}), 201
+            return jsonify({"message": "User created successfully", "id": user_id}), 200
         except Exception as e:
             print(f"Error creating user: {e}")
             if "conn" in locals():
@@ -298,7 +298,7 @@ def handle_campaigns():
             conn.commit()
             return (
                 jsonify({"success": True, "message": "Campaign created successfully"}),
-                201,
+                200,
             )
 
         except Exception as e:
@@ -484,7 +484,7 @@ def handle_submissions():
                 jsonify(
                     {"message": "Submission created successfully", "id": submission_id}
                 ),
-                201,
+                200,
             )
         except Exception as e:
             print(f"Error creating submission: {e}")
@@ -665,7 +665,7 @@ def create_submission_answer():
                     "id": submission_answer_id,
                 }
             ),
-            201,
+            200,
         )
     except Exception as e:
         conn.rollback()
@@ -1601,7 +1601,7 @@ def register():
                     "is_admin": False,
                 }
             ),
-            201,
+            200,
         )
 
     except Exception as e:
@@ -2198,9 +2198,7 @@ def test_create_campaign():
                     },
                 }
             )
-            response.headers.add("Access-Control-Allow-Origin", "*")
-            response.headers.add("Access-Control-Allow-Credentials", "true")
-            return response, 201
+            return response, 200
 
         except Exception as e:
             conn.rollback()
