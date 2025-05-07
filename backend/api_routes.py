@@ -2081,14 +2081,9 @@ def get_livekit_token():
 @api_bp.route("/test-campaigns", methods=["POST", "OPTIONS"])
 def test_create_campaign():
     if request.method == "OPTIONS":
+        # Handle preflight request
         response = jsonify({"status": "ok"})
-        response.headers.add("Access-Control-Allow-Origin", "*")
-        response.headers.add(
-            "Access-Control-Allow-Headers",
-            "Content-Type,Authorization,X-Requested-With,Accept",
-        )
-        response.headers.add("Access-Control-Allow-Methods", "POST,OPTIONS")
-        response.headers.add("Access-Control-Allow-Credentials", "true")
+        # Let the global CORS middleware handle the headers
         return response, 200
 
     try:
