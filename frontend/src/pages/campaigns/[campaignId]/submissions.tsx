@@ -151,27 +151,23 @@ const CampaignSubmissionsPage = () => {
         movableColumns: true,
         resizableRows: true,
         columns: [
-          { title: "Candidate", field: "email", headerFilter: true, widthGrow: 2 },
+          { 
+            title: "Candidate", 
+            field: "email", 
+            widthGrow: 2,
+            formatter: function(cell: any) {
+              const data = cell.getRow().getData();
+              const name = data.user_name || 'No name';
+              return `<div>
+                <div class="font-medium">${name}</div>
+              </div>`;
+            }
+          },
           { 
             title: "Created", 
             field: "created_at", 
             formatter: (cell) => formatDate(cell.getValue()),
             sorter: "datetime",
-            widthGrow: 1
-          },
-          { 
-            title: "Status", 
-            field: "is_complete", 
-            formatter: (cell) => {
-              const value = cell.getValue();
-              return value ? 
-                '<span class="px-2 py-1 bg-green-100 text-green-800 rounded">Completed</span>' : 
-                '<span class="px-2 py-1 bg-yellow-100 text-yellow-800 rounded">In Progress</span>';
-            },
-            headerFilter: true,
-            headerFilterParams: {
-              values: {"true": "Completed", "false": "In Progress"}
-            },
             widthGrow: 1
           },
           { 
@@ -198,16 +194,12 @@ const CampaignSubmissionsPage = () => {
               // Create View button
               const viewButton = document.createElement("a");
               viewButton.innerHTML = "View Answers";
+              // Ensure campaignId is a string and properly encoded
+              const returnToCampaign = String(campaignId);
+              console.log('🚀 ~ Creating view button with returnToCampaign:', returnToCampaign);
+              viewButton.href = `/submissions/${submissionId}?returnToCampaign=${encodeURIComponent(returnToCampaign)}`;
               viewButton.className = "px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm";
-              viewButton.href = `/submissions/${submissionId}`;
               container.appendChild(viewButton);
-              
-              //// Create Interview button
-              //const interviewButton = document.createElement("a");
-              //interviewButton.innerHTML = "Interview";
-              //interviewButton.className = "px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600 text-sm";
-              //interviewButton.href = `/interview/${submissionId}`;
-              //container.appendChild(interviewButton);
               
               return container;
             },
@@ -259,7 +251,7 @@ const CampaignSubmissionsPage = () => {
   }, [submissions, isLoading, router]);
 
   return (
-    <PageTemplate title={`${campaign?.title || 'Campaign'} Submissions`} maxWidth="lg">
+    <PageTemplate title={`Submissions`} maxWidth="lg">
       <div className="flex justify-end mb-4 items-center">
         <Link 
           href={`/campaigns/${campaignId}`}
@@ -272,12 +264,6 @@ const CampaignSubmissionsPage = () => {
       {error && (
         <div className="mb-4 p-2 bg-red-100 text-red-700 rounded">
           {error}
-        </div>
-      )}
-      
-      {!isAdmin && (
-        <div className="mb-4 p-2 bg-yellow-100 text-yellow-700 rounded">
-          This page requires admin privileges.
         </div>
       )}
       
@@ -328,7 +314,6 @@ const CampaignSubmissionsPage = () => {
                       <tr>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Candidate</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                       </tr>
@@ -338,11 +323,6 @@ const CampaignSubmissionsPage = () => {
                         <tr key={submission.id}>
                           <td className="px-6 py-4 whitespace-nowrap">{submission.email}</td>
                           <td className="px-6 py-4 whitespace-nowrap">{new Date(submission.created_at).toLocaleString()}</td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`px-2 py-1 rounded ${submission.is_complete ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                              {submission.is_complete ? 'Completed' : 'In Progress'}
-                            </span>
-                          </td>
                           <td className="px-6 py-4 whitespace-nowrap">{submission.total_points !== null ? submission.total_points : 'Not scored'}</td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex justify-center space-x-2">

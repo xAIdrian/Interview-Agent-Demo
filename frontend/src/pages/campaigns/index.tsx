@@ -73,13 +73,22 @@ const CampaignsPage = () => {
   }, []);
 
   useEffect(() => {
-    if (!isClient || !isAuthenticated) return;
+    if (!isClient || !isAuthenticated || !user?.id) {
+      setIsLoading(false);
+      return;
+    }
 
     const fetchCampaigns = async () => {
       try {
         setIsLoading(true);
-        // Fetch campaigns
-        const response = await axios.get(`${API_BASE_URL}/api/campaigns`);
+        setError('');
+        
+        const response = await axios.get(`${API_BASE_URL}/api/campaigns`, {
+          params: {
+            user_id: user.id
+          },
+          withCredentials: true // Add this to include cookies
+        });
         
         // Ensure all campaign IDs are strings
         const campaignsWithStringIds = response.data.map((campaign: any) => ({
@@ -92,7 +101,8 @@ const CampaignsPage = () => {
         for (const campaign of campaignsWithStringIds) {
           try {
             const assignmentsResponse = await axios.get(
-              `${API_BASE_URL}/api/campaigns/${campaign.id}/assignments`
+              `${API_BASE_URL}/api/campaigns/${campaign.id}/assignments`,
+              { withCredentials: true } // Add this to include cookies
             );
             assignments[campaign.id] = assignmentsResponse.data;
           } catch (err) {
@@ -115,11 +125,11 @@ const CampaignsPage = () => {
         
       } catch (err) {
         console.error('Error fetching campaigns:', err);
-        setError('Failed to load campaigns. Please try again.');
-        
         if (axios.isAxiosError(err)) {
+          setError(err.response?.data?.error || 'Failed to load campaigns. Please try again.');
           AuthLogger.error('Error fetching campaigns:', err.response?.status, err.response?.data);
         } else {
+          setError('Failed to load campaigns. Please try again.');
           AuthLogger.error('Unexpected error fetching campaigns:', err);
         }
       } finally {
@@ -128,14 +138,11 @@ const CampaignsPage = () => {
     };
 
     fetchCampaigns();
-  }, [isClient, isAuthenticated, user?.email, isAdmin]);
+  }, [isClient, isAuthenticated, user?.id, isAdmin]);
 
   const handleActionClick = (id: string) => {
-    if (isAdmin) {
-      router.push(`/campaigns/${id}/edit`);
-    } else {
-      router.push(`/campaigns/${id}`);
-    }
+    router.push(`/campaigns/${id}`);
+
   };
 
   const columns: ColumnDefinition[] = [
@@ -200,7 +207,7 @@ const CampaignsPage = () => {
   return (
     <>
       <Head>
-        <title>{isAdmin ? 'Campaigns' : 'Available Positions'} | Gulpin AI Interview</title>
+        <title>{isAdmin ? 'Campaigns' : 'Available Positions'}</title>
       </Head>
       <PageTemplate title={isAdmin ? 'Campaigns' : 'Available Positions'} maxWidth="lg">
         <div className="w-full bg-white shadow-md rounded-lg p-6">

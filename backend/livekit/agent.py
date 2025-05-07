@@ -19,7 +19,7 @@ from livekit.agents import (
 from livekit.agents.multimodal import MultimodalAgent
 from livekit.plugins import openai
 from livekit.agents import stt, transcription
-from livekit.plugins.deepgram import STT
+from livekit.plugins.openai import STT
 from prompts import agent_prompt_template
 
 # Store active tasks to prevent garbage collection
@@ -82,7 +82,7 @@ async def entrypoint(ctx: JobContext):
     interviewer_name = generate_interviewer_name()
     logger.info(f"Using interviewer name: {interviewer_name}")
 
-    stt = STT()
+    stt = STT(model="gpt-4o-transcribe")
     tasks = []
     _accumulated_questions = []
     submission_data = None

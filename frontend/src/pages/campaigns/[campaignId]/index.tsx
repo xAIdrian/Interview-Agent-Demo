@@ -5,6 +5,9 @@ import { PageTemplate } from '../../../components/PageTemplate';
 import Link from 'next/link';
 import { AuthLogger } from '../../../utils/logging';
 import { useAuth } from '@/app/components/AuthProvider';
+import { Modal } from '../../../components/ui/Modal';
+import { CheckCircleIcon } from '@heroicons/react/24/outline';
+import { PrimaryButton } from '../../../components/Button/PrimaryButton';
 
 // Define API base URL for consistent usage
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://main-service-48k0.onrender.com';
@@ -17,15 +20,16 @@ interface Campaign {
   is_public: boolean;
   campaign_context: string;
   job_description: string;
+  access_code?: string;
 }
 
 interface Question {
   id: string;
-  campaign_id: string;
   title: string;
   body: string;
   scoring_prompt: string;
   max_points: number;
+  order_index?: number;
 }
 
 interface SubmissionStatus {
@@ -55,6 +59,22 @@ const CampaignDetailsPage = () => {
     can_submit: true,
     has_completed_submission: false,
   });
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+
+  // Handle copying campaign link
+  const handleCopyLink = () => {
+    const campaignLink = `${window.location.origin}/live-interview/${campaignId}`;
+    navigator.clipboard.writeText(campaignLink).then(() => {
+      const button = document.getElementById('copy-link-button');
+      if (button) {
+        const originalText = button.textContent;
+        button.textContent = 'Copied!';
+        setTimeout(() => {
+          button.textContent = originalText;
+        }, 2000);
+      }
+    });
+  };
 
   // Setup auth on component mount
   useEffect(() => {
@@ -69,13 +89,58 @@ const CampaignDetailsPage = () => {
 
       try {
         setIsLoading(true);
-        const response = await axios.get(`${API_BASE_URL}/api/campaigns/${campaignId}`);
-        setCampaign(response.data);
+        setError('');
         
-        // Fetch questions for this campaign
-        const questionsResponse = await axios.get(`${API_BASE_URL}/api/campaigns/${campaignId}`);
-        setQuestions(questionsResponse.data);
+        // Fetch campaign details and access code in parallel
+        const [campaignResponse, accessCodeResponse] = await Promise.all([
+          axios.get(`${API_BASE_URL}/api/campaigns/${campaignId}`),
+          axios.get(`${API_BASE_URL}/api/campaigns/${campaignId}/access-code`)
+        ]);
+
+        console.log('Access Code Response:', accessCodeResponse.data);
+        const accessCode = accessCodeResponse.data.data.access_code;
+        console.log('Extracted Access Code:', accessCode);
+
+        // Add access code to campaign data
+        const campaignData = {
+          ...campaignResponse.data,
+          access_code: accessCode
+        };
+        console.log('Campaign Data with Access Code:', campaignData);
         
+        setCampaign(campaignData);
+        
+        // Fetch submission answers for this campaign with proper error handling
+        try {
+          const answersResponse = await axios.get(`${API_BASE_URL}/api/submission_answers`, {
+            params: { campaign_id: campaignId }
+          });
+          
+          if (answersResponse.data && Array.isArray(answersResponse.data)) {
+            // Sort answers by their order if available
+            const sortedAnswers = answersResponse.data.sort((a, b) => 
+              (a.order_index || 0) - (b.order_index || 0)
+            );
+            
+            // Transform the answers to match the questions format
+            const transformedQuestions = sortedAnswers.map(answer => ({
+              id: answer.question_id,
+              title: answer.question_title,
+              max_points: answer.max_points,
+              scoring_prompt: answer.scoring_prompt || '',
+              body: answer.body || answer.question_title
+            }));
+            
+            setQuestions(transformedQuestions);
+          } else {
+            console.error('Invalid answers data format:', answersResponse.data);
+            setQuestions([]);
+          }
+        } catch (answersError) {
+          console.error('Error fetching answers:', answersError);
+          setQuestions([]);
+        }
+
         // If admin, fetch submission count
         if (isAdmin) {
           const submissionsResponse = await axios.get(`${API_BASE_URL}/api/submissions?campaign_id=${campaignId}`);
@@ -97,9 +162,9 @@ const CampaignDetailsPage = () => {
           setSubmissionStatus({
             total_submissions: submissions.length,
             completed_submissions: completedSubmissions,
-            max_submissions: response.data.max_user_submissions,
-            can_submit: submissions.length < response.data.max_user_submissions && 
-                       completedSubmissions < response.data.max_user_submissions,
+            max_submissions: campaignResponse.data.max_user_submissions,
+            can_submit: submissions.length < campaignResponse.data.max_user_submissions && 
+                       completedSubmissions < campaignResponse.data.max_user_submissions,
             has_completed_submission: completedSubmissions > 0
           });
         }
@@ -181,13 +246,6 @@ const CampaignDetailsPage = () => {
 
     return (
       <div className="flex items-center space-x-2">
-        <button
-          onClick={handleStartInterview}
-          className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-700"
-          disabled={isLoading}
-        >
-          {isLoading ? 'Starting...' : 'Start Interview'}
-        </button>
         <Link 
           href="/campaigns"
           className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-700"
@@ -204,6 +262,18 @@ const CampaignDetailsPage = () => {
     total_submissions: Math.min(submissionStatus.total_submissions, submissionStatus.max_submissions),
     completed_submissions: Math.min(submissionStatus.completed_submissions, submissionStatus.max_submissions)
   };
+
+  const handleSuccessModalClose = () => {
+    setShowSuccessModal(false);
+    router.push('/campaigns');
+  };
+
+  // Debug effect for campaign state
+  useEffect(() => {
+    if (campaign) {
+      console.log('Campaign State Updated:', campaign);
+    }
+  }, [campaign]);
 
   return (
     <PageTemplate title={isAdmin ? "Campaign Details" : "Position Details"} maxWidth="lg">
@@ -255,42 +325,7 @@ const CampaignDetailsPage = () => {
         </div>
       ) : campaign ? (
         <>
-          {!isAdmin && (
-            <div className="bg-white shadow overflow-hidden sm:rounded-lg mb-6">
-              <div className="px-4 py-5 sm:px-6">
-                <h2 className="text-lg leading-6 font-medium text-gray-900">Your Application Status</h2>
-              </div>
-              <div className="border-t border-gray-200">
-                <dl>
-                  <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                    <dt className="text-sm font-medium text-gray-500">Attempts Used</dt>
-                    <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                      {safeSubmissionStatus.total_submissions} of {safeSubmissionStatus.max_submissions}
-                    </dd>
-                  </div>
-                  <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                    <dt className="text-sm font-medium text-gray-500">Completed Interviews</dt>
-                    <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                      {safeSubmissionStatus.completed_submissions}
-                    </dd>
-                  </div>
-                  {safeSubmissionStatus.has_completed_submission && (
-                    <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                      <dt className="text-sm font-medium text-gray-500">Status</dt>
-                      <dd className="mt-1 text-sm text-green-600 sm:mt-0 sm:col-span-2">
-                        Interview Completed
-                      </dd>
-                    </div>
-                  )}
-                </dl>
-              </div>
-            </div>
-          )}
-
           <div className="bg-white shadow overflow-hidden sm:rounded-lg mb-6">
-            <div className="px-4 py-5 sm:px-6">
-              <h2 className="text-lg leading-6 font-medium text-gray-900">Position Information</h2>
-            </div>
             <div className="border-t border-gray-200">
               <dl>
                 <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
@@ -301,44 +336,112 @@ const CampaignDetailsPage = () => {
                   <dt className="text-sm font-medium text-gray-500">Job Description</dt>
                   <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{campaign.job_description}</dd>
                 </div>
-                <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                  <dt className="text-sm font-medium text-gray-500">Status</dt>
-                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                    <span className={`px-2 py-1 rounded ${campaign.is_public ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                      {campaign.is_public ? 'Public' : 'Private'}
-                    </span>
-                  </dd>
-                </div>
               </dl>
             </div>
           </div>
 
+          {/* Campaign Link Section - Only visible for admin users */}
           {isAdmin && (
-            <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-              <div className="px-4 py-5 sm:px-6">
-                <h2 className="text-lg leading-6 font-medium text-gray-900">Interview Questions</h2>
+            <div className="mb-8 p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <div className="flex justify-between items-center mb-2">
+                <h3 className="text-lg font-semibold text-gray-700">Campaign Link</h3>
+                <button
+                  id="copy-link-button"
+                  type="button"
+                  onClick={handleCopyLink}
+                  className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                >
+                  Copy Link
+                </button>
               </div>
-              <div className="border-t border-gray-200">
+              <div className="space-y-4">
+                <div className="bg-white border border-gray-200 rounded-lg p-3">
+                  <p className="text-sm text-gray-600 break-all">
+                    {typeof window !== 'undefined' ? `${window.location.origin}/live-interview/${campaignId}` : ''}
+                  </p>
+                </div>
+                <div className="bg-white border border-gray-200 rounded-lg p-3">
+                  <div className="flex flex-col">
+                    <p className="text-sm font-medium text-gray-500 mb-1">Access Code:</p>
+                    <p className="text-base font-mono font-semibold text-gray-800">
+                      {campaign?.access_code || 'Loading...'}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">Share this code with candidates to access the interview</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Questions Section - Show for both admin and candidates */}
+          <div className="bg-white shadow overflow-hidden sm:rounded-lg mt-6">
+            <div className="px-4 py-5 sm:px-6">
+              <h2 className="text-lg leading-6 font-medium text-gray-900">
+                {isAdmin ? 'Interview Questions' : 'Position Questions'}
+              </h2>
+              <p className="mt-1 text-sm text-gray-500">
+                {isAdmin 
+                  ? 'Review and manage the questions for this campaign.' 
+                  : 'Preview of the questions you will be asked during the interview.'}
+              </p>
+            </div>
+            <div className="border-t border-gray-200">
+              {questions.length > 0 ? (
                 <ul className="divide-y divide-gray-200">
                   {questions.map((question, index) => (
                     <li key={question.id} className="px-4 py-4 sm:px-6">
                       <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">Question {index + 1}</p>
-                          <p className="text-sm text-gray-500">{question.body}</p>
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          Max Points: {question.max_points}
+                        <div className="flex-grow">
+                          <p className="text-sm font-medium text-gray-900">
+                            Question {index + 1}: {question.body}
+                          </p>
                         </div>
                       </div>
                     </li>
                   ))}
                 </ul>
-              </div>
+              ) : (
+                <div className="px-4 py-5 sm:px-6 text-center text-gray-500">
+                  {isLoading ? (
+                    <div className="flex justify-center items-center py-4">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-700"></div>
+                    </div>
+                  ) : (
+                    <p>No questions available for this {isAdmin ? 'campaign' : 'position'}.</p>
+                  )}
+                </div>
+              )}
             </div>
-          )}
+          </div>
         </>
       ) : null}
+
+      {/* Success Modal */}
+      <Modal 
+        isOpen={showSuccessModal}
+        onClose={handleSuccessModalClose}
+        title="Campaign Created Successfully"
+      >
+        <div className="flex flex-col items-center space-y-4">
+          <CheckCircleIcon className="h-12 w-12 text-green-500" />
+          <div className="text-center">
+            <p className="text-gray-600 mb-4">
+              Your campaign has been created successfully!
+            </p>
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
+              <p className="text-sm text-gray-600 break-all">
+                {typeof window !== 'undefined' ? `${window.location.origin}/live-interview/${campaignId}` : ''}
+              </p>
+            </div>
+          </div>
+          <PrimaryButton
+            onClick={handleSuccessModalClose}
+            className="mt-4"
+          >
+            Return to Campaigns
+          </PrimaryButton>
+        </div>
+      </Modal>
     </PageTemplate>
   );
 };

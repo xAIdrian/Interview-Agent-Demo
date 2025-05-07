@@ -1,22 +1,33 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 import { useRouter } from 'next/router';
 import { PrimaryButton } from '../../../components/Button';
 import { PageTemplate } from '../../../components/PageTemplate';
 import { Spinner } from '../../../components/ui/Spinner';
 import { Modal } from '../../../components/ui/Modal';
-import { UserGroupIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
+import { TrashIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
+import { useAuth } from '@/app/components/AuthProvider';
+import Link from 'next/link';
+// Import tabulator config before Tabulator
+import configureTabulatorDependencies from '../../../utils/tabulator-config';
+import { TabulatorFull as Tabulator } from 'tabulator-tables';
+import { AuthLogger } from '../../../utils/logging';
+import "tabulator-tables/dist/css/tabulator.min.css";
+import "../../../styles/tabulator.css"; // Import custom tabulator styles
+
+// Initialize Tabulator with required dependencies
+configureTabulatorDependencies();
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://main-service-48k0.onrender.com';
 
 // Define interface for Question object
 interface Question {
-  id?: string; // ID is required for existing questions
+  id?: string;
   title: string;
   body?: string;
   scoring_prompt: string;
   max_points: number;
-  original_prompt?: string; // For storing original prompt during optimization
+  original_prompt?: string;
 }
 
 // Define interface for Campaign object
@@ -30,23 +41,36 @@ interface Campaign {
   questions: Question[];
 }
 
-// Add interface for User
-interface User {
+// Add Submission interface
+interface Submission {
   id: string;
-  name: string;
+  campaign_id: string;
+  user_id: string;
+  created_at: string;
+  is_complete: boolean;
+  total_points: number | null;
   email: string;
-  is_admin: boolean;
+  user_name: string | null;
+  campaign_name: string;
+}
+
+// Update the Tabulator Cell type
+interface TabulatorCell {
+  getValue: () => any;
+  getRow: () => { getData: () => Submission };
 }
 
 const EditCampaignPage = () => {
   const router = useRouter();
   const { campaignId } = router.query;
+  const { user } = useAuth();
   const [isClient, setIsClient] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [initialAssignments, setInitialAssignments] = useState<string[]>([]);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   // Campaign state
   const [campaign, setCampaign] = useState<Campaign>({
@@ -63,61 +87,22 @@ const EditCampaignPage = () => {
   const [optimizedPrompts, setOptimizedPrompts] = useState<{[key: number]: string}>({});
   const [showOptimized, setShowOptimized] = useState<{[key: number]: boolean}>({});
   
-  // Candidate states
-  const [candidates, setCandidates] = useState<User[]>([]);
-  const [selectedCandidates, setSelectedCandidates] = useState<string[]>([]);
-  const [isLoadingCandidates, setIsLoadingCandidates] = useState(false);
+  // Add submissions state and ref
+  const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const tableRef = useRef<HTMLDivElement>(null);
+  const tabulatorRef = useRef<Tabulator | null>(null);
   
   // Use client-side only rendering
   useEffect(() => {
     setIsClient(true);
   }, []);
   
-  // Add useEffect to fetch candidates
-  useEffect(() => {
-    const fetchCandidates = async () => {
-      try {
-        const response = await axios.get(`${API_URL}/api/users`);
-        // Ensure response.data is an array before filtering
-        const users = Array.isArray(response.data) ? response.data : [];
-        const nonAdminUsers = users.filter((user: User) => !user.is_admin);
-        setCandidates(nonAdminUsers);
-      } catch (error) {
-        console.error('Error fetching candidates:', error);
-        setError('Failed to fetch candidates');
-      }
-    };
-
-    fetchCandidates();
-  }, []);
-  
-  // Update the useEffect that fetches current assignments
-  useEffect(() => {
-    const fetchCurrentAssignments = async () => {
-      if (!campaignId) return;
-      
-      try {
-        const response = await axios.get(`${API_URL}/api/campaigns/${campaignId}/assignments`);
-        const currentAssignments = response.data;
-        const assignmentIds = currentAssignments.map((assignment: any) => assignment.user_id);
-        setSelectedCandidates(assignmentIds);
-        setInitialAssignments(assignmentIds);
-      } catch (error) {
-        console.error('Error fetching current assignments:', error);
-        // Don't show error to user as this is not critical
-      }
-    };
-
-    fetchCurrentAssignments();
-  }, [campaignId]);
-  
-  // Use useCallback to prevent dependency cycle
+  // Modify fetchCampaign to include submissions
   const fetchCampaign = useCallback(async () => {
     try {
       setIsLoading(true);
       setError('');
       
-      // Verify campaignId is available and is a string
       if (!campaignId) {
         setError('Invalid campaign ID');
         setIsLoading(false);
@@ -129,24 +114,31 @@ const EditCampaignPage = () => {
         `${API_URL}/api/campaigns/${campaignId}`
       );
       
-      // Fetch questions for this campaign
+      // Fetch questions for this campaign using submission_answers
       const questionsResponse = await axios.get(
-        `${API_URL}/api/questions?campaign_id=${campaignId}`
+        `${API_URL}/api/submission_answers?campaign_id=${campaignId}`
       );
-      
-      // Fetch current assignments
-      const assignmentsResponse = await axios.get(
-        `${API_URL}/api/campaigns/${campaignId}/assignments`
+
+      // Fetch submissions for this campaign
+      const submissionsResponse = await axios.get(
+        `${API_URL}/api/submissions?campaign_id=${campaignId}`
       );
       
       const campaignData = campaignResponse.data;
-      const questionsData = questionsResponse.data;
-      const currentAssignments = assignmentsResponse.data;
+      const questionsData = questionsResponse.data.map((answer: any) => ({
+        id: answer.question_id,
+        title: answer.question_title,
+        body: answer.body || answer.question_title,
+        scoring_prompt: answer.scoring_prompt || '',
+        max_points: parseInt(answer.max_points) || 10
+      }));
+      const submissionsData = submissionsResponse.data.map((submission: any) => ({
+        ...submission,
+        id: String(submission.id),
+        campaign_id: String(submission.campaign_id),
+        user_id: String(submission.user_id)
+      }));
       
-      // Set selected candidates
-      setSelectedCandidates(currentAssignments.map((assignment: any) => assignment.user_id));
-      
-      // Combine data into campaign state
       setCampaign({
         id: campaignData.id.toString(),
         title: campaignData.title,
@@ -154,14 +146,10 @@ const EditCampaignPage = () => {
         job_description: campaignData.job_description || '',
         max_user_submissions: parseInt(campaignData.max_user_submissions),
         is_public: Boolean(campaignData.is_public),
-        questions: questionsData.map((q: any) => ({
-          id: q.id.toString(),
-          title: q.title,
-          body: q.body || '',
-          scoring_prompt: q.scoring_prompt || '',
-          max_points: parseInt(q.max_points) || 10
-        }))
+        questions: questionsData
       });
+
+      setSubmissions(submissionsData);
       
     } catch (error) {
       console.error('Error fetching campaign:', error);
@@ -177,6 +165,94 @@ const EditCampaignPage = () => {
       fetchCampaign();
     }
   }, [isClient, campaignId, fetchCampaign]);
+  
+  // Add Tabulator initialization effect
+  useEffect(() => {
+    if (isLoading || !tableRef.current || submissions.length === 0) return;
+    
+    try {
+      const formatDate = (date: string | null) => {
+        if (!date) return 'N/A';
+        return new Date(date).toLocaleString();
+      };
+      
+      tabulatorRef.current = new Tabulator(tableRef.current, {
+        data: submissions,
+        layout: "fitColumns",
+        pagination: true,
+        paginationSize: 10,
+        paginationSizeSelector: [5, 10, 20, 50],
+        movableColumns: true,
+        resizableRows: true,
+        columns: [
+          { 
+            title: "Candidate", 
+            field: "email", 
+            headerFilter: true, 
+            widthGrow: 2,
+            formatter: function(cell: any) {
+              const data = cell._cell.row.data;
+              const name = data.user_name || 'No name';
+              const email = data.email;
+              return `<div>
+                <div class="font-medium">${name}</div>
+              </div>`;
+            }
+          },
+          { 
+            title: "Created", 
+            field: "created_at", 
+            formatter: (cell) => formatDate(cell.getValue()),
+            sorter: "datetime",
+            widthGrow: 1
+          },
+          { 
+            title: "Score", 
+            field: "total_points", 
+            formatter: (cell) => {
+              const value = cell.getValue();
+              return value !== null ? value : 'Not scored';
+            },
+            sorter: "number",
+            widthGrow: 1
+          },
+          {
+            title: "Actions",
+            field: "id",
+            hozAlign: "center",
+            formatter: (cell: any) => {
+              const submissionId = String(cell.getValue());
+              const container = document.createElement("div");
+              container.className = "flex space-x-2";
+              
+              const viewButton = document.createElement("a");
+              viewButton.innerHTML = "View Answers";
+              viewButton.className = "px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm";
+              const returnToCampaign = String(campaignId);
+              console.log('🚀 ~ Creating view button with returnToCampaign:', returnToCampaign);
+              viewButton.href = `/submissions/${submissionId}?returnToCampaign=${encodeURIComponent(returnToCampaign)}`;
+              container.appendChild(viewButton);
+              
+              return container;
+            }
+          }
+        ],
+        initialSort: [
+          { column: "created_at", dir: "desc" }
+        ]
+      });
+    } catch (err) {
+      console.error("Error initializing tabulator:", err);
+      setError("Failed to initialize submission table. Please refresh the page.");
+    }
+    
+    return () => {
+      if (tabulatorRef.current) {
+        tabulatorRef.current.destroy();
+        tabulatorRef.current = null;
+      }
+    };
+  }, [submissions, isLoading]);
   
   if (!isClient) {
     return <div className="loading">Loading...</div>;
@@ -338,18 +414,7 @@ const EditCampaignPage = () => {
     });
   };
   
-  // Add handler for candidate selection
-  const handleCandidateSelection = (userId: string) => {
-    setSelectedCandidates(prev => {
-      if (prev.includes(userId)) {
-        return prev.filter(id => id !== userId);
-      } else {
-        return [...prev, userId];
-      }
-    });
-  };
-  
-  // Update handleSubmit to include success modal
+  // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -364,12 +429,6 @@ const EditCampaignPage = () => {
     
     if (campaign.questions.length === 0) {
       setError('At least one question is required');
-      setIsSubmitting(false);
-      return;
-    }
-
-    if (selectedCandidates.length === 0) {
-      setError('At least one candidate must be selected');
       setIsSubmitting(false);
       return;
     }
@@ -395,7 +454,7 @@ const EditCampaignPage = () => {
     }
     
     try {
-      // First update the campaign
+      // Update the campaign
       const response = await axios.post(
         `${API_URL}/api/campaigns/${campaignId}/update`,
         {
@@ -408,32 +467,7 @@ const EditCampaignPage = () => {
       );
 
       if (response.status === 200) {
-        // Only make assignment request if there are changes
-        const hasAssignmentChanges = 
-          initialAssignments.length !== selectedCandidates.length ||
-          !initialAssignments.every(id => selectedCandidates.includes(id)) ||
-          !selectedCandidates.every(id => initialAssignments.includes(id));
-
-        if (hasAssignmentChanges) {
-          try {
-            const assignmentResponse = await axios.post(`${API_URL}/api/campaigns/${campaignId}/assignments`, {
-              user_ids: selectedCandidates
-            });
-
-            if (assignmentResponse.data.message === "Candidates assigned successfully" || 
-                assignmentResponse.data.message === "No candidates assigned") {
-              setShowSuccessModal(true);
-            } else {
-              setError('Failed to update candidate assignments');
-            }
-          } catch (error) {
-            console.error('Error assigning candidates:', error);
-            setError('Failed to update candidate assignments');
-          }
-        } else {
-          // No changes to assignments, just show success modal
-          setShowSuccessModal(true);
-        }
+        setShowSuccessModal(true);
       } else {
         setError('Failed to update campaign');
       }
@@ -448,6 +482,73 @@ const EditCampaignPage = () => {
   const handleSuccessModalClose = () => {
     setShowSuccessModal(false);
     router.push('/campaigns');
+  };
+  
+  const handleCopyLink = async (e: React.MouseEvent) => {
+    e.preventDefault(); // Prevent any default behavior
+    const link = `${typeof window !== 'undefined' ? window.location.origin : ''}/live-interview/${campaignId}`;
+    const button = document.querySelector('#copy-link-button');
+    
+    try {
+      // Create a temporary textarea element
+      const textarea = document.createElement('textarea');
+      textarea.value = link;
+      textarea.setAttribute('readonly', '');
+      textarea.style.cssText = 'position: fixed; pointer-events: none; opacity: 0;'; // Use fixed positioning and make invisible
+      
+      document.body.appendChild(textarea);
+      textarea.select();
+      
+      // Try the modern clipboard API first
+      try {
+        await navigator.clipboard.writeText(link);
+      } catch (clipboardErr) {
+        // Fallback to the older execCommand method
+        document.execCommand('copy');
+      }
+      
+      document.body.removeChild(textarea);
+      
+      // Update button text temporarily
+      if (button) {
+        const originalText = button.textContent;
+        button.textContent = 'Copied!';
+        setTimeout(() => {
+          button.textContent = originalText;
+        }, 2000);
+      }
+    } catch (err) {
+      console.error('Failed to copy link:', err);
+      // Show error state on button
+      if (button) {
+        const originalText = button.textContent;
+        button.textContent = 'Failed to copy';
+        setTimeout(() => {
+          button.textContent = originalText;
+        }, 2000);
+      }
+    }
+  };
+  
+  const handleDeleteCampaign = async () => {
+    if (!campaignId) return;
+    
+    try {
+      setIsDeleting(true);
+      const response = await axios.delete(`${API_URL}/api/campaigns/${campaignId}`);
+      
+      if (response.data.success) {
+        router.push('/campaigns');
+      } else {
+        setError('Failed to delete campaign');
+      }
+    } catch (error) {
+      console.error('Error deleting campaign:', error);
+      setError('Failed to delete campaign. Please try again.');
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteModal(false);
+    }
   };
   
   if (isLoading) {
@@ -465,7 +566,29 @@ const EditCampaignPage = () => {
   return (
     <PageTemplate title="Edit Campaign" maxWidth="lg">
       <div className="w-full bg-white shadow-md rounded-lg p-6">
-        <h2 className="text-2xl font-bold mb-6">Edit Campaign</h2>
+        <div className="flex justify-between items-center mb-6">
+          <div className="flex items-center space-x-4">
+            <Link
+              href={`/campaigns/${campaignId}`}
+              className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 flex items-center gap-2"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+              </svg>
+              Back to Campaign
+            </Link>
+          </div>
+          {user?.is_admin && (
+            <button
+              onClick={() => setShowDeleteModal(true)}
+              className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 flex items-center gap-2"
+              disabled={isDeleting}
+            >
+              <TrashIcon className="h-5 w-5" />
+              {isDeleting ? 'Deleting...' : 'Delete Campaign'}
+            </button>
+          )}
+        </div>
         
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Campaign details */}
@@ -513,65 +636,6 @@ const EditCampaignPage = () => {
                 className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500"
                 placeholder="Enter the complete job description for this role"
               />
-            </div>
-            
-            <div>
-              <label htmlFor="max_user_submissions" className="block text-sm font-medium text-gray-700">
-                Max User Submissions
-              </label>
-              <input
-                id="max_user_submissions"
-                name="max_user_submissions"
-                type="number"
-                value={campaign.max_user_submissions}
-                onChange={handleCampaignChange}
-                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500"
-                min="1"
-                required
-              />
-            </div>
-          </div>
-          
-          {/* Add Candidate Selection Section */}
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <h2 className="text-xl font-semibold">Candidate Assignment</h2>
-              <UserGroupIcon className="h-6 w-6 text-gray-500" />
-            </div>
-            
-            <div className="border rounded-lg p-4 space-y-4">
-              <p className="text-sm text-gray-600">
-                Select candidates to assign to this campaign. You can also assign candidates later.
-              </p>
-              
-              {isLoadingCandidates ? (
-                <div className="flex justify-center">
-                  <Spinner size="small" />
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {candidates.map((candidate) => (
-                    <div
-                      key={candidate.id}
-                      className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                        selectedCandidates.includes(candidate.id)
-                          ? 'border-blue-500 bg-blue-50'
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                      onClick={() => handleCandidateSelection(candidate.id)}
-                    >
-                      <div className="font-medium">{candidate.name}</div>
-                      <div className="text-sm text-gray-600">{candidate.email}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-              
-              {candidates.length === 0 && !isLoadingCandidates && (
-                <div className="text-center text-gray-500 py-4">
-                  No candidates available to assign.
-                </div>
-              )}
             </div>
           </div>
           
@@ -704,6 +768,84 @@ const EditCampaignPage = () => {
             </div>
           )}
         </form>
+
+        {/* Submissions Section */}
+        <div className="mt-12 border-t pt-8">
+          <h2 className="text-2xl font-bold mb-6">Submissions</h2>
+          
+          <div className="bg-white rounded-lg">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+              <div className="p-3 bg-gray-50 rounded">
+                <h3 className="text-sm font-medium text-gray-500">Total Submissions</h3>
+                <p className="text-2xl font-bold">{submissions.length}</p>
+              </div>
+              <div className="p-3 bg-gray-50 rounded">
+                <h3 className="text-sm font-medium text-gray-500">Completed</h3>
+                <p className="text-2xl font-bold">{submissions.filter(s => s.is_complete).length}</p>
+              </div>
+              <div className="p-3 bg-gray-50 rounded">
+                <h3 className="text-sm font-medium text-gray-500">In Progress</h3>
+                <p className="text-2xl font-bold">{submissions.filter(s => !s.is_complete).length}</p>
+              </div>
+              <div className="p-3 bg-gray-50 rounded">
+                <h3 className="text-sm font-medium text-gray-500">Average Score</h3>
+                <p className="text-2xl font-bold">
+                  {submissions.length > 0 && submissions.some(s => s.total_points !== null)
+                    ? (submissions.reduce((acc, s) => acc + (s.total_points || 0), 0) / 
+                      submissions.filter(s => s.total_points !== null).length).toFixed(1)
+                    : 'N/A'}
+                </p>
+              </div>
+            </div>
+
+            {submissions.length > 0 ? (
+              <div className="bg-white rounded-lg">
+                {error.includes("initialize submission table") ? (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Candidate</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {submissions.map((submission) => (
+                          <tr key={submission.id}>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div>
+                                <div className="font-medium">{submission.user_name || 'No name'}</div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">{new Date(submission.created_at).toLocaleString()}</td>
+                            <td className="px-6 py-4 whitespace-nowrap">{submission.total_points !== null ? submission.total_points : 'Not scored'}</td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <Link
+                                href={`/submissions/${submission.id}`}
+                                className="text-blue-600 hover:text-blue-900"
+                              >
+                                View
+                              </Link>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div ref={tableRef} className="w-full"></div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-8 bg-white rounded-lg">
+                <p className="text-gray-500">No submissions found for this campaign.</p>
+                <p className="text-gray-400 mt-2">Submissions will appear here when candidates complete the interview.</p>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Loading Modal */}
@@ -714,7 +856,7 @@ const EditCampaignPage = () => {
         <div className="flex flex-col items-center space-y-4">
           <Spinner size="large" />
           <p className="text-gray-600 text-center">
-            Please wait while we update your campaign and assign candidates...
+            Please wait while we update your campaign...
           </p>
         </div>
       </Modal>
@@ -735,6 +877,35 @@ const EditCampaignPage = () => {
           >
             Return to Campaigns
           </PrimaryButton>
+        </div>
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        isOpen={showDeleteModal}
+        title="Delete Campaign"
+      >
+        <div className="p-6">
+          <p className="text-gray-700 mb-4">
+            Are you sure you want to delete this campaign? This action cannot be undone and will delete all associated questions and submissions.
+          </p>
+          <div className="flex justify-end gap-4">
+            <button
+              onClick={() => setShowDeleteModal(false)}
+              className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300"
+              disabled={isDeleting}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleDeleteCampaign}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2"
+              disabled={isDeleting}
+            >
+              <TrashIcon className="h-5 w-5" />
+              {isDeleting ? 'Deleting...' : 'Delete Campaign'}
+            </button>
+          </div>
         </div>
       </Modal>
     </PageTemplate>

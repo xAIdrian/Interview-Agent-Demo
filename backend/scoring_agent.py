@@ -64,7 +64,10 @@ def generate_submission_scoring(campaign, questions, transcript):
     if current_question and current_response:
         candidate_responses[current_question] = "\n".join(current_response)
 
-    system_prompt = f"""# CONTEXT
+    system_prompt = f"""
+THE OUTPUT MUST ALWAYS BE IN FRENCH.
+    
+# CONTEXT
 
 You are an interview scoring agent.
 
@@ -90,11 +93,19 @@ You will create a JSON array containing a dictionary representing each of your a
 
 Your rationale should take into consideration the requirements of the {campaign_title} position and the context provided.
 
+Your task is to score each answer on a scale, not just with binary pass/fail outcomes.
+
+Use scaled scoring where partial alignment with the ideal answer earns proportionate credit. 
+For example: if a candidate requests a salary of $70k and the ideal is $50k, do not score them zero — instead, assign them most of the possible points based on proximity. 
+Apply this principle across all answers.  Quantitative and qualitative should use the same scale.
+
+
 Provide only the JSON array in plaintext. Do not use any markdown functionality.
 
 # CANDIDATE RESPONSES
 {json.dumps(candidate_responses, indent=2)}
 
+THE OUTPUT MUST ALWAYS BE IN FRENCH.
 \n\n"""
 
     user_prompt = format_questions(questions)
@@ -113,7 +124,10 @@ Provide only the JSON array in plaintext. Do not use any markdown functionality.
         raise ValueError("Invalid scoring response format")
 
 
-scoring_prompt_optimization_system = """Optimize this scoring prompt created by an admin to score a candidate's response.
+scoring_prompt_optimization_system = """
+THE OUTPUT MUST ALWAYS BE IN FRENCH.
+
+Optimize this scoring prompt created by an admin to score a candidate's response.
 
 Specify what criteria constitutes full points, half points, and no points. Be clear in your definition. Start your prompt with "Full points awarded with"
 
@@ -126,6 +140,7 @@ Role information: {campaign_context}
 Question: {question}
 Original scoring prompt: {scoring_prompt}
 
+THE OUTPUT MUST ALWAYS BE IN FRENCH.
 """
 
 
@@ -175,7 +190,10 @@ def analyze_strengths_weaknesses(campaign, resume_text):
         campaign_context = campaign["campaign_context"]
         job_description = campaign["job_description"]
 
-        system_prompt = f"""# CONTEXT
+        system_prompt = f"""
+THE OUTPUT MUST ALWAYS BE IN FRENCH.
+
+# CONTEXT
 You are an expert resume analyzer and career advisor.
 
 The company is hiring for a {campaign_title} position.
@@ -186,7 +204,7 @@ Job Description: {job_description}
 # TASK
 Analyze the candidate's resume against the job requirements and provide:
 1. Key strengths that make them a good fit
-2. Potential weaknesses or gaps
+2. Potential weaknesses or gaps (do not make these too critical or negative.  Soften the language so you don't hurt the candidate's feelings)
 3. Overall assessment of their fit for the role
 
 Consider:
@@ -208,9 +226,14 @@ Format your response as a JSON object with the following structure:
 # RESUME
 {resume_text}
 
+THE OUTPUT MUST ALWAYS BE IN FRENCH.
 \n\n"""
 
-        user_prompt = "Analyze this resume against the job requirements and provide strengths, weaknesses, and overall fit assessment."
+        user_prompt = """
+Analyze this resume against the job requirements and provide strengths, weaknesses, and overall fit assessment.
+
+THE OUTPUT MUST ALWAYS BE IN FRENCH.
+"""
 
         analysis = openai_response(system_prompt, user_prompt)
         logger.info(f"Received analysis from OpenAI: {analysis}")

@@ -90,22 +90,6 @@ const LiveKitInterviewForm = ({ campaignId, onStartInterview }: LiveKitInterview
   return (
     <div className="bg-white shadow-md rounded-lg p-6">
       <h2 className="text-2xl font-bold mb-4">Interview Details</h2>
-      
-      <div className="mb-6">
-        <h3 className="text-lg font-semibold mb-2">Your Application Status</h3>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="bg-gray-50 p-4 rounded">
-            <p className="text-sm text-gray-500">Attempts Used</p>
-            <p className="text-lg font-semibold">
-              {submissionStatus.total_submissions} of {submissionStatus.max_submissions}
-            </p>
-          </div>
-          <div className="bg-gray-50 p-4 rounded">
-            <p className="text-sm text-gray-500">Completed Interviews</p>
-            <p className="text-lg font-semibold">{submissionStatus.completed_submissions}</p>
-          </div>
-        </div>
-      </div>
 
       <div className="flex flex-col items-center">
         <button

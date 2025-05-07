@@ -47,7 +47,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     >
       <div className="flex items-center justify-between h-16 px-4">
         {!collapsed && (
-          <h1 className="font-bold text-xl">Gulpin AI</h1>
+          <h1 className="font-bold text-xl">Noor</h1>
         )}
         <button 
           onClick={toggleCollapse}
