@@ -469,20 +469,44 @@ def handle_submissions():
 
             # Generate UUID for new submission
             submission_id = str(uuid.uuid4())
+            user_id = None
 
-            # Insert new submission without requiring user_id
+            # If email and name are provided, create a new user
+            if data.get("email") and data.get("name"):
+                # Check if user already exists
+                cursor.execute("SELECT id FROM users WHERE email = ?", (data["email"],))
+                existing_user = cursor.fetchone()
+
+                if existing_user:
+                    user_id = existing_user[0]
+                else:
+                    # Create new user without password
+                    user_id = str(uuid.uuid4())
+                    cursor.execute(
+                        """
+                        INSERT INTO users (id, email, name, is_admin)
+                        VALUES (?, ?, ?, ?)
+                        """,
+                        (user_id, data["email"], data["name"], False),
+                    )
+
+            # Insert new submission with user_id
             cursor.execute(
                 """
-                INSERT INTO submissions (id, campaign_id, created_at, updated_at)
-                VALUES (?, ?, datetime('now'), datetime('now'))
+                INSERT INTO submissions (id, campaign_id, user_id, created_at, updated_at)
+                VALUES (?, ?, ?, datetime('now'), datetime('now'))
                 """,
-                (submission_id, data["campaign_id"]),
+                (submission_id, data["campaign_id"], user_id),
             )
 
             conn.commit()
             return (
                 jsonify(
-                    {"message": "Submission created successfully", "id": submission_id}
+                    {
+                        "message": "Submission created successfully",
+                        "id": submission_id,
+                        "user_id": user_id,
+                    }
                 ),
                 200,
             )
