@@ -18,6 +18,7 @@ import { Track } from 'livekit-client';
 import axios from 'axios';
 import { Modal } from '@/components/ui/Modal';
 import { Spinner } from '@/components/ui/Spinner';
+import { Toast } from '@/components/ui/Toast';
 import { useRouter } from 'next/router';
 import { useAuth } from '@/app/components/AuthProvider';
 import { Dialog } from '@headlessui/react';
@@ -67,6 +68,7 @@ const SimpleVoiceAssistant: React.FC<{ onTranscriptUpdate: (transcript: any[]) =
   });
 
   const [messages, setMessages] = React.useState<Array<{ id?: string; type: 'agent' | 'user'; text: string }>>([]);
+  const [isWaitingForFirstResponse, setIsWaitingForFirstResponse] = useState(true);
 
   // Memoize the transcript update to prevent unnecessary re-renders
   const handleTranscriptUpdate = React.useCallback((newMessages: any[]) => {
@@ -79,12 +81,17 @@ const SimpleVoiceAssistant: React.FC<{ onTranscriptUpdate: (transcript: any[]) =
       ...(userTranscriptions?.map((t) => ({ ...t, type: 'user' as const })) ?? []),
     ].sort((a, b) => a.firstReceivedTime - b.firstReceivedTime);
 
+    // Check if we've received the first agent response
+    if (isWaitingForFirstResponse && agentTranscriptions && agentTranscriptions.length > 0) {
+      setIsWaitingForFirstResponse(false);
+    }
+
     // Only update if messages have actually changed
     if (JSON.stringify(allMessages) !== JSON.stringify(messages)) {
       setMessages(allMessages);
       handleTranscriptUpdate(allMessages);
     }
-  }, [agentTranscriptions, userTranscriptions, messages, handleTranscriptUpdate]);
+  }, [agentTranscriptions, userTranscriptions, messages, handleTranscriptUpdate, isWaitingForFirstResponse]);
 
   return (
     <div className="voice-assistant-container">
@@ -108,7 +115,14 @@ const SimpleVoiceAssistant: React.FC<{ onTranscriptUpdate: (transcript: any[]) =
           <div className="p-4 h-80 overflow-y-auto">
             {messages.length === 0 && (
               <div className="interview-instructions text-center py-8 text-gray-500">
+                {isWaitingForFirstResponse ? (
+                  <div className="flex flex-col items-center space-y-3">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                    <p>Waiting for the interviewer to begin...</p>
+                  </div>
+                ) : (
                 <p>The interviewer will ask you questions. Answer naturally as if in a real interview.</p>
+                )}
               </div>
             )}
             {messages.map((msg, index) => (
@@ -121,48 +135,217 @@ const SimpleVoiceAssistant: React.FC<{ onTranscriptUpdate: (transcript: any[]) =
   );
 };
 
-const OnboardingModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-8 max-w-2xl mx-4 shadow-xl">
-        <div className="text-center">
-          <h2 className="text-3xl font-bold text-blue-600 mb-6">Welcome to Your AI Interview! 🎯</h2>
-          
-          <div className="space-y-4 text-left mb-8">
+const InstructionsModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => {
+  const [currentStep, setCurrentStep] = useState(1);
+  const totalSteps = 3;
+  const [interviewCode, setInterviewCode] = useState('');
+  const [isCodeValid, setIsCodeValid] = useState(false);
+  const [isValidating, setIsValidating] = useState(false);
+  const [codeError, setCodeError] = useState('');
+  const router = useRouter();
+  const { campaignId } = router.query;
+
+  // Prevent closing modal with escape key
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, []);
+
+  const handleNext = async () => {
+    if (currentStep === 1) {
+      if (!interviewCode.trim()) {
+        setCodeError('Please enter an interview code');
+        return;
+      }
+
+      // Validate code format (8 characters)
+      if (interviewCode.trim().length !== 8) {
+        setCodeError('Interview code must be 8 characters long');
+        return;
+      }
+      
+      setIsValidating(true);
+      setCodeError('');
+      
+      try {
+        const response = await axios.post(
+          `${API_URL}/api/campaigns/${campaignId}/validate-access-code`,
+          { access_code: interviewCode.trim() }
+        );
+
+        if (response.data.status === 'accepted') {
+          setIsCodeValid(true);
+          setCurrentStep(currentStep + 1);
+        } else {
+          setCodeError(response.data.message || 'Invalid interview code. Please try again.');
+        }
+      } catch (error) {
+        setCodeError('Error validating code. Please try again.');
+        console.error('Error validating access code:', error);
+      } finally {
+        setIsValidating(false);
+      }
+    } else if (currentStep < totalSteps) {
+      setCurrentStep(currentStep + 1);
+    } else {
+      onClose();
+    }
+  };
+
+  const handleBack = () => {
+    if (currentStep > 1) {
+      setCurrentStep(currentStep - 1);
+    }
+  };
+
+  const handleCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.toUpperCase();
+    if (value.length <= 8) {
+      setInterviewCode(value);
+      setCodeError('');
+    }
+  };
+
+  const renderStepContent = () => {
+    switch (currentStep) {
+      case 1:
+        return (
+          <div className="space-y-4">
+            <h3 className="text-xl font-semibold text-blue-800 mb-3">Welcome to Your AI Interview! 🎯</h3>
             <p className="text-lg text-gray-700">
-              Before we begin, let's make sure you're set up for success:
+              To begin your interview, please enter the interview code provided to you:
             </p>
-            
-            <div className="bg-blue-50 p-4 rounded-lg">
-              <h3 className="text-xl font-semibold text-blue-800 mb-3">Quick Tips for a Great Interview:</h3>
-              <ul className="space-y-3 text-blue-700">
-                <li className="flex items-start">
-                  <span className="mr-2">🎙️</span>
-                  Find a quiet space where you won't be interrupted and there is no extra noise
-                </li>
-                <li className="flex items-start">
-                  <span className="mr-2">💡</span>
-                  Take your time to provide complete, thoughtful answers
-                </li>
-                <li className="flex items-start">
-                  <span className="mr-2">🎯</span>
-                  Be yourself - we want to get to know the real you!
-                </li>
-              </ul>
+            <div className="space-y-2">
+              <div className="relative">
+                <input
+                  type="text"
+                  value={interviewCode}
+                  onChange={handleCodeChange}
+                  placeholder="Enter your interview code"
+                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                    codeError 
+                      ? 'border-red-300 focus:ring-red-200' 
+                      : 'border-gray-300 focus:ring-blue-200'
+                  }`}
+                />
+                {isValidating && (
+                  <div className="absolute right-3 top-2.5">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                  </div>
+                )}
+              </div>
+              {codeError && (
+                <p className="text-sm text-red-600">{codeError}</p>
+              )}
             </div>
-
-            <p className="text-gray-600 italic">
-              "Remember: This is your moment to shine. We're here to help you showcase your best self!"
-            </p>
+            <div className="bg-blue-50 p-4 rounded-lg mt-4">
+              <h4 className="text-lg font-semibold text-blue-800 mb-2">Don't have an interview code?</h4>
+              <p className="text-blue-700">
+                If you haven't received an interview code, please contact your recruiter or the hiring team.
+              </p>
+            </div>
           </div>
+        );
+      case 2:
+        return (
+          <div className="space-y-4">
+            <h3 className="text-xl font-semibold text-blue-800 mb-3">How the Interview Works</h3>
+            <div className="space-y-4">
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <h4 className="text-lg font-semibold text-blue-800 mb-2">Interview Process:</h4>
+                <ol className="space-y-3 text-blue-700 list-decimal list-inside">
+                  <li>The AI interviewer will ask you a series of questions</li>
+                  <li>Take your time to think and respond naturally</li>
+                  <li>Your responses will be evaluated for content and clarity</li>
+                  <li>The interview will last approximately 15-20 minutes</li>
+                </ol>
+              </div>
+              <p className="text-gray-600">
+                You'll see a transcript of the conversation in real-time, helping you track the discussion.
+              </p>
+            </div>
+          </div>
+        );
+      case 3:
+        return (
+          <div className="space-y-4">
+            <h3 className="text-xl font-semibold text-blue-800 mb-3">Ready to Begin?</h3>
+            <div className="space-y-4">
+              <p className="text-lg text-gray-700">
+                You're all set to start your interview! Remember:
+              </p>
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <ul className="space-y-3 text-blue-700">
+                  <li className="flex items-start">
+                    <span className="mr-2">🎙️</span>
+                    Find a quiet space where you won't be interrupted
+                  </li>
+                  <li className="flex items-start">
+                    <span className="mr-2">💡</span>
+                    Take your time to provide complete, thoughtful answers
+                  </li>
+                  <li className="flex items-start">
+                    <span className="mr-2">🎯</span>
+                    Be yourself - we want to get to know the real you!
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
 
-          <button
-            onClick={onClose}
-            className="bg-blue-600 text-white px-8 py-3 rounded-lg text-lg font-semibold hover:bg-blue-700 transition-colors duration-200 shadow-lg hover:shadow-xl"
-          >
-            I'm Ready to Begin! 🚀
-          </button>
-        </div>
+  return (
+    <div className="fixed inset-0 z-50" style={{ pointerEvents: 'none' }}>
+      <div style={{ pointerEvents: 'auto' }}>
+        <Modal 
+          isOpen={isOpen} 
+          onClose={() => {}} // Empty function to prevent closing
+          title={`Step ${currentStep} of ${totalSteps}`}
+        >
+          <div className="space-y-6">
+            {renderStepContent()}
+            
+            <div className="flex justify-between mt-8">
+              <button
+                onClick={handleBack}
+                disabled={currentStep === 1}
+                className={`px-4 py-2 rounded ${
+                  currentStep === 1
+                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Back
+              </button>
+              <button
+                onClick={handleNext}
+                disabled={currentStep === 1 && (isValidating || !interviewCode.trim())}
+                className={`px-4 py-2 rounded ${
+                  currentStep === 1 && (isValidating || !interviewCode.trim())
+                    ? 'bg-blue-400 cursor-not-allowed'
+                    : 'bg-blue-600 hover:bg-blue-700'
+                } text-white`}
+              >
+                {isValidating 
+                  ? 'Validating...' 
+                  : currentStep === totalSteps 
+                    ? 'Start Interview' 
+                    : 'Next'
+                }
+              </button>
+            </div>
+          </div>
+        </Modal>
       </div>
     </div>
   );
@@ -170,12 +353,16 @@ const OnboardingModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
 const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, room, submissionId, onDisconnect }: LiveKitInterviewComponentProps) => {
   const livekitUrl = 'wss://default-test-oyjqa9xh.livekit.cloud';
-  const [showOnboarding, setShowOnboarding] = useState(true);
+  const [showInstructions, setShowInstructions] = useState(true);
+  const [isLivekitConnected, setIsLivekitConnected] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isProcessingSubmission, setIsProcessingSubmission] = useState(false);
   const [transcript, setTranscript] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [hasSubmitted, setHasSubmitted] = useState(false);
   const [submissionStatus, setSubmissionStatus] = useState<SubmissionStatus>({
     total_submissions: 0,
     completed_submissions: 0,
@@ -211,7 +398,6 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
           has_completed_submission: completedSubmissions > 0
         });
 
-        // No longer need to generate token and submissionId here since they are passed as props
       } catch (err) {
         console.error('Error fetching submission status:', err);
         setError('Failed to load submission status');
@@ -231,6 +417,11 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
 
     try {
       if (submitInterview) {
+        // Prevent duplicate submissions
+        if (hasSubmitted) {
+          console.log('Interview already submitted, skipping duplicate submission');
+          return;
+        }
         
         // Ensure transcript is an array and not empty
         const formattedTranscript = Array.isArray(newTranscript) ? newTranscript : [];
@@ -244,10 +435,13 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
           transcript: formattedTranscript,
           submissionId,
           campaignId,
-          userId: user.id
+          userId: user.id,
+          transcriptLength: formattedTranscript.length
         });
         
         setIsProcessingSubmission(true);
+        setHasSubmitted(true); // Mark as submitted before making the request
+        
         const response = await axios.post(`${API_URL}/api/submit_interview`, {
           campaign_id: campaignId,
           user_id: user.id,
@@ -255,19 +449,43 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
           transcript: formattedTranscript
         });
 
+        console.log('📝 Submit interview response:', response.data);
+
         if (response.data.success) {
-          console.log('✅ Interview submitted successfully');
+          console.log('✅ Interview submitted successfully', {
+            submissionId,
+            totalScore: response.data.total_score,
+            maxPossibleScore: response.data.max_possible_score
+          });
+
+          // Verify the submission was marked as complete
+          const verifyResponse = await axios.get(`${API_URL}/api/submissions/${submissionId}`);
+          console.log('🔍 Verifying submission status:', verifyResponse.data);
+          
+          if (!verifyResponse.data.is_complete) {
+            console.log('⚠️ Submission was not marked as complete');
+            setToastMessage('Your interview was submitted but may take a few minutes to process completely.');
+            setShowToast(true);
+          }
+
           setIsProcessingSubmission(false);
-          router.push('/campaigns');
+          onInterviewComplete(submissionId); // Call the callback instead of redirecting
         } else {
+          console.error('❌ Interview submission failed:', response.data.error);
+          setHasSubmitted(false); // Reset submission flag on failure
           throw new Error(response.data.error || 'Failed to submit interview');
         }
       } else {
         setTranscript(newTranscript);
       }
     } catch (err) {
-      console.error('Error submitting interview:', err);
+      console.error('❌ Error submitting interview:', err);
+      if (axios.isAxiosError(err)) {
+        console.error('Response data:', err.response?.data);
+      }
       setError('Failed to submit interview. Please try again.');
+      setIsProcessingSubmission(false);
+      setHasSubmitted(false); // Reset submission flag on error
     } 
   };
 
@@ -275,14 +493,44 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
     try {
       if (!submissionId) {
         console.error('No submissionId available for submission');
+        setError('Missing submission ID');
+        return;
+      }
+
+      if (hasSubmitted) {
+        console.log('Interview already submitted, skipping duplicate submission');
         return;
       }
 
       setIsProcessingSubmission(true);
+      
+      // Wait a short time for any final transcriptions to be processed
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Check if transcript is empty
+      if (!transcript || transcript.length === 0) {
+        setError('Cannot submit interview: no conversation recorded');
+        setIsProcessingSubmission(false);
+        return;
+      }
+
+      console.log('🚀 Submitting final interview transcript:', {
+        transcript,
+        submissionId,
+        campaignId,
+        transcriptLength: transcript.length
+      });
+
+      // Submit the final transcript
       await handleTranscriptUpdate(true, transcript);
+      
+      // Call onDisconnect after successful submission
+      onDisconnect();
     } catch (err) {
       console.error('Error during disconnect:', err);
       setError('Failed to properly disconnect. Please try again.');
+      setHasSubmitted(false); // Reset submission flag on error
+      setIsProcessingSubmission(false);
     } 
   };
 
@@ -304,22 +552,44 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
   }
 
   return (
-    <div className="livekit-interview">
-      {showOnboarding && (
-        <OnboardingModal onClose={() => setShowOnboarding(false)} />
+    <div className="livekit-interview space-y-6">
+      {showToast && (
+        <Toast
+          message={toastMessage}
+          duration={5000}
+          onClose={() => setShowToast(false)}
+        />
       )}
+      
+      <InstructionsModal 
+        isOpen={showInstructions} 
+        onClose={() => {
+          setShowInstructions(false);
+          setIsLivekitConnected(true); // Start LiveKit connection when instructions are complete
+        }} 
+      />
+
+      {/* Interview Interface */}
       <div className="bg-white rounded-lg overflow-hidden shadow-lg">
         <div className="p-4 bg-blue-600 text-white">
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-bold">Interview Session: {user?.name}</h2>
             <button 
               onClick={() => {
-                console.log('🔌 LiveKit disconnected, submitting transcript...');
+                console.log('End Interview clicked', {
+                  hasSubmitted,
+                  isProcessingSubmission,
+                  transcript,
+                  submissionId
+                });
                 handleDisconnect();
               }}
-              className="px-3 py-1 bg-white text-blue-600 rounded hover:bg-blue-50 transition-colors"
+              disabled={hasSubmitted || isProcessingSubmission}
+              className={`px-3 py-1 bg-white text-blue-600 rounded transition-colors ${
+                (hasSubmitted || isProcessingSubmission) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-50'
+              }`}
             >
-              End Interview
+              {isProcessingSubmission ? 'Processing...' : hasSubmitted ? 'Submitted' : 'End Interview'}
             </button>
           </div>
         </div>
@@ -328,13 +598,10 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
           <LiveKitRoom
             serverUrl={livekitUrl}
             token={token}
-            connect={true}
+            connect={isLivekitConnected}
             video={false}
             audio={true}
-            onDisconnected={() => {
-              console.log('🔌 LiveKit disconnected, submitting transcript...');
-              handleDisconnect();
-            }}
+            onDisconnected={handleDisconnect}
           >
             <RoomAudioRenderer />
             <SimpleVoiceAssistant onTranscriptUpdate={(transcript) => handleTranscriptUpdate(false, transcript)} />
@@ -345,7 +612,7 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
       {/* Processing Modal */}
       <Modal 
         isOpen={isProcessingSubmission}
-        title="Processing Interview"
+        onClose={() => {}}
       >
         <div className="flex flex-col items-center space-y-4">
           <Spinner size="large" />

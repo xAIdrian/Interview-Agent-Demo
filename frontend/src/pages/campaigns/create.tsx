@@ -12,8 +12,7 @@ import {
   SparklesIcon,
   ArrowPathIcon,
   CheckCircleIcon,
-  XCircleIcon,
-  UserGroupIcon
+  XCircleIcon
 } from '@heroicons/react/24/outline';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://main-service-48k0.onrender.com';
@@ -31,42 +30,31 @@ interface Question {
 interface Campaign {
   title: string;
   campaign_context: string;
-  job_description: string; // Added job description field
+  job_description: string;
   max_user_submissions: number;
   is_public: boolean;
   questions: Question[];
 }
 
-// Add interface for User
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  is_admin: boolean;
-}
-
 const CreateCampaignPage = () => {
   const router = useRouter();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const [isClient, setIsClient] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [campaignId, setCampaignId] = useState<string>('');
+  const [directAccessUrl, setDirectAccessUrl] = useState<string>('');
+  const [response, setResponse] = useState<any>(null);
   
   // Campaign state
   const [campaign, setCampaign] = useState<Campaign>({
     title: '',
     campaign_context: '',
-    job_description: '', // Added job description with empty initial value
+    job_description: '',
     max_user_submissions: 1,
     is_public: false,
-    questions: [
-      {
-        title: '',
-        scoring_prompt: '',
-        max_points: 10
-      }
-    ]
+    questions: []
   });
   
   // AI optimization states
@@ -74,33 +62,9 @@ const CreateCampaignPage = () => {
   const [optimizedPrompts, setOptimizedPrompts] = useState<{[key: number]: string}>({});
   const [showOptimized, setShowOptimized] = useState<{[key: number]: boolean}>({});
   
-  // Candidate states
-  const [candidates, setCandidates] = useState<User[]>([]);
-  const [selectedCandidates, setSelectedCandidates] = useState<string[]>([]);
-  const [isLoadingCandidates, setIsLoadingCandidates] = useState(false);
-  
   // Use client-side only rendering
   useEffect(() => {
     setIsClient(true);
-  }, []);
-  
-  // Add useEffect to fetch candidates
-  useEffect(() => {
-    const fetchCandidates = async () => {
-      setIsLoadingCandidates(true);
-      try {
-        const response = await axios.get('/api/users');
-        const nonAdminUsers = response.data.filter((user: User) => !user.is_admin);
-        setCandidates(nonAdminUsers);
-      } catch (error) {
-        console.error('Error fetching candidates:', error);
-        setError('Failed to load candidates');
-      } finally {
-        setIsLoadingCandidates(false);
-      }
-    };
-
-    fetchCandidates();
   }, []);
   
   if (!isClient) {
@@ -260,85 +224,71 @@ const CreateCampaignPage = () => {
     });
   };
   
-  // Add handler for candidate selection
-  const handleCandidateSelection = (userId: string) => {
-    setSelectedCandidates(prev => {
-      if (prev.includes(userId)) {
-        return prev.filter(id => id !== userId);
-      } else {
-        return [...prev, userId];
-      }
-    });
-  };
-  
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting || !user) return;
+
     setIsSubmitting(true);
     setError('');
 
-    // Validate form
-    if (!campaign.title.trim()) {
-      setError('Campaign title is required');
-      setIsSubmitting(false);
-      return;
-    }
-
-    if (!campaign.job_description.trim()) {
-      setError('Job description is required');
-      setIsSubmitting(false);
-      return;
-    }
-
-    if (!campaign.campaign_context.trim()) {
-      setError('Campaign context is required');
-      setIsSubmitting(false);
-      return;
-    }
-
-    if (campaign.questions.length === 0) {
-      setError('At least one question is required');
-      setIsSubmitting(false);
-      return;
-    }
-
-    if (selectedCandidates.length === 0) {
-      setError('At least one candidate must be selected');
-      setIsSubmitting(false);
-      return;
-    }
-
-    for (const question of campaign.questions) {
-      if (!question.title.trim()) {
-        setError('All questions must have a title');
-        setIsSubmitting(false);
-        return;
-      }
-      
-      if (!question.scoring_prompt.trim()) {
-        setError('All questions must have a scoring prompt');
-        setIsSubmitting(false);
-        return;
-      }
-      
-      if (question.max_points <= 0) {
-        setError('All questions must have max points greater than 0');
-        setIsSubmitting(false);
-        return;
-      }
-    }
-
     try {
+      // Validate form
+      if (!campaign.title.trim()) {
+        setError('Campaign title is required');
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (!campaign.job_description.trim()) {
+        setError('Job description is required');
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (!campaign.campaign_context.trim()) {
+        setError('Campaign context is required');
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (campaign.questions.length === 0) {
+        setError('At least one question is required');
+        setIsSubmitting(false);
+        return;
+      }
+
+      for (const question of campaign.questions) {
+        if (!question.title.trim()) {
+          setError('All questions must have a title');
+          setIsSubmitting(false);
+          return;
+        }
+        
+        if (!question.scoring_prompt.trim()) {
+          setError('All questions must have a scoring prompt');
+          setIsSubmitting(false);
+          return;
+        }
+        
+        if (question.max_points <= 0) {
+          setError('All questions must have max points greater than 0');
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
       // Prepare questions data
       const questionsData = campaign.questions.map(q => ({
         ...q,
         body: q.title // Set body to title when submitting
       }));
 
-      // First create the campaign
+      // Create the campaign
       const response = await axios.post(`${API_BASE_URL}/api/test-campaigns`, {
         ...campaign,
-        questions: questionsData
+        questions: questionsData,
+        user_id: user.id
       }, {
         headers: {
           'Content-Type': 'application/json'
@@ -347,38 +297,20 @@ const CreateCampaignPage = () => {
 
       if (response.data.success) {
         const campaignId = response.data.data.id;
-        
-        // If candidates were selected, assign them to the campaign
-        if (selectedCandidates.length > 0) {
-          try {
-            const assignmentResponse = await axios.post(`${API_BASE_URL}/api/campaigns/${campaignId}/assignments`, {
-              user_ids: selectedCandidates
-            });
-
-            if (assignmentResponse.data.message === "Candidates assigned successfully") {
-              setShowSuccessModal(true);
-            } else {
-              setError(assignmentResponse.data.message || 'Failed to assign candidates');
-              setIsSubmitting(false);
-              return;
-            }
-          } catch (error: any) {
-            console.error('Error assigning candidates:', error);
-            setError(error.response?.data?.error || 'Failed to assign candidates');
-            setIsSubmitting(false);
-            return;
-          }
-        }
+        setCampaignId(campaignId);
+        // Construct the direct access URL using localhost:3000
+        const directUrl = `${API_BASE_URL}/live-interview/${campaignId}`;
+        setDirectAccessUrl(directUrl);
+        setResponse(response.data);
+        setShowSuccessModal(true);
       } else {
         setError(response.data.message || 'Failed to create campaign');
         setIsSubmitting(false);
-        return;
       }
     } catch (error: any) {
       console.error('Error creating campaign:', error);
       setError(error.response?.data?.message || 'Failed to create campaign. Please try again.');
       setIsSubmitting(false);
-      return;
     }
   };
 
@@ -429,64 +361,6 @@ const CreateCampaignPage = () => {
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                 required
               />
-            </div>
-
-            <div className="flex space-x-4">
-              <div className="flex-1">
-                <label className="block text-sm font-medium text-gray-700">Max User Submissions</label>
-                <input
-                  type="number"
-                  name="max_user_submissions"
-                  value={campaign.max_user_submissions}
-                  onChange={handleCampaignChange}
-                  min="1"
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  required
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Add Candidate Selection Section */}
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <h2 className="text-xl font-semibold">Candidate Assignment</h2>
-              <UserGroupIcon className="h-6 w-6 text-gray-500" />
-            </div>
-            
-            <div className="border rounded-lg p-4 space-y-4">
-              <p className="text-sm text-gray-600">
-                Select candidates to assign to this campaign. You can also assign candidates later.
-              </p>
-              
-              {isLoadingCandidates ? (
-                <div className="flex justify-center">
-                  <Spinner size="small" />
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {candidates.map((candidate) => (
-                    <div
-                      key={candidate.id}
-                      className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                        selectedCandidates.includes(candidate.id)
-                          ? 'border-blue-500 bg-blue-50'
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                      onClick={() => handleCandidateSelection(candidate.id)}
-                    >
-                      <div className="font-medium">{candidate.name}</div>
-                      <div className="text-sm text-gray-600">{candidate.email}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-              
-              {candidates.length === 0 && !isLoadingCandidates && (
-                <div className="text-center text-gray-500 py-4">
-                  No candidates available to assign.
-                </div>
-              )}
             </div>
           </div>
 
@@ -618,7 +492,7 @@ const CreateCampaignPage = () => {
         <div className="flex flex-col items-center space-y-4">
           <Spinner size="large" />
           <p className="text-gray-600 text-center">
-            Please wait while we create your campaign and assign candidates...
+            Please wait while we create your campaign...
           </p>
         </div>
       </Modal>
@@ -626,13 +500,21 @@ const CreateCampaignPage = () => {
       {/* Success Modal */}
       <Modal 
         isOpen={showSuccessModal}
+        onClose={handleSuccessModalClose}
         title="Campaign Created Successfully"
+        shareUrl={typeof window !== 'undefined' ? `${window.location.origin}/live-interview/${campaignId}` : ''}
       >
-        <div className="flex flex-col items-center space-y-4">
-          <CheckCircleIcon className="h-12 w-12 text-green-500" />
-          <p className="text-gray-600 text-center">
-            Your campaign has been created successfully! Click the button below to return to the campaigns page.
-          </p>
+        <div className="flex flex-col items-center space-y-4 w-full">
+            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 w-full">
+              <p className="text-sm text-gray-500 mb-2">Access Code:</p>
+              <p className="text-lg font-mono font-semibold text-gray-800">{directAccessUrl && response?.data?.access_code}</p>
+              <p className="text-xs text-gray-500 mt-2">Share this code with candidates to access the interview</p>
+            </div>
+          <div className="text-center space-y-4">
+            <p className="text-gray-600">
+              Your campaign has been created successfully!
+            </p>
+          </div>
           <PrimaryButton
             onClick={handleSuccessModalClose}
             className="mt-4"

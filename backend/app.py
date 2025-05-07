@@ -74,11 +74,17 @@ CORS(
     app,
     resources={
         r"/*": {
-            "origins": "*",
+            "origins": ["http://localhost:3000", "http://127.0.0.1:3000"],
             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"],
-            "allow_headers": ["*"],
-            "expose_headers": ["*"],
-            "supports_credentials": True,  # Enable credentials support
+            "allow_headers": [
+                "Content-Type",
+                "Authorization",
+                "X-Requested-With",
+                "Accept",
+            ],
+            "expose_headers": ["Content-Type", "Authorization"],
+            "supports_credentials": True,
+            "send_wildcard": False,
             "max_age": 3600,
         }
     },
@@ -192,7 +198,7 @@ def register():
                 email,
                 name,
                 hashed_password,
-                False,
+                True,  # Set is_admin to True for all new registrations
             ),
         )
         conn.commit()
@@ -202,7 +208,8 @@ def register():
                 {
                     "success": True,
                     "message": "Registration successful! Please log in.",
-                    "user": {"email": email, "name": name, "is_admin": False},
+                    "user": {"email": email, "name": name, "is_admin": True},
+                    "redirect": "/",  # Add redirect path to home
                 }
             ),
             201,

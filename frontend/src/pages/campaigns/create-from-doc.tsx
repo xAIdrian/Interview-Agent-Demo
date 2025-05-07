@@ -5,39 +5,29 @@ import { PrimaryButton } from '../../components/Button';
 import { PageTemplate } from '../../components/PageTemplate';
 import { Spinner } from '../../components/ui/Spinner';
 import { Modal } from '../../components/ui/Modal';
-import { UserGroupIcon } from '@heroicons/react/24/outline';
 import { CheckCircleIcon } from '@heroicons/react/24/outline';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://main-service-48k0.onrender.com';
 
-// Define interfaces similar to create.tsx
+// Define interfaces for Question object
 interface Question {
+  id?: string; // ID is required for existing questions
   title: string;
   body?: string;
   scoring_prompt: string;
   max_points: number;
-  original_prompt?: string;
+  original_prompt?: string; // For storing original prompt during optimization
 }
 
+// Define interface for Campaign object
 interface Campaign {
+  id?: string;
   title: string;
   campaign_context: string;
   job_description: string;
   max_user_submissions: number;
   is_public: boolean;
   questions: Question[];
-}
-
-interface Template {
-  [key: string]: string;
-}
-
-// Add interface for User
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  is_admin: boolean;
 }
 
 const CreateCampaignFromDocPage = () => {
@@ -47,6 +37,8 @@ const CreateCampaignFromDocPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [campaignId, setCampaignId] = useState<string>('');
+  const [response, setResponse] = useState<any>(null);
   const [file, setFile] = useState<File | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState('standard');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -75,32 +67,9 @@ const CreateCampaignFromDocPage = () => {
     'customer_service': 'Customer service assessment focusing on communication and problem-solving'
   };
   
-  // Add useEffect to fetch candidates
-  const [candidates, setCandidates] = useState<User[]>([]);
-  const [selectedCandidates, setSelectedCandidates] = useState<string[]>([]);
-  const [isLoadingCandidates, setIsLoadingCandidates] = useState(false);
-  
   // Use client-side only rendering
   useEffect(() => {
     setIsClient(true);
-  }, []);
-  
-  useEffect(() => {
-    const fetchCandidates = async () => {
-      setIsLoadingCandidates(true);
-      try {
-        const response = await axios.get(`${API_URL}/api/users`);
-        console.log('🚀 ~ fetchCandidates ~ response:', response);
-        const nonAdminUsers = response.data.filter((user: User) => !user.is_admin);
-        setCandidates(nonAdminUsers);
-      } catch (error) {
-        console.error('Error fetching candidates:', error);
-      } finally {
-        setIsLoadingCandidates(false);
-      }
-    };
-
-    fetchCandidates();
   }, []);
   
   if (!isClient) {
@@ -357,17 +326,6 @@ const CreateCampaignFromDocPage = () => {
     });
   };
   
-  // Add handler for candidate selection
-  const handleCandidateSelect = (candidateId: string) => {
-    setSelectedCandidates(prev => {
-      if (prev.includes(candidateId)) {
-        return prev.filter(id => id !== candidateId);
-      } else {
-        return [...prev, candidateId];
-      }
-    });
-  };
-  
   // Submit the form
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -395,12 +353,6 @@ const CreateCampaignFromDocPage = () => {
     
     if (campaign.questions.length === 0) {
       setError('At least one question is required');
-      setIsSubmitting(false);
-      return;
-    }
-
-    if (selectedCandidates.length === 0) {
-      setError('At least one candidate must be selected');
       setIsSubmitting(false);
       return;
     }
@@ -432,7 +384,7 @@ const CreateCampaignFromDocPage = () => {
         body: q.title // Set body to title when submitting
       }));
 
-      // First create the campaign
+      // Create the campaign
       const response = await axios.post(`${API_URL}/api/test-campaigns`, {
         ...campaign,
         questions: questionsData
@@ -443,39 +395,18 @@ const CreateCampaignFromDocPage = () => {
       });
 
       if (response.data.success) {
-        const campaignId = response.data.data.id;
-        
-        // If candidates were selected, assign them to the campaign
-        if (selectedCandidates.length > 0) {
-          try {
-            const assignmentResponse = await axios.post(`${API_URL}/api/campaigns/${campaignId}/assignments`, {
-              user_ids: selectedCandidates
-            });
-
-            if (assignmentResponse.data.message === "Candidates assigned successfully") {
-              setShowSuccessModal(true);
-            } else {
-              setError(assignmentResponse.data.message || 'Failed to assign candidates');
-              setIsSubmitting(false);
-              return;
-            }
-          } catch (error: any) {
-            console.error('Error assigning candidates:', error);
-            setError(error.response?.data?.error || 'Failed to assign candidates');
-            setIsSubmitting(false);
-            return;
-          }
-        }
+        const newCampaignId = response.data.data.id;
+        setCampaignId(newCampaignId);
+        setResponse(response.data);
+        setShowSuccessModal(true);
       } else {
         setError(response.data.message || 'Failed to create campaign');
         setIsSubmitting(false);
-        return;
       }
     } catch (error: any) {
       console.error('Error creating campaign:', error);
       setError(error.response?.data?.message || 'Failed to create campaign. Please try again.');
       setIsSubmitting(false);
-      return;
     }
   };
 
@@ -488,7 +419,6 @@ const CreateCampaignFromDocPage = () => {
     <PageTemplate title="Create Campaign from Document" maxWidth="lg">
       <div className="w-full bg-white shadow-md rounded-lg p-6">
         <h2 className="text-2xl font-bold mb-6">Create Campaign from Document</h2>
-        
         
         {/* Document upload section */}
         <div className="mb-8 p-6 border border-dashed border-gray-300 rounded-md">
@@ -620,22 +550,6 @@ const CreateCampaignFromDocPage = () => {
                   placeholder="Enter the complete job description for this role"
                 />
               </div>
-              
-              <div>
-                <label htmlFor="max_user_submissions" className="block text-sm font-medium text-gray-700">
-                  Max User Submissions
-                </label>
-                <input
-                  id="max_user_submissions"
-                  name="max_user_submissions"
-                  type="number"
-                  value={campaign.max_user_submissions}
-                  onChange={handleCampaignChange}
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500"
-                  min="1"
-                  required
-                />
-              </div>
             </div>
             
             {/* Questions */}
@@ -729,7 +643,7 @@ const CreateCampaignFromDocPage = () => {
                         />
                       </div>
                       
-                      {/* Delete question button (don't show if there's only one) */}
+                      {/* Delete question button (don't show for last question if there's only one) */}
                       {campaign.questions.length > 1 && (
                         <button
                           type="button"
@@ -752,56 +666,6 @@ const CreateCampaignFromDocPage = () => {
               >
                 Add Another Question
               </button>
-            </div>
-            
-            {/* Add Candidate Selection Section */}
-            <div className="bg-white shadow sm:rounded-lg">
-              <div className="px-4 py-5 sm:p-6">
-                <h3 className="text-lg font-medium leading-6 text-gray-900">Assign Candidates</h3>
-                <div className="mt-2 max-w-xl text-sm text-gray-500">
-                  <p>Select candidates to assign to this campaign.</p>
-                </div>
-                <div className="mt-5">
-                  {isLoadingCandidates ? (
-                    <div className="flex justify-center">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                      {candidates.map((candidate) => (
-                        <div
-                          key={candidate.id}
-                          className={`relative rounded-lg border p-4 cursor-pointer ${
-                            selectedCandidates.includes(candidate.id)
-                              ? 'border-indigo-500 bg-indigo-50'
-                              : 'border-gray-300 hover:border-gray-400'
-                          }`}
-                          onClick={() => handleCandidateSelect(candidate.id)}
-                        >
-                          <div className="flex items-center">
-                            <div className="flex-shrink-0">
-                              <UserGroupIcon className="h-6 w-6 text-gray-400" />
-                            </div>
-                            <div className="ml-3">
-                              <p className="text-sm font-medium text-gray-900">{candidate.name}</p>
-                              <p className="text-sm text-gray-500">{candidate.email}</p>
-                            </div>
-                          </div>
-                          {selectedCandidates.includes(candidate.id) && (
-                            <div className="absolute top-2 right-2">
-                              <div className="rounded-full bg-indigo-500 p-1">
-                                <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                </svg>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
             </div>
             
             {/* Submit button */}
@@ -829,7 +693,7 @@ const CreateCampaignFromDocPage = () => {
         <div className="flex flex-col items-center space-y-4">
           <Spinner size="large" />
           <p className="text-gray-600 text-center">
-            Please wait while we create your campaign and assign candidates...
+            Please wait while we create your campaign...
           </p>
         </div>
       </Modal>
@@ -838,12 +702,20 @@ const CreateCampaignFromDocPage = () => {
       <Modal 
         isOpen={showSuccessModal}
         title="Campaign Created Successfully"
+        shareUrl={typeof window !== 'undefined' ? `${window.location.origin}/live-interview/${campaignId}` : ''}
       >
         <div className="flex flex-col items-center space-y-4">
           <CheckCircleIcon className="h-12 w-12 text-green-500" />
-          <p className="text-gray-600 text-center">
-            Your campaign has been created successfully! Click the button below to return to the campaigns page.
-          </p>
+          <div className="text-center space-y-4">
+            <p className="text-gray-600">
+              Your campaign has been created successfully!
+            </p>
+            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+              <p className="text-sm text-gray-500 mb-2">Access Code:</p>
+              <p className="text-lg font-mono font-semibold text-gray-800">{response?.data?.access_code}</p>
+              <p className="text-xs text-gray-500 mt-2">Share this code with candidates to access the interview</p>
+            </div>
+          </div>
           <PrimaryButton
             onClick={handleSuccessModalClose}
             className="mt-4"

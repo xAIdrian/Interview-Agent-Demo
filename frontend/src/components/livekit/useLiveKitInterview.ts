@@ -69,7 +69,8 @@ export const useLiveKitInterview = (campaignId: string) => {
       // Create submission first
       const submissionResponse = await axios.post(`${API_URL}/api/submissions`, {
         campaign_id: campaignId,
-        user_id: user?.id
+        email: user?.email,
+        name: user?.name
       });
       
       const newSubmissionId = submissionResponse.data.id;

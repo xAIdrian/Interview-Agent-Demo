@@ -23,12 +23,12 @@ const RegisterPage = () => {
   const router = useRouter();
   const { error, clearError, isAuthenticated } = useAuth();
 
-  // If already authenticated, redirect to positions page
+  // Remove the automatic redirect for authenticated users
+  // This allows users to register even if they have an old session
   useEffect(() => {
-    if (isAuthenticated) {
-      router.push('/candidate');
-    }
-  }, [isAuthenticated, router]);
+    // Clear any existing auth errors when component mounts
+    if (error) clearError();
+  }, [error, clearError]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -93,14 +93,10 @@ const RegisterPage = () => {
       if (response.data.success) {
         // Store user data in localStorage
         localStorage.setItem('user', JSON.stringify(response.data.user));
-        // Redirect to homepage with success message
-        router.push({
-          pathname: '/',
-          query: {
-            registered: 'true',
-            message: response.data.message
-          }
-        });
+        localStorage.setItem('isAdmin', 'true'); // Set admin status
+        
+        // Navigate to admin page after successful registration
+        router.push('/admin');
       } else {
         setApiError(response.data.message || 'Registration failed');
       }
@@ -121,7 +117,7 @@ const RegisterPage = () => {
   return (
     <>
       <Head>
-        <title>Register | Gulpin AI Interview</title>
+        <title>Register</title>
       </Head>
       <PageTemplate title="Create an Account">
         <div className="flex min-h-full flex-col justify-center py-12 sm:px-6 lg:px-8">

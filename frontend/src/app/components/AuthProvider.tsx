@@ -72,15 +72,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       AuthLogger.info('Attempting login...');
       
-      const response = await axios.post(`${API_BASE_URL}/login`, { email, password });
+      const response = await axios.post(`${API_BASE_URL}/api/login`, { email, password });
       
-      if (response.data.user) {
-        setUser(response.data.user);
-        localStorage.setItem('user', JSON.stringify(response.data.user));
+      if (response.data.success) {
+        const userData = {
+          id: response.data.id,
+          email: response.data.email,
+          name: response.data.name,
+          role: response.data.is_admin ? 'admin' : 'user',
+          is_admin: response.data.is_admin
+        };
+        setUser(userData);
+        localStorage.setItem('user', JSON.stringify(userData));
         AuthLogger.info('Login successful');
         return true;
       } else {
-        setError('Invalid response from server');
+        setError('Error logging in or registering. Please try again.');
         AuthLogger.error('Login failed: Invalid response format');
         return false;
       }

@@ -211,7 +211,7 @@ const SubmissionsPage = () => {
   return (
     <>
       <Head>
-        <title>{isAdmin ? 'All Submissions' : 'My Submissions'} | Gulpin AI Interview</title>
+        <title>{isAdmin ? 'All Submissions' : 'My Submissions'}</title>
       </Head>
       <PageTemplate title={isAdmin ? 'All Submissions' : 'My Submissions'} maxWidth="lg">
         <div className="w-full bg-white shadow-md rounded-lg p-6">
