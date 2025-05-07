@@ -74,7 +74,7 @@ CORS(
     app,
     resources={
         r"/*": {
-            "origins": ["http://localhost:3000", "http://127.0.0.1:3000"],
+            "origins": ["*"],
             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"],
             "allow_headers": [
                 "Content-Type",
