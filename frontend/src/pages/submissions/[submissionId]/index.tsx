@@ -203,7 +203,7 @@ const SubmissionDetailsPage = () => {
     if (!submissionId) return;
     try {
       setIsLoading(true);
-      const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/submissions/${submissionId}`);
+      const response = await axios.get(`${API_BASE_URL}/api/submissions/${submissionId}`);
       setSubmission(response.data);
       if (response.data.answers) {
         setSubmissionAnswers(response.data.answers);
