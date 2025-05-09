@@ -143,7 +143,7 @@ const CampaignSubmissionsPage = () => {
       
       // Configure and initialize Tabulator
       tabulatorRef.current = new Tabulator(tableRef.current, {
-        data: submissions,
+        data: submissions.filter(submission => submission.total_points !== null),
         layout: "fitColumns",
         pagination: true,
         paginationSize: 10,
@@ -282,22 +282,23 @@ const CampaignSubmissionsPage = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="p-3 bg-gray-50 rounded">
                 <h3 className="text-sm font-medium text-gray-500">Total Submissions</h3>
-                <p className="text-2xl font-bold">{submissions.length}</p>
+                <p className="text-2xl font-bold">{submissions.filter(s => s.total_points !== null).length}</p>
               </div>
               <div className="p-3 bg-gray-50 rounded">
                 <h3 className="text-sm font-medium text-gray-500">Completed</h3>
-                <p className="text-2xl font-bold">{submissions.filter(s => s.is_complete).length}</p>
+                <p className="text-2xl font-bold">{submissions.filter(s => s.is_complete && s.total_points !== null).length}</p>
               </div>
               <div className="p-3 bg-gray-50 rounded">
                 <h3 className="text-sm font-medium text-gray-500">In Progress</h3>
-                <p className="text-2xl font-bold">{submissions.filter(s => !s.is_complete).length}</p>
+                <p className="text-2xl font-bold">{submissions.filter(s => !s.is_complete && s.total_points !== null).length}</p>
               </div>
               <div className="p-3 bg-gray-50 rounded">
                 <h3 className="text-sm font-medium text-gray-500">Average Score</h3>
                 <p className="text-2xl font-bold">
-                  {submissions.length > 0 && submissions.some(s => s.total_points !== null)
-                    ? (submissions.reduce((acc, s) => acc + (s.total_points || 0), 0) / 
-                      submissions.filter(s => s.total_points !== null).length).toFixed(1)
+                  {submissions.filter(s => s.total_points !== null).length > 0
+                    ? (submissions.filter(s => s.total_points !== null)
+                        .reduce((acc, s) => acc + (s.total_points || 0), 0) / 
+                        submissions.filter(s => s.total_points !== null).length).toFixed(1)
                     : 'N/A'}
                 </p>
               </div>
