@@ -262,46 +262,66 @@ const CampaignsPage = () => {
 
         {/* Campaigns Section */}
         <div className="mb-6 m-16">
-          <h3 className="text-xl font-bold mb-4">Campaigns</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {/* Add new campaign card */}
-            {isAdmin && (
-              <div
-                className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-8 cursor-pointer hover:bg-gray-50 transition"
+          {campaigns.length === 0 ? (
+            <div className="flex flex-col items-center justify-center min-h-[40vh] p-10">
+              {/* Illustration placeholder */}
+              <div className="text-6xl mb-6">📂✨</div>
+              <div className="text-xl font-semibold mb-2">Start your first campaign</div>
+              <div className="text-gray-500 mb-6 text-center max-w-md">
+                Click "create a campaign" button to get started and list your job offer in our market.
+              </div>
+              <button
+                className="bg-blue-500 text-white px-6 py-3 rounded-lg text-lg font-semibold flex items-center gap-2 hover:bg-blue-600 transition"
                 onClick={() => router.push('/campaigns/create')}
               >
-                <span className="text-4xl text-gray-400 mb-2">+</span>
-                <span className="font-semibold text-gray-600">Add a new campaign</span>
-              </div>
-            )}
-            {/* Campaign cards */}
-            {campaigns.map((campaign) => (
-              <div key={campaign.id} className="bg-white rounded-lg shadow p-6 flex flex-col">
-                {/* Placeholder for logo */}
-                <div className="flex items-center mb-4">
-                  <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mr-3">
-                    {/* Use first letter of title as logo placeholder */}
-                    <span className="text-xl font-bold text-gray-400">{campaign.title[0]}</span>
+                <span className="text-2xl">+</span> Create a Campaign
+              </button>
+            </div>
+          ) : (
+            <>
+              <h3 className="text-xl font-bold mb-4">Campaigns</h3>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {/* Add new campaign card */}
+                {isAdmin && (
+                  <div
+                    className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-8 cursor-pointer hover:bg-gray-50 transition"
+                    onClick={() => router.push('/campaigns/create')}
+                  >
+                    <span className="text-4xl text-gray-400 mb-2">+</span>
+                    <span className="font-semibold text-gray-600">Add a new campaign</span>
                   </div>
-                  <div>
-                    <div className="font-bold text-lg">{campaign.title}</div>
-                    <div className="text-xs text-gray-400">Société générale</div> {/* Placeholder company */}
+                )}
+                {/* Campaign cards */}
+                {campaigns.map((campaign) => (
+                  <div key={campaign.id} className="bg-white rounded-lg shadow p-6 flex flex-col">
+                    {/* Placeholder for logo */}
+                    <div className="flex items-center mb-4">
+                      <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mr-3">
+                        {/* Use first letter of title as logo placeholder */}
+                        <span className="text-xl font-bold text-gray-400">{campaign.title[0]}</span>
+                      </div>
+                      <div>
+                        <div className="font-bold text-lg">{campaign.title}</div>
+                        <div className="text-xs text-gray-400">Société générale</div> {/* Placeholder company */}
+                      </div>
+                    </div>
+                    <div className="flex-1 text-gray-600 mb-4">
+                      {campaign.job_description.length > 120
+                        ? campaign.job_description.substring(0, 120) + '...'
+                        : campaign.job_description}
+                    </div>
+                    <button
+                      className="mt-auto bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700 transition"
+                      onClick={() => router.push(`/campaigns/${campaign.id}`)}
+                    >
+                      Campaign details
+                    </button>
                   </div>
-                </div>
-                <div className="flex-1 text-gray-600 mb-4">
-                  {campaign.job_description.length > 120
-                    ? campaign.job_description.substring(0, 120) + '...'
-                    : campaign.job_description}
-                </div>
-                <button
-                  className="mt-auto bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700 transition"
-                  onClick={() => router.push(`/campaigns/${campaign.id}`)}
-                >
-                  Campaign details
-                </button>
+                ))}
               </div>
-            ))}
-          </div>
+            </>
+          )}
         </div>
       </PageTemplate>
       {showToast && (
