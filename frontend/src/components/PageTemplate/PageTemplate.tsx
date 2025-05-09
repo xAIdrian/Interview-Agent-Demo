@@ -224,7 +224,7 @@ export const PageTemplate: React.FC<PageTemplateProps> = ({
       )}
 
       {/* Page content */}
-      <main className={`max-w-${maxWidth} mx-auto  ${centered ? 'flex items-center justify-center' : ''}`}>
+      <main className={`max-w-${maxWidth} mx-auto ${centered ? 'flex items-center justify-center' : ''}`}>
         {children}
       </main>
     </div>

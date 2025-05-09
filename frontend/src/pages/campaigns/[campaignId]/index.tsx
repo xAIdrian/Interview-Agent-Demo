@@ -60,6 +60,7 @@ const CampaignDetailsPage = () => {
     has_completed_submission: false,
   });
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [activeTab, setActiveTab] = useState<'info' | 'submissions'>('info');
 
   // Handle copying campaign link
   const handleCopyLink = () => {
@@ -195,17 +196,6 @@ const CampaignDetailsPage = () => {
     fetchData();
   }, [campaignId, isAdmin, user?.id]);
 
-  const handleStartInterview = async () => {
-    try {
-      setIsLoading(true);
-      router.push(`/live-interview/${campaignId}`);
-    } catch (error) {
-      console.error('Error creating submission:', error);
-      setErrorMessage('Failed to start interview. Please try again.');
-      setIsLoading(false);
-    }
-  };
-
   const renderStartInterviewButton = () => {
     if (isLoading) {
       return (
@@ -276,172 +266,250 @@ const CampaignDetailsPage = () => {
   }, [campaign]);
 
   return (
-    <PageTemplate title={isAdmin ? "Campaign Details" : "Position Details"} maxWidth="lg">
-      <div className="flex justify-end mb-4 items-center">
-        <div className="space-x-2">
-          {isAdmin && (
-            <>
-              <Link 
-                href={`/campaigns/${campaignId}/submissions`}
-                className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700"
-              >
-                View Submissions ({submissionCount})
-              </Link>
-              <Link 
-                href={`/campaigns/${campaignId}/edit`}
-                className="bg-indigo-500 text-white px-4 py-2 rounded hover:bg-indigo-700"
-              >
-                Edit Campaign
-              </Link>
-            </>
-          )}
-          {!isAdmin && renderStartInterviewButton()}
-          {isAdmin && (
-            <Link 
-              href="/campaigns"
-              className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-700"
-            >
-              Back to Campaigns
-            </Link>
-          )}
-        </div>
+    <PageTemplate maxWidth="lg">
+      {/* Breadcrumbs */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
+        <nav className="flex items-center text-sm text-gray-500 mb-4" aria-label="Breadcrumb">
+          <button
+            onClick={() => router.push('/campaigns')}
+            className="mr-2 p-1 rounded hover:bg-gray-200 focus:outline-none flex items-center"
+            aria-label="Back to campaigns"
+            type="button"
+          >
+            <svg className="h-5 w-5 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <Link href="/campaigns" className="hover:text-blue-600 font-medium">Campaigns</Link>
+          <span className="mx-2">/</span>
+          <span className="text-gray-700 font-semibold">{campaign ? campaign.title : 'Campaign'}</span>
+        </nav>
       </div>
-      
-      {error && (
-        <div className="mb-4 p-2 bg-red-100 text-red-700 rounded">
-          {error}
-        </div>
-      )}
-      
-      {errorMessage && (
-        <div className="mb-4 p-2 bg-red-100 text-red-700 rounded">
-          {errorMessage}
-        </div>
-      )}
-      
-      {isLoading ? (
-        <div className="flex justify-center items-center py-10">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-700"></div>
-        </div>
-      ) : campaign ? (
-        <>
-          <div className="bg-white shadow overflow-hidden sm:rounded-lg mb-6">
-            <div className="border-t border-gray-200">
-              <dl>
-                <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                  <dt className="text-sm font-medium text-gray-500">Title</dt>
-                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{campaign.title}</dd>
-                </div>
-                <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                  <dt className="text-sm font-medium text-gray-500">Job Description</dt>
-                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{campaign.job_description}</dd>
-                </div>
-              </dl>
+      {/* Header Title */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-4">
+        <h1 className="text-3xl font-bold text-gray-900">{campaign ? campaign.title : 'Campaign Title'}</h1>
+      </div>
+      {/* Two-column layout */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex gap-8">
+        {/* Left column: menu as text headers and campaign details */}
+        <div className="flex-shrink-0" style={{ width: '410px' }}>
+          {/* Menu as text headers */}
+          <div className="flex space-x-6 mb-6 pl-2">
+            <span
+              className={`cursor-pointer text-base font-semibold pb-1 border-b-2 ${activeTab === 'info' ? 'border-blue-600 text-blue-700' : 'border-transparent text-gray-500 hover:text-blue-700'}`}
+              onClick={() => setActiveTab('info')}
+            >
+              Informations générale
+            </span>
+            <span
+              className={`cursor-pointer text-base font-semibold pb-1 border-b-2 ${activeTab === 'submissions' ? 'border-blue-600 text-blue-700' : 'border-transparent text-gray-500 hover:text-blue-700'}`}
+              onClick={() => router.push(`/campaigns/${campaignId}/submissions`)}
+            >
+              Submissions
+            </span>
+          </div>
+          {/* Campaign details card */}
+          <div className="bg-white rounded-lg shadow p-6 mb-6">
+            <div className="mb-4">
+              <div className="text-xs text-gray-400 font-semibold mb-1">Poste</div>
+              <div className="font-medium text-gray-900">{campaign?.title || 'UX/UI Designer'}</div>
+            </div>
+            <div className="mb-4">
+              <div className="text-xs text-gray-400 font-semibold mb-1">Localisation</div>
+              <div className="text-gray-700">Casablanca, Morocco</div>
+            </div>
+            <div className="mb-4">
+              <div className="text-xs text-gray-400 font-semibold mb-1">Mode de travail</div>
+              <div className="text-gray-700">Hybrid</div>
+            </div>
+            <div className="mb-4">
+              <div className="text-xs text-gray-400 font-semibold mb-1">Niveau d'étude</div>
+              <div className="text-gray-700">Bac + 5</div>
+            </div>
+            <div className="mb-4">
+              <div className="text-xs text-gray-400 font-semibold mb-1">Experiences</div>
+              <div className="text-gray-700">3 ans → 5 ans</div>
+            </div>
+            <div className="mb-4">
+              <div className="text-xs text-gray-400 font-semibold mb-1">Salaire</div>
+              <div className="text-gray-700">20 000 Dhs Net</div>
+            </div>
+            <div>
+              <div className="text-xs text-gray-400 font-semibold mb-1">Contract</div>
+              <div className="text-gray-700">CDI</div>
             </div>
           </div>
-
-          {/* Campaign Link Section - Only visible for admin users */}
-          {isAdmin && (
-            <div className="mb-8 p-4 bg-gray-50 rounded-lg border border-gray-200">
-              <div className="flex justify-between items-center mb-2">
-                <h3 className="text-lg font-semibold text-gray-700">Campaign Link</h3>
-                <button
-                  id="copy-link-button"
-                  type="button"
-                  onClick={handleCopyLink}
-                  className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+        </div>
+        {/* Right column: nest existing sections */}
+        <div className="flex-1">
+          {/* Existing content goes here, unchanged */}
+          <div className="flex justify-end mb-4 items-center">
+            <div className="space-x-2 px-16">
+              {isAdmin && (
+                <>
+                  <Link 
+                    href={`/campaigns/${campaignId}/submissions`}
+                    className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700"
+                  >
+                    View Submissions ({submissionCount})
+                  </Link>
+                  <Link 
+                    href={`/campaigns/${campaignId}/edit`}
+                    className="bg-indigo-500 text-white px-4 py-2 rounded hover:bg-indigo-700"
+                  >
+                    Edit Campaign
+                  </Link>
+                </>
+              )}
+              {!isAdmin && renderStartInterviewButton()}
+              {isAdmin && (
+                <Link 
+                  href="/campaigns"
+                  className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-700"
                 >
-                  Copy Link
-                </button>
-              </div>
-              <div className="space-y-4">
-                <div className="bg-white border border-gray-200 rounded-lg p-3">
-                  <p className="text-sm text-gray-600 break-all">
-                    {typeof window !== 'undefined' ? `${window.location.origin}/live-interview/${campaignId}` : ''}
-                  </p>
-                </div>
-                <div className="bg-white border border-gray-200 rounded-lg p-3">
-                  <div className="flex flex-col">
-                    <p className="text-sm font-medium text-gray-500 mb-1">Access Code:</p>
-                    <p className="text-base font-mono font-semibold text-gray-800">
-                      {campaign?.access_code || 'Loading...'}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-1">Share this code with candidates to access the interview</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Questions Section - Show for both admin and candidates */}
-          <div className="bg-white shadow overflow-hidden sm:rounded-lg mt-6">
-            <div className="px-4 py-5 sm:px-6">
-              <h2 className="text-lg leading-6 font-medium text-gray-900">
-                {isAdmin ? 'Interview Questions' : 'Position Questions'}
-              </h2>
-              <p className="mt-1 text-sm text-gray-500">
-                {isAdmin 
-                  ? 'Review and manage the questions for this campaign.' 
-                  : 'Preview of the questions you will be asked during the interview.'}
-              </p>
-            </div>
-            <div className="border-t border-gray-200">
-              {questions.length > 0 ? (
-                <ul className="divide-y divide-gray-200">
-                  {questions.map((question, index) => (
-                    <li key={question.id} className="px-4 py-4 sm:px-6">
-                      <div className="flex items-center justify-between">
-                        <div className="flex-grow">
-                          <p className="text-sm font-medium text-gray-900">
-                            Question {index + 1}: {question.body}
-                          </p>
-                        </div>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <div className="px-4 py-5 sm:px-6 text-center text-gray-500">
-                  {isLoading ? (
-                    <div className="flex justify-center items-center py-4">
-                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-700"></div>
-                    </div>
-                  ) : (
-                    <p>No questions available for this {isAdmin ? 'campaign' : 'position'}.</p>
-                  )}
-                </div>
+                  Back to Campaigns
+                </Link>
               )}
             </div>
           </div>
-        </>
-      ) : null}
-
-      {/* Success Modal */}
-      <Modal 
-        isOpen={showSuccessModal}
-        onClose={handleSuccessModalClose}
-        title="Campaign Created Successfully"
-      >
-        <div className="flex flex-col items-center space-y-4">
-          <CheckCircleIcon className="h-12 w-12 text-green-500" />
-          <div className="text-center">
-            <p className="text-gray-600 mb-4">
-              Your campaign has been created successfully!
-            </p>
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
-              <p className="text-sm text-gray-600 break-all">
-                {typeof window !== 'undefined' ? `${window.location.origin}/live-interview/${campaignId}` : ''}
-              </p>
+          
+          {error && (
+            <div className="mb-4 p-2 bg-red-100 text-red-700 rounded">
+              {error}
             </div>
-          </div>
-          <PrimaryButton
-            onClick={handleSuccessModalClose}
-            className="mt-4"
-          >
-            Return to Campaigns
-          </PrimaryButton>
+          )}
+          
+          {errorMessage && (
+            <div className="mb-4 p-2 bg-red-100 text-red-700 rounded">
+              {errorMessage}
+            </div>
+          )}
+          
+          {isLoading ? (
+            <div className="flex justify-center items-center py-10">
+              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-700"></div>
+            </div>
+          ) : campaign ? (
+            <>
+              <div className="bg-white shadow overflow-hidden sm:rounded-lg mb-6">
+                <div className="border-t border-gray-200">
+                  <dl>
+                    <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                      <dt className="text-sm font-medium text-gray-500">Title</dt>
+                      <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{campaign.title}</dd>
+                    </div>
+                    <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                      <dt className="text-sm font-medium text-gray-500">Job Description</dt>
+                      <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{campaign.job_description}</dd>
+                    </div>
+                  </dl>
+                </div>
+              </div>
+
+              {/* Campaign Link Section - Only visible for admin users */}
+              {isAdmin && (
+                <div className="mb-8 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                  <div className="flex justify-between items-center mb-2">
+                    <h3 className="text-lg font-semibold text-gray-700">Campaign Link</h3>
+                    <button
+                      id="copy-link-button"
+                      type="button"
+                      onClick={handleCopyLink}
+                      className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                    >
+                      Copy Link
+                    </button>
+                  </div>
+                  <div className="space-y-4">
+                    <div className="bg-white border border-gray-200 rounded-lg p-3">
+                      <p className="text-sm text-gray-600 break-all">
+                        {typeof window !== 'undefined' ? `${window.location.origin}/live-interview/${campaignId}` : ''}
+                      </p>
+                    </div>
+                    <div className="bg-white border border-gray-200 rounded-lg p-3">
+                      <div className="flex flex-col">
+                        <p className="text-sm font-medium text-gray-500 mb-1">Access Code:</p>
+                        <p className="text-base font-mono font-semibold text-gray-800">
+                          {campaign?.access_code || 'Loading...'}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">Share this code with candidates to access the interview</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Questions Section - Show for both admin and candidates */}
+              <div className="bg-white shadow overflow-hidden sm:rounded-lg mt-6">
+                <div className="px-4 py-5 sm:px-6">
+                  <h2 className="text-lg leading-6 font-medium text-gray-900">
+                    {isAdmin ? 'Interview Questions' : 'Position Questions'}
+                  </h2>
+                  <p className="mt-1 text-sm text-gray-500">
+                    {isAdmin 
+                      ? 'Review and manage the questions for this campaign.' 
+                      : 'Preview of the questions you will be asked during the interview.'}
+                  </p>
+                </div>
+                <div className="border-t border-gray-200">
+                  {questions.length > 0 ? (
+                    <ul className="divide-y divide-gray-200">
+                      {questions.map((question, index) => (
+                        <li key={question.id} className="px-4 py-4 sm:px-6">
+                          <div className="flex items-center justify-between">
+                            <div className="flex-grow">
+                              <p className="text-sm font-medium text-gray-900">
+                                Question {index + 1}: {question.body}
+                              </p>
+                            </div>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="px-4 py-5 sm:px-6 text-center text-gray-500">
+                      {isLoading ? (
+                        <div className="flex justify-center items-center py-4">
+                          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-700"></div>
+                        </div>
+                      ) : (
+                        <p>No questions available for this {isAdmin ? 'campaign' : 'position'}.</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Success Modal */}
+              <Modal 
+                isOpen={showSuccessModal}
+                onClose={handleSuccessModalClose}
+                title="Campaign Created Successfully"
+              >
+                <div className="flex flex-col items-center space-y-4">
+                  <CheckCircleIcon className="h-12 w-12 text-green-500" />
+                  <div className="text-center">
+                    <p className="text-gray-600 mb-4">
+                      Your campaign has been created successfully!
+                    </p>
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
+                      <p className="text-sm text-gray-600 break-all">
+                        {typeof window !== 'undefined' ? `${window.location.origin}/live-interview/${campaignId}` : ''}
+                      </p>
+                    </div>
+                  </div>
+                  <PrimaryButton
+                    onClick={handleSuccessModalClose}
+                    className="mt-4"
+                  >
+                    Return to Campaigns
+                  </PrimaryButton>
+                </div>
+              </Modal>
+            </>
+          ) : null}
         </div>
-      </Modal>
+      </div>
     </PageTemplate>
   );
 };
