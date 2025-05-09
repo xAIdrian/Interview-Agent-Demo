@@ -8,6 +8,7 @@ import { useAuth } from '@/app/components/AuthProvider';
 import { Modal } from '../../../components/ui/Modal';
 import { CheckCircleIcon } from '@heroicons/react/24/outline';
 import { PrimaryButton } from '../../../components/Button/PrimaryButton';
+import CampaignSubmissionsPage from './submissions';
 
 // Define API base URL for consistent usage
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://main-service-48k0.onrender.com';
@@ -299,85 +300,91 @@ const CampaignDetailsPage = () => {
         </span>
         <span
           className={`cursor-pointer text-base font-semibold pb-1 border-b-2 ${activeTab === 'submissions' ? 'border-blue-600 text-blue-700' : 'border-transparent text-gray-500 hover:text-blue-700'}`}
-          onClick={() => router.push(`/campaigns/${campaignId}/submissions`)}
+          onClick={() => setActiveTab('submissions')}
         >
           Submissions
         </span>
       </div>
-      {/* Two-column layout */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex gap-8">
-        {/* Left column: menu as text headers and campaign details */}
-        <div className="flex-shrink-0" style={{ width: '410px' }}>
-          {/* Campaign details card */}
-          <div className="bg-white rounded-lg shadow p-6 mb-6">
-            <div className="mb-4">
-              <div className="text-xs text-gray-400 font-semibold mb-1">Poste</div>
-              <div className="font-medium text-gray-900">{campaign?.title || 'UX/UI Designer'}</div>
-            </div>
-            <div className="mb-4">
-              <div className="text-xs text-gray-400 font-semibold mb-1">Localisation</div>
-              <div className="text-gray-700">Casablanca, Morocco</div>
-            </div>
-            <div className="mb-4">
-              <div className="text-xs text-gray-400 font-semibold mb-1">Mode de travail</div>
-              <div className="text-gray-700">Hybrid</div>
-            </div>
-            <div className="mb-4">
-              <div className="text-xs text-gray-400 font-semibold mb-1">Niveau d'étude</div>
-              <div className="text-gray-700">Bac + 5</div>
-            </div>
-            <div className="mb-4">
-              <div className="text-xs text-gray-400 font-semibold mb-1">Experiences</div>
-              <div className="text-gray-700">3 ans → 5 ans</div>
-            </div>
-            <div className="mb-4">
-              <div className="text-xs text-gray-400 font-semibold mb-1">Salaire</div>
-              <div className="text-gray-700">20 000 Dhs Net</div>
-            </div>
-            <div>
-              <div className="text-xs text-gray-400 font-semibold mb-1">Contract</div>
-              <div className="text-gray-700">CDI</div>
-            </div>
-          </div>
-        </div>
-        {/* Right column: unified view with shared background and text sections */}
-        <div className="flex-1">
-          <div className="bg-white rounded-lg shadow p-8">
-            {/* About the job section */}
-            <h2 className="text-xl font-bold mb-4">About the job</h2>
-            <div className="mb-6">
-              <div className="font-bold text-gray-800 mb-2">MISSION</div>
-              <div className="text-gray-700 mb-2">
-                {campaign?.job_description || 'No job description provided.'}
+      {/* Tab views */}
+      {activeTab === 'info' ? (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex gap-8">
+          {/* Left column: menu as text headers and campaign details */}
+          <div className="flex-shrink-0" style={{ width: '410px' }}>
+            {/* Campaign details card */}
+            <div className="bg-white rounded-lg shadow p-6 mb-6">
+              <div className="mb-4">
+                <div className="text-xs text-gray-400 font-semibold mb-1">Poste</div>
+                <div className="font-medium text-gray-900">{campaign?.title || 'UX/UI Designer'}</div>
               </div>
-            </div>
-            <div className="mb-6">
-              <div className="font-bold text-gray-800 mb-2">ACTIVITES PRINCIPALES</div>
-              <ul className="list-disc pl-6 text-gray-700 space-y-1">
-                <li>Organise, prépare et anime les ateliers</li>
-                <li>Interagit avec les SPOC et les chefs de projets</li>
-                <li>Mène une veille technologique régulière et adhoc,</li>
-                <li>Fabrique les prototypes</li>
-                <li>Rédige les différents livrables, restitutions</li>
-                <li>Coordonne la production de supports de communication,</li>
-                <li>Construit et entretient les synergies avec les interlocuteurs partenaires.</li>
-              </ul>
-            </div>
-            <div className="mb-6">
-              <div className="font-bold text-gray-800 mb-2">Autres informations</div>
-              <ol className="list-decimal pl-6 text-gray-700 space-y-2">
-                <li>
-                  Il/Elle travaille en amélioration continue, ce qui l'amène à évoluer en mode test and learn, en intégrant en permanence de nouvelles méthodes : agile, Lean, lean startup, corporate hacking... Par ailleurs, il/elle a pour mission d'identifier et de construire les assets mutualisables liés à son activité. (toolkit, templates, nouvelle méthode de travail)
-                </li>
-                <li>
-                  Il/elle peut également acculturer toute entité de la BMCI ayant besoin de formation aux méthodes qu'il/elle maîtrise.
-                </li>
-              </ol>
-            </div>
-            {/* Add more sections as needed, using campaign/job data */}
-          </div>
+              <div className="mb-4">
+                <div className="text-xs text-gray-400 font-semibold mb-1">Localisation</div>
+                <div className="text-gray-700">Casablanca, Morocco</div>
+              </div>
+              <div className="mb-4">
+                <div className="text-xs text-gray-400 font-semibold mb-1">Mode de travail</div>
+                <div className="text-gray-700">Hybrid</div>
         </div>
-      </div>
+              <div className="mb-4">
+                <div className="text-xs text-gray-400 font-semibold mb-1">Niveau d'étude</div>
+                <div className="text-gray-700">Bac + 5</div>
+        </div>
+              <div className="mb-4">
+                <div className="text-xs text-gray-400 font-semibold mb-1">Experiences</div>
+                <div className="text-gray-700">3 ans → 5 ans</div>
+        </div>
+              <div className="mb-4">
+                <div className="text-xs text-gray-400 font-semibold mb-1">Salaire</div>
+                <div className="text-gray-700">20 000 Dhs Net</div>
+                </div>
+              <div>
+                <div className="text-xs text-gray-400 font-semibold mb-1">Contract</div>
+                <div className="text-gray-700">CDI</div>
+                </div>
+            </div>
+          </div>
+          {/* Right column: unified view with shared background and text sections */}
+          <div className="flex-1">
+            <div className="bg-white rounded-lg shadow p-8">
+              {/* About the job section */}
+              <h2 className="text-xl font-bold mb-4">About the job</h2>
+              <div className="mb-6">
+                <div className="font-bold text-gray-800 mb-2">MISSION</div>
+                <div className="text-gray-700 mb-2">
+                  {campaign?.job_description || 'No job description provided.'}
+                </div>
+              </div>
+              <div className="mb-6">
+                <div className="font-bold text-gray-800 mb-2">ACTIVITES PRINCIPALES</div>
+                <ul className="list-disc pl-6 text-gray-700 space-y-1">
+                  <li>Organise, prépare et anime les ateliers</li>
+                  <li>Interagit avec les SPOC et les chefs de projets</li>
+                  <li>Mène une veille technologique régulière et adhoc,</li>
+                  <li>Fabrique les prototypes</li>
+                  <li>Rédige les différents livrables, restitutions</li>
+                  <li>Coordonne la production de supports de communication,</li>
+                  <li>Construit et entretient les synergies avec les interlocuteurs partenaires.</li>
+                </ul>
+                    </div>
+              <div className="mb-6">
+                <div className="font-bold text-gray-800 mb-2">Autres informations</div>
+                <ol className="list-decimal pl-6 text-gray-700 space-y-2">
+                  <li>
+                    Il/Elle travaille en amélioration continue, ce qui l'amène à évoluer en mode test and learn, en intégrant en permanence de nouvelles méthodes : agile, Lean, lean startup, corporate hacking... Par ailleurs, il/elle a pour mission d'identifier et de construire les assets mutualisables liés à son activité. (toolkit, templates, nouvelle méthode de travail)
+                  </li>
+                  <li>
+                    Il/elle peut également acculturer toute entité de la BMCI ayant besoin de formation aux méthodes qu'il/elle maîtrise.
+                  </li>
+                </ol>
+                </div>
+              {/* Add more sections as needed, using campaign/job data */}
+            </div>
+          </div>
+            </div>
+      ) : (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <CampaignSubmissionsPage />
+        </div>
+      )}
     </PageTemplate>
   );
 };
