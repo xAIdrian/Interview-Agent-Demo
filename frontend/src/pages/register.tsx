@@ -96,7 +96,7 @@ const RegisterPage = () => {
         localStorage.setItem('isAdmin', 'true'); // Set admin status
         
         // Navigate to admin page after successful registration
-        router.push('/admin');
+        router.push('/login');
       } else {
         setApiError(response.data.message || 'Registration failed');
       }
