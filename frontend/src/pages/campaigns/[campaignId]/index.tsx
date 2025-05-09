@@ -289,25 +289,25 @@ const CampaignDetailsPage = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-4">
         <h1 className="text-3xl font-bold text-gray-900">{campaign ? campaign.title : 'Campaign Title'}</h1>
       </div>
+      {/* Menu as text headers */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex gap-8">
+        <span
+          className={`cursor-pointer text-base font-semibold pb-1 border-b-2 ${activeTab === 'info' ? 'border-blue-600 text-blue-700' : 'border-transparent text-gray-500 hover:text-blue-700'}`}
+          onClick={() => setActiveTab('info')}
+        >
+          Informations générale
+        </span>
+        <span
+          className={`cursor-pointer text-base font-semibold pb-1 border-b-2 ${activeTab === 'submissions' ? 'border-blue-600 text-blue-700' : 'border-transparent text-gray-500 hover:text-blue-700'}`}
+          onClick={() => router.push(`/campaigns/${campaignId}/submissions`)}
+        >
+          Submissions
+        </span>
+      </div>
       {/* Two-column layout */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex gap-8">
         {/* Left column: menu as text headers and campaign details */}
         <div className="flex-shrink-0" style={{ width: '410px' }}>
-          {/* Menu as text headers */}
-          <div className="flex space-x-6 mb-6 pl-2">
-            <span
-              className={`cursor-pointer text-base font-semibold pb-1 border-b-2 ${activeTab === 'info' ? 'border-blue-600 text-blue-700' : 'border-transparent text-gray-500 hover:text-blue-700'}`}
-              onClick={() => setActiveTab('info')}
-            >
-              Informations générale
-            </span>
-            <span
-              className={`cursor-pointer text-base font-semibold pb-1 border-b-2 ${activeTab === 'submissions' ? 'border-blue-600 text-blue-700' : 'border-transparent text-gray-500 hover:text-blue-700'}`}
-              onClick={() => router.push(`/campaigns/${campaignId}/submissions`)}
-            >
-              Submissions
-            </span>
-          </div>
           {/* Campaign details card */}
           <div className="bg-white rounded-lg shadow p-6 mb-6">
             <div className="mb-4">
@@ -340,174 +340,42 @@ const CampaignDetailsPage = () => {
             </div>
           </div>
         </div>
-        {/* Right column: nest existing sections */}
+        {/* Right column: unified view with shared background and text sections */}
         <div className="flex-1">
-          {/* Existing content goes here, unchanged */}
-          <div className="flex justify-end mb-4 items-center">
-            <div className="space-x-2 px-16">
-              {isAdmin && (
-                <>
-                  <Link 
-                    href={`/campaigns/${campaignId}/submissions`}
-                    className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700"
-                  >
-                    View Submissions ({submissionCount})
-                  </Link>
-                  <Link 
-                    href={`/campaigns/${campaignId}/edit`}
-                    className="bg-indigo-500 text-white px-4 py-2 rounded hover:bg-indigo-700"
-                  >
-                    Edit Campaign
-                  </Link>
-                </>
-              )}
-              {!isAdmin && renderStartInterviewButton()}
-              {isAdmin && (
-                <Link 
-                  href="/campaigns"
-                  className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-700"
-                >
-                  Back to Campaigns
-                </Link>
-              )}
+          <div className="bg-white rounded-lg shadow p-8">
+            {/* About the job section */}
+            <h2 className="text-xl font-bold mb-4">About the job</h2>
+            <div className="mb-6">
+              <div className="font-bold text-gray-800 mb-2">MISSION</div>
+              <div className="text-gray-700 mb-2">
+                {campaign?.job_description || 'No job description provided.'}
+              </div>
             </div>
+            <div className="mb-6">
+              <div className="font-bold text-gray-800 mb-2">ACTIVITES PRINCIPALES</div>
+              <ul className="list-disc pl-6 text-gray-700 space-y-1">
+                <li>Organise, prépare et anime les ateliers</li>
+                <li>Interagit avec les SPOC et les chefs de projets</li>
+                <li>Mène une veille technologique régulière et adhoc,</li>
+                <li>Fabrique les prototypes</li>
+                <li>Rédige les différents livrables, restitutions</li>
+                <li>Coordonne la production de supports de communication,</li>
+                <li>Construit et entretient les synergies avec les interlocuteurs partenaires.</li>
+              </ul>
+            </div>
+            <div className="mb-6">
+              <div className="font-bold text-gray-800 mb-2">Autres informations</div>
+              <ol className="list-decimal pl-6 text-gray-700 space-y-2">
+                <li>
+                  Il/Elle travaille en amélioration continue, ce qui l'amène à évoluer en mode test and learn, en intégrant en permanence de nouvelles méthodes : agile, Lean, lean startup, corporate hacking... Par ailleurs, il/elle a pour mission d'identifier et de construire les assets mutualisables liés à son activité. (toolkit, templates, nouvelle méthode de travail)
+                </li>
+                <li>
+                  Il/elle peut également acculturer toute entité de la BMCI ayant besoin de formation aux méthodes qu'il/elle maîtrise.
+                </li>
+              </ol>
+            </div>
+            {/* Add more sections as needed, using campaign/job data */}
           </div>
-          
-          {error && (
-            <div className="mb-4 p-2 bg-red-100 text-red-700 rounded">
-              {error}
-            </div>
-          )}
-          
-          {errorMessage && (
-            <div className="mb-4 p-2 bg-red-100 text-red-700 rounded">
-              {errorMessage}
-            </div>
-          )}
-          
-          {isLoading ? (
-            <div className="flex justify-center items-center py-10">
-              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-700"></div>
-            </div>
-          ) : campaign ? (
-            <>
-              <div className="bg-white shadow overflow-hidden sm:rounded-lg mb-6">
-                <div className="border-t border-gray-200">
-                  <dl>
-                    <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                      <dt className="text-sm font-medium text-gray-500">Title</dt>
-                      <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{campaign.title}</dd>
-                    </div>
-                    <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                      <dt className="text-sm font-medium text-gray-500">Job Description</dt>
-                      <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{campaign.job_description}</dd>
-                    </div>
-                  </dl>
-                </div>
-              </div>
-
-              {/* Campaign Link Section - Only visible for admin users */}
-              {isAdmin && (
-                <div className="mb-8 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                  <div className="flex justify-between items-center mb-2">
-                    <h3 className="text-lg font-semibold text-gray-700">Campaign Link</h3>
-                    <button
-                      id="copy-link-button"
-                      type="button"
-                      onClick={handleCopyLink}
-                      className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-                    >
-                      Copy Link
-                    </button>
-                  </div>
-                  <div className="space-y-4">
-                    <div className="bg-white border border-gray-200 rounded-lg p-3">
-                      <p className="text-sm text-gray-600 break-all">
-                        {typeof window !== 'undefined' ? `${window.location.origin}/live-interview/${campaignId}` : ''}
-                      </p>
-                    </div>
-                    <div className="bg-white border border-gray-200 rounded-lg p-3">
-                      <div className="flex flex-col">
-                        <p className="text-sm font-medium text-gray-500 mb-1">Access Code:</p>
-                        <p className="text-base font-mono font-semibold text-gray-800">
-                          {campaign?.access_code || 'Loading...'}
-                        </p>
-                        <p className="text-xs text-gray-500 mt-1">Share this code with candidates to access the interview</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Questions Section - Show for both admin and candidates */}
-              <div className="bg-white shadow overflow-hidden sm:rounded-lg mt-6">
-                <div className="px-4 py-5 sm:px-6">
-                  <h2 className="text-lg leading-6 font-medium text-gray-900">
-                    {isAdmin ? 'Interview Questions' : 'Position Questions'}
-                  </h2>
-                  <p className="mt-1 text-sm text-gray-500">
-                    {isAdmin 
-                      ? 'Review and manage the questions for this campaign.' 
-                      : 'Preview of the questions you will be asked during the interview.'}
-                  </p>
-                </div>
-                <div className="border-t border-gray-200">
-                  {questions.length > 0 ? (
-                    <ul className="divide-y divide-gray-200">
-                      {questions.map((question, index) => (
-                        <li key={question.id} className="px-4 py-4 sm:px-6">
-                          <div className="flex items-center justify-between">
-                            <div className="flex-grow">
-                              <p className="text-sm font-medium text-gray-900">
-                                Question {index + 1}: {question.body}
-                              </p>
-                            </div>
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <div className="px-4 py-5 sm:px-6 text-center text-gray-500">
-                      {isLoading ? (
-                        <div className="flex justify-center items-center py-4">
-                          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-700"></div>
-                        </div>
-                      ) : (
-                        <p>No questions available for this {isAdmin ? 'campaign' : 'position'}.</p>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Success Modal */}
-              <Modal 
-                isOpen={showSuccessModal}
-                onClose={handleSuccessModalClose}
-                title="Campaign Created Successfully"
-              >
-                <div className="flex flex-col items-center space-y-4">
-                  <CheckCircleIcon className="h-12 w-12 text-green-500" />
-                  <div className="text-center">
-                    <p className="text-gray-600 mb-4">
-                      Your campaign has been created successfully!
-                    </p>
-                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
-                      <p className="text-sm text-gray-600 break-all">
-                        {typeof window !== 'undefined' ? `${window.location.origin}/live-interview/${campaignId}` : ''}
-                      </p>
-                    </div>
-                  </div>
-                  <PrimaryButton
-                    onClick={handleSuccessModalClose}
-                    className="mt-4"
-                  >
-                    Return to Campaigns
-                  </PrimaryButton>
-                </div>
-              </Modal>
-            </>
-          ) : null}
         </div>
       </div>
     </PageTemplate>
