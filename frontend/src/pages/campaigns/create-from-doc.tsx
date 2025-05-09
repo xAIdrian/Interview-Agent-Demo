@@ -6,6 +6,7 @@ import { PageTemplate } from '../../components/PageTemplate';
 import { Spinner } from '../../components/ui/Spinner';
 import { Modal } from '../../components/ui/Modal';
 import { CheckCircleIcon } from '@heroicons/react/24/outline';
+import { useAuth } from '../../app/components/AuthProvider';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://main-service-48k0.onrender.com';
 
@@ -32,6 +33,7 @@ interface Campaign {
 
 const CreateCampaignFromDocPage = () => {
   const router = useRouter();
+  const { user } = useAuth();
   const [isClient, setIsClient] = useState(false);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -339,6 +341,12 @@ const CreateCampaignFromDocPage = () => {
       return;
     }
 
+    if (!user?.id) {
+      setError('User authentication required');
+      setIsSubmitting(false);
+      return;
+    }
+
     if (!campaign.job_description.trim()) {
       setError('Job description is required');
       setIsSubmitting(false);
@@ -384,10 +392,11 @@ const CreateCampaignFromDocPage = () => {
         body: q.title // Set body to title when submitting
       }));
 
-      // Create the campaign
+      // Create the campaign with user_id
       const response = await axios.post(`${API_URL}/api/test-campaigns`, {
         ...campaign,
-        questions: questionsData
+        questions: questionsData,
+        user_id: user.id  // Add user_id to the request
       }, {
         headers: {
           'Content-Type': 'application/json'
