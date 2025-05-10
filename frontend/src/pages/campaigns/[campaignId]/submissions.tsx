@@ -25,6 +25,7 @@ interface Submission {
   total_points: number | null;
   email: string;
   campaign_name: string;
+  candidate_name?: string;
 }
 
 interface Campaign {
@@ -174,7 +175,7 @@ const CampaignSubmissionsPage = () => {
             widthGrow: 2,
             formatter: function(cell: any) {
               const data = cell.getRow().getData();
-              const name = data.user_name || 'No name';
+              const name = data.candidate_name || 'No name';
               return `<div>
                 <div class="font-medium">${name}</div>
               </div>`;
@@ -290,7 +291,7 @@ const CampaignSubmissionsPage = () => {
               {submissions.filter(sub => sub.total_points !== null).map((submission) => {
                 // Safe handling for missing or malformed email
                 const email = typeof submission.email === 'string' ? submission.email : '';
-                const name = email.includes('@') ? email.split('@')[0].replace(/\./g, ' ') : 'Unknown';
+                const name = submission.candidate_name || (email.includes('@') ? email.split('@')[0].replace(/\./g, ' ') : 'Unknown');
                 const initials = name.split(' ').map(n => n[0]?.toUpperCase() || '').join('').slice(0,2) || '??';
                 const qualified = submission.total_points && submission.total_points > 70; // Example logic
                 const analysis = resumeAnalyses[submission.id];
