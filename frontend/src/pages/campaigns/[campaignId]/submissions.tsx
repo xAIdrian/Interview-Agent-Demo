@@ -215,7 +215,8 @@ const CampaignSubmissionsPage = () => {
               // Ensure campaignId is a string and properly encoded
               const returnToCampaign = String(campaignId);
               console.log('🚀 ~ Creating view button with returnToCampaign:', returnToCampaign);
-              viewButton.href = `/submissions/${submissionId}?returnToCampaign=${encodeURIComponent(returnToCampaign)}`;
+              const data = cell.getRow().getData() as Submission;
+              viewButton.href = `/submissions/${submissionId}?returnToCampaign=${encodeURIComponent(returnToCampaign)}&userId=${encodeURIComponent(data.user_id)}&campaignId=${encodeURIComponent(data.campaign_id)}`;
               viewButton.className = "px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm";
               container.appendChild(viewButton);
               
@@ -230,7 +231,7 @@ const CampaignSubmissionsPage = () => {
               
               // If not clicking on a link, navigate to view submission
               const submissionId = String(cell.getValue());
-              window.location.href = `/submissions/${submissionId}`;
+              router.push(`/submissions/${submissionId}?userId=${encodeURIComponent(cell.getRow().getData().user_id)}&campaignId=${encodeURIComponent(cell.getRow().getData().campaign_id)}`);
             }
           }
         ],
@@ -297,11 +298,12 @@ const CampaignSubmissionsPage = () => {
                 const analysis = resumeAnalyses[submission.id];
                 const summary = analysis?.overall_fit || `${name} has a strong background in banking and project management, making them a solid candidate for the Product Owner position. However, gaps in specific international banking product knowledge and Agile experience might limit their effectiveness in the role.`;
                 const matching = analysis?.percent_match !== undefined ? Math.round(analysis.percent_match) : 'N/A';
+                const isQualified = typeof matching === 'number' && matching >= 75;
                 return (
                   <div
                     key={submission.id}
                     className="bg-white rounded-xl shadow p-6 flex flex-col justify-between min-h-[260px] cursor-pointer hover:shadow-lg transition"
-                    onClick={() => router.push(`/submissions/${submission.id}`)}
+                    onClick={() => router.push(`/submissions/${submission.id}?userId=${encodeURIComponent(submission.user_id)}&campaignId=${encodeURIComponent(submission.campaign_id)}`)}
                   >
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center">
@@ -310,7 +312,9 @@ const CampaignSubmissionsPage = () => {
                         </div>
                         <span className="text-lg font-semibold text-gray-900">{name}</span>
                       </div>
-                      <span className={`text-xs font-semibold px-2 py-1 rounded ${qualified ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>{qualified ? '⚡ Qualified' : 'Not Qualified'}</span>
+                      {isQualified && (
+                        <span className="text-xs font-semibold px-2 py-1 rounded bg-green-50 text-green-700">Qualified</span>
+                      )}
                     </div>
                     <div className="text-gray-700 mb-6 mt-2 flex-1">
                       {summary}
