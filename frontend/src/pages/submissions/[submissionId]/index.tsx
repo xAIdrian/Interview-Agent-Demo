@@ -388,7 +388,7 @@ const SubmissionDetailsPage = () => {
 
   // Breadcrumbs header for submission details
   const renderBreadcrumbs = () => (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
+    <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8 py-2">
       <nav className="flex items-center text-sm text-gray-500 mb-4" aria-label="Breadcrumb">
         <button
           onClick={() => router.push(`/campaigns/${campaignId}/submissions`)}
@@ -450,15 +450,78 @@ const SubmissionDetailsPage = () => {
           </div>
           <div className="flex flex-col md:flex-row gap-8">
             {/* Left Column: Candidate Info */}
-            <div className="w-full md:w-80 bg-white rounded-xl shadow p-6 flex flex-col items-center mb-6 md:mb-0">
-              <div className="w-20 h-20 rounded-full bg-gray-200 flex items-center justify-center text-3xl font-bold text-blue-700 mb-4">
-                {candidateUser?.name ? candidateUser.name.split(' ').map(n => n[0]?.toUpperCase() || '').join('').slice(0,2) : '??'}
+            <div className="w-full md:w-1/3 bg-white rounded-2xl shadow p-0 mb-6 md:mb-0 flex flex-col">
+              {/* Header with avatar, name, job title, badge (horizontal row) */}
+              <div className="flex items-center justify-between bg-blue-50 rounded-t-2xl px-6 py-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-full bg-blue-600 flex items-center justify-center text-xl font-bold text-white">
+                    {candidateUser?.name ? candidateUser.name.split(' ').map(n => n[0]?.toUpperCase() || '').join('').slice(0,2) : 'ZZ'}
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-base font-bold text-gray-900 leading-tight">{candidateUser?.name || 'Zakia ZAGHRARI'}</span>
+                    <span className="text-sm text-blue-500 leading-tight">Business developer</span>
+                  </div>
+                </div>
+                <span className="bg-blue-500 text-white text-xs font-semibold px-4 py-1.5 rounded-full flex items-center whitespace-nowrap">
+                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                  Qualified profile
+                </span>
               </div>
-              <div className="text-xl font-bold text-gray-900 mb-1 text-center">{candidateUser?.name || 'N/A'}</div>
-              <div className="text-gray-700 font-medium mb-2 text-center">{candidateUser?.email || 'N/A'}</div>
+              {/* Info fields */}
+              <div className="flex flex-col divide-y divide-gray-100">
+                <div className="flex items-center gap-3 px-6 py-4">
+                  <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 11c0-2.21 1.79-4 4-4s4 1.79 4 4-1.79 4-4 4-4-1.79-4-4z" /></svg>
+                  <div>
+                    <div className="text-xs text-gray-400">Poste</div>
+                    <div className="text-sm font-medium text-gray-900">Business Developer</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 px-6 py-4">
+                  <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8m-9 4v8" /></svg>
+                  <div>
+                    <div className="text-xs text-gray-400">Téléphone</div>
+                    <div className="text-sm font-medium text-gray-900">+2126 08 6466 31</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 px-6 py-4">
+                  <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M16 12H8m8 0a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+                  <div>
+                    <div className="text-xs text-gray-400">Adresse mail</div>
+                    <div className="text-sm font-medium text-gray-900">z.zaghrari@gmail.com</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 px-6 py-4">
+                  <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 12.414a4 4 0 10-5.657 5.657l4.243 4.243a8 8 0 1011.314-11.314l-4.243 4.243z" /></svg>
+                  <div>
+                    <div className="text-xs text-gray-400">Localisation</div>
+                    <div className="text-sm font-medium text-gray-900">Casablanca, Morocco</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 px-6 py-4">
+                  <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 14l9-5-9-5-9 5 9 5zm0 7v-7" /></svg>
+                  <div>
+                    <div className="text-xs text-gray-400">Niveau d'étude</div>
+                    <div className="text-sm font-medium text-gray-900">Bac + 5</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 px-6 py-4">
+                  <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M8 17l4-4 4 4m0 0V3m0 14H4" /></svg>
+                  <div>
+                    <div className="text-xs text-gray-400">Experiences</div>
+                    <div className="text-sm font-medium text-gray-900">3 ans</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 px-6 py-4">
+                  <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm0 8v2m0-10V4" /></svg>
+                  <div>
+                    <div className="text-xs text-gray-400">Salaire actuelle</div>
+                    <div className="text-sm font-medium text-gray-900">20 000 Dhs Net</div>
+                  </div>
+                </div>
+              </div>
             </div>
             {/* Right Column: Main Content */}
-            <div className="flex-1">
+            <div className="w-full md:w-2/3">
               {/* Tabs and Main Content */}
               <Tab.Group selectedIndex={activeTab === 'analysis' ? 0 : 1} onChange={i => setActiveTab(i === 0 ? 'analysis' : 'answers')}>
                 <Tab.List className="flex space-x-8 border-b mb-6">
