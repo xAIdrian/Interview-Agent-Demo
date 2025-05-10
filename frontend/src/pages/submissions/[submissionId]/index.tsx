@@ -391,9 +391,9 @@ const SubmissionDetailsPage = () => {
     <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8 py-2">
       <nav className="flex items-center text-sm text-gray-500 mb-4" aria-label="Breadcrumb">
         <button
-          onClick={() => router.push(`/campaigns/${campaignId}/submissions`)}
+          onClick={() => router.push(`/campaigns/${campaignId}`)}
           className="mr-3 p-1 rounded hover:bg-gray-200 focus:outline-none flex items-center"
-          aria-label="Back to submissions"
+          aria-label="Back to campaign"
           type="button"
         >
           <svg className="h-5 w-5 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
@@ -416,7 +416,7 @@ const SubmissionDetailsPage = () => {
         <span className="mx-2">/</span>
         <span
           className="hover:text-blue-600 font-medium cursor-pointer"
-          onClick={() => router.push(`/campaigns/${campaignId}/submissions`)}
+          onClick={() => router.push(`/campaigns/${campaignId}`)}
         >
           Submissions
         </span>
