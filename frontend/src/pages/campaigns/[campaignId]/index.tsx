@@ -62,6 +62,7 @@ const CampaignDetailsPage = () => {
   });
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'info' | 'submissions'>('info');
+  const [campaignLink, setCampaignLink] = useState('');
 
   // Handle copying campaign link
   const handleCopyLink = () => {
@@ -196,6 +197,12 @@ const CampaignDetailsPage = () => {
 
     fetchData();
   }, [campaignId, isAdmin, user?.id]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && campaignId) {
+      setCampaignLink(`${window.location.origin}/live-interview/${campaignId}`);
+    }
+  }, [campaignId]);
 
   const renderStartInterviewButton = () => {
     if (isLoading) {
@@ -344,6 +351,34 @@ const CampaignDetailsPage = () => {
           </div>
           {/* Right column: unified view with shared background and text sections */}
           <div className="flex-1">
+            {/* Campaign Link and Access Code */}
+            <div className="bg-white rounded-lg shadow p-4 mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between">
+              <div className="mb-2 sm:mb-0">
+                <div className="text-xs text-blue-700 font-semibold mb-1">Campaign Link</div>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="text"
+                    value={campaignLink}
+                    readOnly
+                    className="w-64 px-2 py-1 border border-blue-200 rounded text-blue-900 bg-white text-sm font-mono"
+                    style={{ minWidth: '200px' }}
+                  />
+                  <button
+                    id="copy-link-button"
+                    onClick={handleCopyLink}
+                    className="px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
+                  >
+                    Copy
+                  </button>
+                </div>
+              </div>
+              <div className="mt-2 sm:mt-0">
+                <div className="text-xs text-blue-700 font-semibold mb-1">Access Code</div>
+                <span className="inline-block px-3 py-1 bg-white border border-blue-200 rounded text-blue-900 font-mono text-base tracking-widest">
+                  {campaign?.access_code || 'N/A'}
+                </span>
+              </div>
+            </div>
             <div className="bg-white rounded-lg shadow p-8">
               {/* About the job section */}
               <h2 className="text-xl font-bold mb-4">About the job</h2>
