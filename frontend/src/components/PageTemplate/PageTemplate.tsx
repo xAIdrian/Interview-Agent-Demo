@@ -16,7 +16,7 @@ export const PageTemplate: React.FC<PageTemplateProps> = ({
   children,
   title,
   centered = false,
-  maxWidth = 'lg',
+  maxWidth = 'full',
 }) => {
   const router = useRouter();
   const { user, isAuthenticated, isAdmin, logout } = useAuth();
