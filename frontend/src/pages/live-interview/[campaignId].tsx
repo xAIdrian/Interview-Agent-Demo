@@ -43,7 +43,9 @@ const LiveKitInterviewPage: React.FC = () => {
   const [candidateData, setCandidateData] = useState({
     name: '',
     email: '',
-    phoneNumber: ''
+    phoneNumber: '',
+    countryCode: '+1',
+    lastName: ''
   });
   const [isCreatingUser, setIsCreatingUser] = useState(false);
   const [submissionId, setSubmissionId] = useState<string | null>(null);
@@ -277,154 +279,124 @@ const LiveKitInterviewPage: React.FC = () => {
         <meta name="description" content="AI-Powered Interview Experience" />
       </Head>
       
-      <div className="container mx-auto px-4 py-8">
-
-        {campaign && (
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold mb-4">{campaign.title}</h1>
-            
-            <div className="bg-white shadow rounded-lg p-6 mb-6">
-              <div className="grid gap-6">
-                <div>
-                  <h2 className="text-xl font-semibold mb-2">Job Description</h2>
-                  <p className="text-gray-700 mb-4">{campaign.job_description}</p>
+      <div className="min-h-screen flex flex-col flex-1 justify-center items-center bg-[#f5f7fa] w-full">
+        <div className="w-full max-w-3xl bg-white shadow-md rounded-lg p-12 md:p-16 mx-auto mt-16">
+          <h2 className="text-3xl font-bold mb-10 text-center">Interview Application</h2>
+          <form onSubmit={e => { e.preventDefault(); onStartInterview(); }}>
+            <div className="flex gap-6 mb-6">
+              <div className="w-1/2">
+                <label htmlFor="name" className="block text-lg font-medium text-gray-700 mb-2">Name</label>
+                <input
+                  type="text"
+                  name="name"
+                  id="name"
+                  value={candidateData.name}
+                  onChange={handleInputChange}
+                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-3 px-5 text-lg focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  required
+                />
+              </div>
+              <div className="w-1/2">
+                <label htmlFor="lastName" className="block text-lg font-medium text-gray-700 mb-2">Last name</label>
+                <input
+                  type="text"
+                  name="lastName"
+                  id="lastName"
+                  value={candidateData.lastName || ''}
+                  onChange={e => setCandidateData(prev => ({ ...prev, lastName: e.target.value }))}
+                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-3 px-5 text-lg focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  required
+                />
+              </div>
+            </div>
+            <div className="mb-6">
+              <label htmlFor="phoneNumber" className="block text-lg font-medium text-gray-700 mb-2">Telephone</label>
+              <div className="flex">
+                <select
+                  className="border border-gray-300 rounded-l-md py-3 px-4 bg-gray-50 text-lg focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  style={{ minWidth: 90 }}
+                  value={candidateData.countryCode || '+1'}
+                  onChange={e => setCandidateData(prev => ({ ...prev, countryCode: e.target.value }))}
+                  required
+                >
+                  <option value="+1">🇺🇸 +1</option>
+                  <option value="+44">🇬🇧 +44</option>
+                  <option value="+91">🇮🇳 +91</option>
+                  {/* Add more as needed */}
+                </select>
+                <input
+                  type="tel"
+                  name="phoneNumber"
+                  id="phoneNumber"
+                  value={candidateData.phoneNumber}
+                  onChange={handleInputChange}
+                  className="mt-0 block w-full border border-gray-300 rounded-r-md shadow-sm py-3 px-5 text-lg focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="608 646631"
+                  required
+                />
+              </div>
+            </div>
+            <div className="mb-6">
+              <label htmlFor="email" className="block text-lg font-medium text-gray-700 mb-2">Email address</label>
+              <input
+                type="email"
+                name="email"
+                id="email"
+                value={candidateData.email}
+                onChange={handleInputChange}
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-3 px-5 text-lg focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                required
+              />
+            </div>
+            <div className="mb-8">
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-10 text-center bg-gray-50 relative">
+                <input
+                  id="resume-upload"
+                  type="file"
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  accept=".pdf,.doc,.docx,.txt"
+                  onChange={e => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      setResumeFile(file);
+                      setError(null);
+                    }
+                  }}
+                  required
+                />
+                <div className="flex flex-col items-center justify-center pointer-events-none">
+                  <svg className="w-14 h-14 mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                  </svg>
+                  <p className="mb-3 text-lg text-blue-600 font-semibold">Click to upload</p>
+                  <p className="mb-3 text-lg text-gray-500">or drag and drop</p>
+                  <p className="text-base text-gray-400">DOCX, DOC, PDF or text</p>
+                  <div className="mt-4">
+                    <label htmlFor="resume-upload" className="inline-block px-6 py-3 bg-blue-500 text-white rounded text-lg cursor-pointer pointer-events-auto">Browse Files</label>
+                  </div>
+                  {resumeFile && (
+                    <div className="mt-4 text-green-600 text-lg">{resumeFile.name}</div>
+                  )}
                 </div>
               </div>
             </div>
-
-            {/* Candidate Information Section */}
-            <div className="bg-white shadow rounded-lg p-6 mb-6">
-              <div className="px-4 py-5 sm:px-6">
-                <h2 className="text-lg leading-6 font-medium text-gray-900">Your Information</h2>
-                <p className="mt-1 text-sm text-gray-500">
-                  Please provide your details to begin the interview.
-                </p>
-              </div>
-              <div className="border-t border-gray-200 px-4 py-5 sm:px-6">
-                <div className="space-y-4">
-                  <div>
-                    <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-                      Full Name *
-                    </label>
-                    <input
-                      type="text"
-                      name="name"
-                      id="name"
-                      value={candidateData.name}
-                      onChange={handleInputChange}
-                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                      Email Address *
-                    </label>
-                    <input
-                      type="email"
-                      name="email"
-                      id="email"
-                      value={candidateData.email}
-                      onChange={handleInputChange}
-                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                      required
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-                
-            {/* Resume Upload Section */}
-            <div className="bg-white shadow rounded-lg p-6 mb-6">
-              <div className="px-4 py-5 sm:px-6">
-                <h2 className="text-lg leading-6 font-medium text-gray-900">Upload Your Resume</h2>
-                <p className="mt-1 text-sm text-gray-500">
-                  Please upload your resume before starting the interview.
-                </p>
-              </div>
-              <div className="border-t border-gray-200 px-4 py-5 sm:px-6">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-center w-full">
-                    <label
-                      htmlFor="resume-upload"
-                      className={`flex flex-col items-center justify-center w-full h-64 border-2 
-                        ${resumeFile ? 'border-green-300 bg-green-50' : 'border-gray-300 border-dashed'} 
-                        rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100`}
-                    >
-                      <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                        {resumeFile ? (
-                          <>
-                            <svg className="w-10 h-10 mb-3 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-                            </svg>
-                            <p className="mb-2 text-sm text-green-600">
-                              Resume uploaded: {resumeFile.name}
-                            </p>
-                            <p className="text-xs text-green-500">
-                              Click to change file
-                            </p>
-                          </>
-                        ) : (
-                          <>
-                            <svg
-                              className="w-8 h-8 mb-4 text-gray-500"
-                              aria-hidden="true"
-                              xmlns="http://www.w3.org/2000/svg"
-                              fill="none"
-                              viewBox="0 0 20 16"
-                            >
-                              <path
-                                stroke="currentColor"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth="2"
-                                d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2"
-                              />
-                            </svg>
-                            <p className="mb-2 text-sm text-gray-500">
-                              <span className="font-semibold">Click to upload</span> or drag and drop
-                            </p>
-                            <p className="text-xs text-gray-500">
-                              PDF, DOC, or DOCX (MAX. 5MB)
-                            </p>
-                          </>
-                        )}
-                      </div>
-                      <input
-                        id="resume-upload"
-                        type="file"
-                        className="hidden"
-                        accept=".pdf,.doc,.docx"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            setResumeFile(file);
-                            setError(null); // Clear any previous errors
-                          }
-                        }}
-                      />
-                    </label>
-                  </div>
-                </div>
-              </div>
-            </div>
-
             {error && (
-              <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
+              <div className="mb-6 p-3 bg-red-100 border border-red-400 text-red-700 rounded text-center text-lg">
                 {error}
               </div>
             )}
-
             <button
-              onClick={onStartInterview}
+              type="submit"
               disabled={isCreatingUser}
-              className={`w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-semibold
-                ${isCreatingUser ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-700'}`}
+              className={`w-full bg-blue-600 text-white py-4 px-8 rounded-lg font-semibold text-xl transition-colors duration-200 ${isCreatingUser ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-700'}`}
             >
-              {isCreatingUser ? 'Creating Account...' : 'Start Interview'}
+              {isCreatingUser ? 'Creating Account...' : 'Start the interview'}
             </button>
-          </div>
-        )}
+          </form>
+        </div>
+        <div className="mt-12 text-center text-gray-400 text-lg w-full">
+          Powered by <span className="font-semibold text-gray-500">KWIKS.</span>
+        </div>
       </div>
 
       {/* Maximum Attempts Modal - Updated to be non-closeable */}
