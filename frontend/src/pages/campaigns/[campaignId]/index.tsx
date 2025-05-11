@@ -66,7 +66,7 @@ const CampaignDetailsPage = () => {
 
   // Handle copying campaign link
   const handleCopyLink = () => {
-    const campaignLink = `${window.location.origin}/live-interview/${campaignId}`;
+    const campaignLink = `${window.location.origin}/start/${campaignId}`;
     navigator.clipboard.writeText(campaignLink).then(() => {
       const button = document.getElementById('copy-link-button');
       if (button) {
@@ -200,71 +200,9 @@ const CampaignDetailsPage = () => {
 
   useEffect(() => {
     if (typeof window !== 'undefined' && campaignId) {
-      setCampaignLink(`${window.location.origin}/live-interview/${campaignId}`);
+      setCampaignLink(`${window.location.origin}/start/${campaignId}`);
     }
   }, [campaignId]);
-
-  const renderStartInterviewButton = () => {
-    if (isLoading) {
-      return (
-        <button
-          className="bg-gray-400 text-white px-4 py-2 rounded cursor-not-allowed"
-          disabled
-        >
-          Loading...
-        </button>
-      );
-    }
-
-    if (!submissionStatus.can_submit) {
-      return (
-        <div className="flex items-start space-x-2">
-          <div className="flex flex-col items-center">
-            <button
-              className="bg-gray-400 text-white px-4 py-2 rounded cursor-not-allowed"
-              disabled
-            >
-              Interview Not Available
-            </button>
-            <p className="text-sm text-red-600 mt-1">
-              {submissionStatus.has_completed_submission 
-                ? "You have already completed this interview"
-                : `Maximum attempts reached (${submissionStatus.max_submissions})`}
-            </p>
-          </div>
-          <Link 
-            href="/campaigns"
-            className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-700 mt-0"
-          >
-            Back to Positions
-          </Link>
-        </div>
-      );
-    }
-
-    return (
-      <div className="flex items-center space-x-2">
-        <Link 
-          href="/campaigns"
-          className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-700"
-        >
-          Back to Positions
-        </Link>
-      </div>
-    );
-  };
-
-  // Update submission status to ensure numbers don't exceed max
-  const safeSubmissionStatus = {
-    ...submissionStatus,
-    total_submissions: Math.min(submissionStatus.total_submissions, submissionStatus.max_submissions),
-    completed_submissions: Math.min(submissionStatus.completed_submissions, submissionStatus.max_submissions)
-  };
-
-  const handleSuccessModalClose = () => {
-    setShowSuccessModal(false);
-    router.push('/campaigns');
-  };
 
   // Debug effect for campaign state
   useEffect(() => {
@@ -274,7 +212,7 @@ const CampaignDetailsPage = () => {
   }, [campaign]);
 
   return (
-    <PageTemplate maxWidth="lg">
+    <PageTemplate>
       {/* Breadcrumbs */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
         <nav className="flex items-center text-sm text-gray-500 mb-4" aria-label="Breadcrumb">
@@ -361,7 +299,7 @@ const CampaignDetailsPage = () => {
                     value={campaignLink}
                     readOnly
                     className="w-64 px-2 py-1 border border-blue-200 rounded text-blue-900 bg-white text-sm font-mono"
-                    style={{ minWidth: '200px' }}
+                    style={{ minWidth: '400px' }}
                   />
                   <button
                     id="copy-link-button"
