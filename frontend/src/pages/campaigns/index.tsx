@@ -213,7 +213,7 @@ const CampaignsPage = () => {
 
   return (
     <>
-      <PageTemplate maxWidth="lg">
+      <PageTemplate>
         {/* Header Section */}
         <div className="w-full bg-black p-6">
           <div className="flex flex-col items-center justify-center flex-1">
