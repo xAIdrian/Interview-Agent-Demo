@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/app/components/AuthProvider';
 import { Modal } from '@/components/Modal';
+import MicTest from '@/components/livekit/MicTest';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://main-service-48k0.onrender.com';
 
@@ -52,6 +53,7 @@ const LiveKitInterviewPage: React.FC = () => {
   const [showMaxAttemptsModal, setShowMaxAttemptsModal] = useState(false);
   const [maxAttemptsMessage, setMaxAttemptsMessage] = useState<string | null>(null);
   const [isInterviewComplete, setIsInterviewComplete] = useState(false);
+  const [showMicTest, setShowMicTest] = useState(false);
 
   useEffect(() => {
     if (campaignId) {
@@ -102,29 +104,29 @@ const LiveKitInterviewPage: React.FC = () => {
       setError('Invalid campaign ID');
       return;
     }
-
     // Validate inputs
     if (!candidateData.name || !candidateData.email) {
       setError('Name and email are required');
       return;
     }
-
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(candidateData.email)) {
       setError('Please enter a valid email address');
       return;
     }
-
     if (!resumeFile) {
       setError('Please upload your resume');
       return;
     }
+    // Instead of starting the interview, show the mic test stage
+    setShowMicTest(true);
+  };
 
+  const handleMicTestSuccess = async () => {
     setIsCreatingUser(true);
     setError(null);
     let newSubmissionId: string | null = null;
-
     try {
       // Create or get user
       const userResponse = await axios.post(`${API_BASE_URL}/api/users`, {
@@ -133,50 +135,50 @@ const LiveKitInterviewPage: React.FC = () => {
         phone_number: candidateData.phoneNumber,
         campaign_id: campaignId
       });
-
-      // Check if user has reached maximum attempts for this campaign
       if (userResponse.data.max_attempts_reached) {
         setShowMaxAttemptsModal(true);
         setMaxAttemptsMessage(userResponse.data.message || 'Maximum attempts reached for this campaign');
+        setShowMicTest(false);
         return;
       }
-
       const userId = userResponse.data.id;
-
       // Create submission
       const submissionResponse = await axios.post(`${API_BASE_URL}/api/submissions`, {
         campaign_id: campaignId,
         email: candidateData.email,
         name: candidateData.name
       });
-
-      // Check if there's an error in the response
       if (submissionResponse.data.error === "Maximum submission limit reached for this campaign") {
         setShowMaxAttemptsModal(true);
         setMaxAttemptsMessage("You have reached the maximum number of attempts allowed for this position. Please contact the hiring team for more information.");
+        setShowMicTest(false);
         return;
       }
-
       newSubmissionId = submissionResponse.data.id;
       setSubmissionId(newSubmissionId);
-
       // Upload resume
+      if (!resumeFile) {
+        throw new Error('Resume file is missing');
+      }
+      if (!userId) {
+        throw new Error('User ID is missing');
+      }
       const formData = new FormData();
       formData.append('resume', resumeFile);
-      formData.append('user_id', userId!);
+      formData.append('user_id', userId);
       formData.append('submission_id', newSubmissionId!);
+      if (typeof campaignId !== 'string') {
+        throw new Error('Campaign ID is missing or invalid');
+      }
       formData.append('position_id', campaignId);
-
       const resumeResponse = await axios.post(`${API_BASE_URL}/api/upload_resume`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
       });
-
       if (!resumeResponse.data.message) {
         throw new Error('Failed to upload resume');
       }
-
       // Get LiveKit token
       const tokenResponse = await axios.get(`${API_BASE_URL}/api/livekit/token`, {
         params: {
@@ -184,13 +186,12 @@ const LiveKitInterviewPage: React.FC = () => {
           campaignId
         }
       });
-
       // If successful, proceed with the interview
-      onFormSubmit(tokenResponse.data.token, tokenResponse.data.room);
+      setToken(tokenResponse.data.token);
+      setRoom(tokenResponse.data.room);
+      setShowMicTest(false);
     } catch (err) {
       console.error('Error starting interview:', err);
-      
-      // Cleanup on failure
       if (newSubmissionId) {
         try {
           await axios.delete(`${API_BASE_URL}/api/submissions/${newSubmissionId}`);
@@ -198,8 +199,8 @@ const LiveKitInterviewPage: React.FC = () => {
           console.error('Failed to cleanup submission:', cleanupErr);
         }
       }
-      
       setError(err instanceof Error ? err.message : 'Failed to start interview');
+      setShowMicTest(false);
     } finally {
       setIsCreatingUser(false);
     }
@@ -230,45 +231,22 @@ const LiveKitInterviewPage: React.FC = () => {
     return <div>Campaign not found</div>;
   }
 
+  if (showMicTest) {
+    return <MicTest onSuccess={handleMicTestSuccess} showVideoToggle={true} />;
+  }
+
   if (token && room) {
     return (
-      <>
-        <LiveKitInterviewComponent
-          campaignId={campaignId as string}
-          onInterviewComplete={() => {
-            console.log('Interview completed');
-            setIsInterviewComplete(true);
-          }}
-          token={token}
-          room={room}
-          onDisconnect={onDisconnect}
-          submissionId={submissionId!}
-        />
-        
-        {/* Interview Complete Modal */}
-        <Modal
-          isOpen={isInterviewComplete}
-          onClose={() => {}}
-          title="Interview Complete"
-        >
-          <div className="p-6">
-            <div className="text-center">
-              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 mb-4">
-                <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Interview Successfully Completed</h3>
-              <p className="text-gray-600 mb-6">
-                Thank you for completing the interview. Your responses have been recorded.
-              </p>
-              <p>
-                You can close this window now.
-              </p>
-            </div>
-          </div>
-        </Modal>
-      </>
+      <LiveKitInterviewComponent
+        campaignId={campaignId as string}
+        onInterviewComplete={() => {
+          setIsInterviewComplete(true);
+        }}
+        token={token}
+        room={room}
+        onDisconnect={onDisconnect}
+        submissionId={submissionId!}
+      />
     );
   }
 
@@ -286,12 +264,12 @@ const LiveKitInterviewPage: React.FC = () => {
             <div className="flex gap-6 mb-6">
               <div className="w-1/2">
                 <label htmlFor="name" className="block text-lg font-medium text-gray-700 mb-2">Name</label>
-                <input
-                  type="text"
-                  name="name"
-                  id="name"
-                  value={candidateData.name}
-                  onChange={handleInputChange}
+                    <input
+                      type="text"
+                      name="name"
+                      id="name"
+                      value={candidateData.name}
+                      onChange={handleInputChange}
                   className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-3 px-5 text-lg focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                   required
                 />
@@ -332,33 +310,33 @@ const LiveKitInterviewPage: React.FC = () => {
                   onChange={handleInputChange}
                   className="mt-0 block w-full border border-gray-300 rounded-r-md shadow-sm py-3 px-5 text-lg focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                   placeholder="608 646631"
-                  required
-                />
-              </div>
+                      required
+                    />
+                  </div>
             </div>
             <div className="mb-6">
               <label htmlFor="email" className="block text-lg font-medium text-gray-700 mb-2">Email address</label>
-              <input
-                type="email"
-                name="email"
-                id="email"
-                value={candidateData.email}
-                onChange={handleInputChange}
+                    <input
+                      type="email"
+                      name="email"
+                      id="email"
+                      value={candidateData.email}
+                      onChange={handleInputChange}
                 className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-3 px-5 text-lg focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                required
-              />
+                      required
+                    />
             </div>
             <div className="mb-8">
               <div className="border-2 border-dashed border-gray-300 rounded-lg p-10 text-center bg-gray-50 relative">
-                <input
-                  id="resume-upload"
-                  type="file"
+                      <input
+                        id="resume-upload"
+                        type="file"
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                   accept=".pdf,.doc,.docx,.txt"
                   onChange={e => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      setResumeFile(file);
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            setResumeFile(file);
                       setError(null);
                     }
                   }}
@@ -396,7 +374,7 @@ const LiveKitInterviewPage: React.FC = () => {
         </div>
         <div className="mt-12 text-center text-gray-400 text-lg w-full">
           Powered by <span className="font-semibold text-gray-500">KWIKS.</span>
-        </div>
+          </div>
       </div>
 
       {/* Maximum Attempts Modal - Updated to be non-closeable */}
