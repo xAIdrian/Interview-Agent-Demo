@@ -22,6 +22,7 @@ import { Toast } from '@/components/ui/Toast';
 import { useRouter } from 'next/router';
 import { useAuth } from '@/app/components/AuthProvider';
 import { Dialog } from '@headlessui/react';
+import { MicrophoneIcon, PhoneXMarkIcon, VideoCameraIcon } from '@heroicons/react/24/outline';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://main-service-48k0.onrender.com';
 
@@ -356,21 +357,18 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
           {/* Tiles Row */}
           <div className="flex flex-row gap-8 w-full justify-center mb-8">
             {/* Video Tile (left) */}
-            <div className="flex-1 max-w-xl bg-[#23242A] rounded-2xl border-4 border-blue-500 shadow-lg flex flex-col relative overflow-hidden min-h-[420px]">
+            <div className="flex-1 max-w-xl bg-[#23242A] rounded-2xl border-4 border-transparent shadow-lg flex flex-col relative overflow-hidden min-h-[420px]">
               {/* Name label */}
               <div className="absolute top-4 left-4 bg-black/80 text-white text-sm px-3 py-1 rounded-full flex items-center gap-2 z-10">
                 <span className="w-2 h-2 bg-green-400 rounded-full inline-block"></span>
                 {candidateName}
-                <span className="ml-2">
-                  <svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path d="M4 12l6 6L20 6" stroke="#4ade80" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                </span>
               </div>
-              {/* Video feed placeholder (replace with actual video) */}
-              <div className="flex-1 flex items-center justify-center">
-                {/* LiveKit video feed would go here */}
-                <div className="w-full h-full flex items-center justify-center">
-                  <VideoConference />
+              {/* Avatar circle */}
+              <div className="flex-1 flex flex-col items-center justify-center">
+                <div className="w-40 h-40 rounded-full bg-[#6B7280] flex items-center justify-center text-6xl font-bold text-white mb-6">
+                  {candidateName.split(' ').map(n => n[0]).join('')}
                 </div>
+                <div className="text-2xl text-white font-semibold tracking-wide">{candidateName}</div>
               </div>
             </div>
             {/* Avatar Tile (right) */}
@@ -393,15 +391,15 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
           <div className="flex flex-row items-center justify-center gap-6 bg-[#23242A] rounded-xl px-8 py-4 mt-2 shadow-lg">
             {/* Mic button */}
             <button className="w-12 h-12 rounded-full bg-[#23242A] border-2 border-gray-600 flex items-center justify-center text-2xl text-gray-200 hover:bg-green-700 hover:border-green-500 transition-colors duration-150 focus:outline-none">
-              <svg width="28" height="28" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="feather feather-mic"><path d="M14 3v14M22 12a8 8 0 0 1-16 0"/></svg>
+              <MicrophoneIcon className="w-7 h-7" />
             </button>
             {/* Hangup button */}
             <button className="w-12 h-12 rounded-full bg-red-600 flex items-center justify-center text-2xl text-white hover:bg-red-700 transition-colors duration-150 focus:outline-none" onClick={handleDisconnect} disabled={hasSubmitted || isProcessingSubmission}>
-              <svg width="28" height="28" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="feather feather-phone-off"><path d="M10 14l2-2 2 2m-2-2v6"/><path d="M22 16.92V19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-2.08a2 2 0 0 1 .84-1.63l7.11-5.33a2 2 0 0 1 2.1 0l7.11 5.33A2 2 0 0 1 22 16.92z"/></svg>
+              <PhoneXMarkIcon className="w-7 h-7" />
             </button>
             {/* Video button (disabled for now) */}
             <button className="w-12 h-12 rounded-full bg-[#23242A] border-2 border-gray-600 flex items-center justify-center text-2xl text-gray-200 opacity-50 cursor-not-allowed">
-              <svg width="28" height="28" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="feather feather-video"><rect x="4" y="8" width="20" height="12" rx="2" ry="2"/><polygon points="24 8 32 14 24 20 24 8"/></svg>
+              <VideoCameraIcon className="w-7 h-7" />
             </button>
           </div>
         </div>
