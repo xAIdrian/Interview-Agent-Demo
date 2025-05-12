@@ -40,6 +40,7 @@ interface LiveKitInterviewComponentProps {
   room: string;
   submissionId: string;
   onDisconnect: () => void;
+  candidateName: string;
 }
 
 interface MessageProps {
@@ -135,7 +136,7 @@ const SimpleVoiceAssistant: React.FC<{ onTranscriptUpdate: (transcript: any[]) =
   );
 };
 
-const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, room, submissionId, onDisconnect }: LiveKitInterviewComponentProps) => {
+const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, room, submissionId, onDisconnect, candidateName }: LiveKitInterviewComponentProps) => {
   const livekitUrl = 'wss://default-test-oyjqa9xh.livekit.cloud';
   const [showInstructions, setShowInstructions] = useState(true);
   const [isLivekitConnected, setIsLivekitConnected] = useState(false);
@@ -359,7 +360,7 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
               {/* Name label */}
               <div className="absolute top-4 left-4 bg-black/80 text-white text-sm px-3 py-1 rounded-full flex items-center gap-2 z-10">
                 <span className="w-2 h-2 bg-green-400 rounded-full inline-block"></span>
-                Karen A
+                {candidateName}
                 <span className="ml-2">
                   <svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path d="M4 12l6 6L20 6" stroke="#4ade80" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
                 </span>
@@ -370,10 +371,6 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
                 <div className="w-full h-full flex items-center justify-center">
                   <VideoConference />
                 </div>
-              </div>
-              {/* Caption bar */}
-              <div className="absolute bottom-0 left-0 w-full bg-black/80 text-white text-sm px-4 py-2 text-center">
-                A concept on how closed captions might look on your desktop either
               </div>
             </div>
             {/* Avatar Tile (right) */}
@@ -389,10 +386,6 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
                   NA
                 </div>
                 <div className="text-2xl text-white font-semibold tracking-wide">NOOR AI</div>
-              </div>
-              {/* Caption bar */}
-              <div className="absolute bottom-0 left-0 w-full bg-black/80 text-white text-sm px-4 py-2 text-center">
-                A concept on how closed captions might look on your desktop either
               </div>
             </div>
           </div>
