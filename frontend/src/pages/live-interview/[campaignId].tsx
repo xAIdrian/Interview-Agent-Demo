@@ -247,6 +247,7 @@ const LiveKitInterviewPage: React.FC = () => {
         room={room}
         onDisconnect={onDisconnect}
         submissionId={submissionId!}
+        candidateName={candidateData.name}
       />
     );
   }
