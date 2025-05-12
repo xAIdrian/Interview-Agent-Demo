@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { MicrophoneIcon, VideoCameraIcon, VideoCameraSlashIcon } from '@heroicons/react/24/outline';
 
 interface MicTestProps {
   onSuccess: () => void;
@@ -113,9 +114,7 @@ const MicTest: React.FC<MicTestProps> = ({ onSuccess, showVideoToggle = false })
                 className={`w-56 h-56 rounded-full bg-[#8B6AFF] flex items-center justify-center text-7xl font-bold select-none z-10 border-8 transition-colors duration-200 ${micActive && micOn ? 'border-green-400' : 'border-[#6C4DFF]'}`}
                 style={micActive && micOn ? { boxShadow: `0 0 ${30 + audioLevel * 80}px ${audioLevel * 1.0 + 0.2}px #22c55e` } : {}}
               >
-                <svg width="80" height="80" fill="none" stroke="white" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" className="feather feather-mic">
-                  <path d="M40 8v48M68 32a28 28 0 0 1-56 0"/>
-                </svg>
+                <MicrophoneIcon className="w-16 h-16" />
               </div>
             </div>
             <div className="text-2xl text-gray-200 tracking-wide mt-4">NOOR AI</div>
@@ -128,11 +127,7 @@ const MicTest: React.FC<MicTestProps> = ({ onSuccess, showVideoToggle = false })
               aria-label={micOn ? 'Turn off microphone' : 'Turn on microphone'}
               type="button"
             >
-              {micOn ? (
-                <svg width="36" height="36" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" className="feather feather-mic"><path d="M18 3v18M30 12a12 12 0 0 1-24 0"/></svg>
-              ) : (
-                <svg width="36" height="36" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" className="feather feather-mic-off"><line x1="1" y1="1" x2="35" y2="35" /><path d="M18 3v8m0 8v8m0 8v4m12-14a12 12 0 0 1-24 0"/></svg>
-              )}
+              <MicrophoneIcon className="w-9 h-9" />
             </button>
             {showVideoToggle && (
               <button
@@ -142,9 +137,9 @@ const MicTest: React.FC<MicTestProps> = ({ onSuccess, showVideoToggle = false })
                 type="button"
               >
                 {videoOn ? (
-                  <svg width="36" height="36" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" className="feather feather-video"><rect x="4" y="14" width="28" height="20" rx="4" ry="4"/><polygon points="44 14 32 24 44 34 44 14"/></svg>
+                  <VideoCameraIcon className="w-9 h-9" />
                 ) : (
-                  <svg width="36" height="36" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" className="feather feather-video-off"><path d="M34 34L4 4m30 30V14a4 4 0 0 0-4-4H14m20 20l8 8m-8-8l-8-8m0 0L4 4"/></svg>
+                  <VideoCameraSlashIcon className="w-9 h-9" />
                 )}
               </button>
             )}
