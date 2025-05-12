@@ -141,7 +141,8 @@ const LiveKitInterviewPage: React.FC = () => {
         setShowMicTest(false);
         return;
       }
-      const userId = userResponse.data.id;
+      // Prefer API response, fallback to useAuth user.id
+      const userId = userResponse.data.id || user?.id;
       // Create submission
       const submissionResponse = await axios.post(`${API_BASE_URL}/api/submissions`, {
         campaign_id: campaignId,
@@ -208,7 +209,7 @@ const LiveKitInterviewPage: React.FC = () => {
   
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8">
+      <div className="min-h-screen flex flex-col flex-1 justify-center items-center bg-[#f5f7fa] w-full">
         <div className="flex justify-center items-center h-64">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
         </div>
@@ -218,7 +219,7 @@ const LiveKitInterviewPage: React.FC = () => {
 
   if (error) {
     return (
-      <div className="container mx-auto px-4 py-8">
+      <div className="min-h-screen flex flex-col flex-1 justify-center items-center bg-[#f5f7fa] w-full">
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
           <strong className="font-bold">Error!</strong>
           <span className="block sm:inline"> {error}</span>

@@ -320,8 +320,8 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
 
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center py-10">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-700"></div>
+      <div className="flex justify-center items-center min-h-screen bg-[#181A20]">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-400"></div>
       </div>
     );
   }
@@ -336,68 +336,96 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
   }
 
   return (
-    <div className="livekit-interview space-y-6">
-      {showToast && (
-        <Toast
-          message={toastMessage}
-          duration={5000}
-          onClose={() => setShowToast(false)}
-        />
-      )}
-      
-      {/* Interview Interface */}
-      <div className="bg-white rounded-lg overflow-hidden shadow-lg">
-        <div className="p-4 bg-blue-600 text-white">
-          <div className="flex justify-between items-center">
-            <h2 className="text-xl font-bold">Interview Session: {user?.name}</h2>
-            <button 
-              onClick={() => {
-                console.log('End Interview clicked', {
-                  hasSubmitted,
-                  isProcessingSubmission,
-                  transcript,
-                  submissionId
-                });
-                handleDisconnect();
-              }}
-              disabled={hasSubmitted || isProcessingSubmission}
-              className={`px-3 py-1 bg-white text-blue-600 rounded transition-colors ${
-                (hasSubmitted || isProcessingSubmission) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-50'
-              }`}
-            >
-              {isProcessingSubmission ? 'Processing...' : hasSubmitted ? 'Submitted' : 'End Interview'}
+    <LiveKitRoom
+      token={token}
+      serverUrl={livekitUrl}
+      connect={true}
+      audio={true}
+      video={true}
+    >
+      <div className="min-h-screen bg-[#181A20] flex flex-col justify-center items-center py-8">
+        {showToast && (
+          <Toast
+            message={toastMessage}
+            duration={5000}
+            onClose={() => setShowToast(false)}
+          />
+        )}
+        <div className="flex flex-col items-center w-full max-w-5xl">
+          {/* Tiles Row */}
+          <div className="flex flex-row gap-8 w-full justify-center mb-8">
+            {/* Video Tile (left) */}
+            <div className="flex-1 max-w-xl bg-[#23242A] rounded-2xl border-4 border-blue-500 shadow-lg flex flex-col relative overflow-hidden min-h-[420px]">
+              {/* Name label */}
+              <div className="absolute top-4 left-4 bg-black/80 text-white text-sm px-3 py-1 rounded-full flex items-center gap-2 z-10">
+                <span className="w-2 h-2 bg-green-400 rounded-full inline-block"></span>
+                Karen A
+                <span className="ml-2">
+                  <svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path d="M4 12l6 6L20 6" stroke="#4ade80" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                </span>
+              </div>
+              {/* Video feed placeholder (replace with actual video) */}
+              <div className="flex-1 flex items-center justify-center">
+                {/* LiveKit video feed would go here */}
+                <div className="w-full h-full flex items-center justify-center">
+                  <VideoConference />
+                </div>
+              </div>
+              {/* Caption bar */}
+              <div className="absolute bottom-0 left-0 w-full bg-black/80 text-white text-sm px-4 py-2 text-center">
+                A concept on how closed captions might look on your desktop either
+              </div>
+            </div>
+            {/* Avatar Tile (right) */}
+            <div className="flex-1 max-w-xl bg-[#23242A] rounded-2xl border-4 border-transparent shadow-lg flex flex-col relative overflow-hidden min-h-[420px]">
+              {/* Name label */}
+              <div className="absolute top-4 left-4 bg-black/80 text-white text-sm px-3 py-1 rounded-full flex items-center gap-2 z-10">
+                <span className="w-2 h-2 bg-green-400 rounded-full inline-block"></span>
+                NOOR AI
+              </div>
+              {/* Avatar circle */}
+              <div className="flex-1 flex flex-col items-center justify-center">
+                <div className="w-40 h-40 rounded-full bg-[#8B6AFF] flex items-center justify-center text-6xl font-bold text-white mb-6">
+                  NA
+                </div>
+                <div className="text-2xl text-white font-semibold tracking-wide">NOOR AI</div>
+              </div>
+              {/* Caption bar */}
+              <div className="absolute bottom-0 left-0 w-full bg-black/80 text-white text-sm px-4 py-2 text-center">
+                A concept on how closed captions might look on your desktop either
+              </div>
+            </div>
+          </div>
+          {/* Control Bar */}
+          <div className="flex flex-row items-center justify-center gap-6 bg-[#23242A] rounded-xl px-8 py-4 mt-2 shadow-lg">
+            {/* Mic button */}
+            <button className="w-12 h-12 rounded-full bg-[#23242A] border-2 border-gray-600 flex items-center justify-center text-2xl text-gray-200 hover:bg-green-700 hover:border-green-500 transition-colors duration-150 focus:outline-none">
+              <svg width="28" height="28" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="feather feather-mic"><path d="M14 3v14M22 12a8 8 0 0 1-16 0"/></svg>
+            </button>
+            {/* Hangup button */}
+            <button className="w-12 h-12 rounded-full bg-red-600 flex items-center justify-center text-2xl text-white hover:bg-red-700 transition-colors duration-150 focus:outline-none" onClick={handleDisconnect} disabled={hasSubmitted || isProcessingSubmission}>
+              <svg width="28" height="28" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="feather feather-phone-off"><path d="M10 14l2-2 2 2m-2-2v6"/><path d="M22 16.92V19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-2.08a2 2 0 0 1 .84-1.63l7.11-5.33a2 2 0 0 1 2.1 0l7.11 5.33A2 2 0 0 1 22 16.92z"/></svg>
+            </button>
+            {/* Video button (disabled for now) */}
+            <button className="w-12 h-12 rounded-full bg-[#23242A] border-2 border-gray-600 flex items-center justify-center text-2xl text-gray-200 opacity-50 cursor-not-allowed">
+              <svg width="28" height="28" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="feather feather-video"><rect x="4" y="8" width="20" height="12" rx="2" ry="2"/><polygon points="24 8 32 14 24 20 24 8"/></svg>
             </button>
           </div>
         </div>
-        
-        <div className="p-6">
-          <LiveKitRoom
-            serverUrl={livekitUrl}
-            token={token}
-            connect={isLivekitConnected}
-            video={false}
-            audio={true}
-            onDisconnected={handleDisconnect}
-          >
-            <RoomAudioRenderer />
-            <SimpleVoiceAssistant onTranscriptUpdate={(transcript) => handleTranscriptUpdate(false, transcript)} />
-          </LiveKitRoom>
-        </div>
+        {/* Processing Modal */}
+        <Modal 
+          isOpen={isProcessingSubmission}
+          onClose={() => {}}
+        >
+          <div className="flex flex-col items-center space-y-4">
+            <Spinner size="large" />
+            <p className="text-gray-600 text-center">
+              Please wait while we process your interview responses and calculate scores...
+            </p>
+          </div>
+        </Modal>
       </div>
-
-      {/* Processing Modal */}
-      <Modal 
-        isOpen={isProcessingSubmission}
-        onClose={() => {}}
-      >
-        <div className="flex flex-col items-center space-y-4">
-          <Spinner size="large" />
-          <p className="text-gray-600 text-center">
-            Please wait while we process your interview responses and calculate scores...
-          </p>
-        </div>
-      </Modal>
-    </div>
+    </LiveKitRoom>
   );
 };
 
