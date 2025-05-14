@@ -1855,7 +1855,7 @@ def submit_interview():
         cursor.execute(
             """
             SELECT id, body, scoring_prompt, max_points 
-            FROM questions 
+            FROM questions
             WHERE campaign_id = ?
             """,
             (submission["campaign_id"],),

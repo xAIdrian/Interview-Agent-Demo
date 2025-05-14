@@ -5,6 +5,8 @@
     "@emotion/styled": "^11.14.0",
     "@headlessui/react": "^2.2.0",
     "@heroicons/react": "^2.2.0",
+    "@mui/icons-material": "^7.1.0",
+    "@mui/material": "^7.1.0",
     "framer-motion": "^12.5.0",
     "luxon": "^3.5.0",
     "react-camera-pro": "^1.4.0",
