@@ -97,43 +97,17 @@ const SimpleVoiceAssistant: React.FC<{ onTranscriptUpdate: (transcript: any[]) =
 
   return (
     <div className="voice-assistant-container">
-      <div className="interview-status mb-4">
-        <span className="status-indicator inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
-          <span className="h-2 w-2 bg-green-500 rounded-full mr-2"></span>
-          Interview in progress
-        </span>
-      </div>
-      <div className="visualizer-container mb-6">
-        <BarVisualizer state={state} barCount={7} trackRef={audioTrack} />
-      </div>
-      <div className="control-section">
-        <div className="mb-4">
-          <VoiceAssistantControlBar />
-        </div>
-        <div className="conversation rounded-lg bg-white shadow overflow-hidden">
-          <div className="px-4 py-3 bg-gray-50 border-b">
-            <h3 className="text-lg font-medium text-gray-900">Conversation</h3>
-          </div>
-          <div className="p-4 h-80 overflow-y-auto">
-            {messages.length === 0 && (
-              <div className="interview-instructions text-center py-8 text-gray-500">
-                {isWaitingForFirstResponse ? (
-                  <div className="flex flex-col items-center space-y-3">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                    <p>Waiting for the interviewer to begin...</p>
-                  </div>
-                ) : (
-                <p>The interviewer will ask you questions. Answer naturally as if in a real interview.</p>
-                )}
+        <div className="p-4 overflow-y-auto">
+          {messages.length === 0 && isWaitingForFirstResponse && (
+            <div className="interview-instructions text-center py-8 bg-black text-white rounded-lg">
+              <div className="flex flex-col items-center space-y-3">
+                <div className="animate-spin rounded-full h-8 w-8 border-2 border-white"></div>
+                <p>Waiting for the interviewer to begin...</p>
               </div>
-            )}
-            {messages.map((msg, index) => (
-              <Message key={msg.id || index} type={msg.type} text={msg.text} />
-            ))}
-          </div>
+            </div>
+          )}
         </div>
       </div>
-    </div>
   );
 };
 
@@ -256,6 +230,15 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
 
           setIsProcessingSubmission(false);
           onInterviewComplete(submissionId); // Call the callback instead of redirecting
+          router.push({
+            pathname: '/complete',
+            query: {
+              campaignId,
+              retakeCount: submissionStatus.max_submissions - submissionStatus.completed_submissions,
+              maxAttempts: submissionStatus.max_submissions,
+              isSubmitted: 'true',
+            },
+          });
         } else {
           console.error('❌ Interview submission failed:', response.data.error);
           setHasSubmitted(false); // Reset submission flag on failure
@@ -345,6 +328,8 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
       audio={true}
       video={true}
     >
+      <RoomAudioRenderer />
+      <SimpleVoiceAssistant onTranscriptUpdate={(transcript) => handleTranscriptUpdate(false, transcript)} />
       <div className="min-h-screen bg-[#181A20] flex flex-col justify-center items-center py-8">
         {showToast && (
           <Toast
