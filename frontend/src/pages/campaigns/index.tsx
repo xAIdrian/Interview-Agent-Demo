@@ -204,51 +204,123 @@ const CampaignsPage = () => {
     return <div className="loading">Loading...</div>;
   }
 
+  // Derive stats from available data
+  const ongoingCampaigns = campaigns.length;
+  // Placeholder values for stats (since we only have campaigns data)
+  const profilesInterviewed = 2;
+  const qualifiedProfiles = 12;
+  const credits = 120;
+
   return (
     <>
-      <Head>
-        <title>{isAdmin ? 'Campaigns' : 'Available Positions'}</title>
-      </Head>
-      <PageTemplate title={isAdmin ? 'Campaigns' : 'Available Positions'} maxWidth="lg">
-        <div className="w-full bg-white shadow-md rounded-lg p-6">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold">{isAdmin ? 'Campaigns' : 'Available Positions'}</h2>
-            {isAdmin && (
-              <div className="flex items-center">
-                <Link 
-                  href="/campaigns/create"
-                  className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700"
-                >
-                  Create Campaign
-                </Link>
-                <Link 
-                  href="/campaigns/create-from-doc"
-                  className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-700 ml-2"
-                >
-                  Create from Doc
-                </Link>
-              </div>
-            )}
+      <PageTemplate>
+        {/* Header Section */}
+        <div className="w-full bg-black p-6">
+          <div className="flex flex-col items-center justify-center flex-1">
+            <p className="text-white">Welcome {user?.name || 'User'}</p>
+            <h2 className="text-2xl font-bold text-white mb-1 pb-10">Glad to see you again</h2>
           </div>
-
-          {error && (
-            <div className="mb-4 p-2 bg-red-100 text-red-700 rounded">
-              {error}
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 -mt-8 mx-16">
+          <div className="bg-gray-50 rounded-lg flex shadow-md">
+            <div className="flex items-center px-2">
+              <span className="text-xl font-bold text-gray-400 w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mr-3">{campaigns[0]?.title[0]}</span>
+              <div className="p-4 flex flex-col">
+                <span className="text-xs text-gray-500 mt-1">ON GOING CAMPAIGNS</span>
+                <span className="text-lg font-bold">{ongoingCampaigns}</span>
+              </div>
             </div>
-          )}
+          </div>
+          <div className="bg-gray-50 rounded-lg flex shadow-md">
+            <div className="flex items-center px-2">
+              <span className="text-xl font-bold text-gray-400 w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mr-3">{campaigns[0]?.title[0]}</span>
+              <div className="p-4 flex flex-col">
+                <span className="text-xs text-gray-500 mt-1">PROFILES INTERVIEWED</span>
+                <span className="text-lg font-bold">{profilesInterviewed}</span>
+              </div>
+            </div>
+          </div>
+          <div className="bg-gray-50 rounded-lg flex shadow-md">
+            <div className="flex items-center px-2">
+              <span className="text-xl font-bold text-gray-400 w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mr-3">{campaigns[0]?.title[0]}</span>
+              <div className="p-4 flex flex-col">
+                <span className="text-xs text-gray-500 mt-1">QUALIFIED PROFILES</span>
+                <span className="text-lg font-bold">{qualifiedProfiles}</span>
+              </div>
+            </div>
+          </div>
+          <div className="bg-gray-50 rounded-lg flex shadow-md">
+            <div className="flex items-center px-2">
+              <span className="text-xl font-bold text-gray-400 w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mr-3">{campaigns[0]?.title[0]}</span>
+              <div className="p-4 flex flex-col">
+                <span className="text-xs text-gray-500 mt-1">CREDITS</span>
+                <span className="text-lg font-bold">{credits}</span>
+              </div>
+            </div>
+          </div>
+        </div>
 
-          {isLoading ? (
-            <div className="flex justify-center items-center py-10">
-              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-700"></div>
+        {/* Campaigns Section */}
+        <div className="mb-6 m-16">
+          {campaigns.length === 0 ? (
+            <div className="flex flex-col items-center justify-center min-h-[40vh] p-10">
+              {/* Illustration placeholder */}
+              <div className="text-6xl mb-6">📂✨</div>
+              <div className="text-xl font-semibold mb-2">Start your first campaign</div>
+              <div className="text-gray-500 mb-6 text-center max-w-md">
+                Click "create a campaign" button to get started and list your job offer in our market.
+              </div>
+              <button
+                className="bg-blue-500 text-white px-6 py-3 rounded-lg text-lg font-semibold flex items-center gap-2 hover:bg-blue-600 transition"
+                onClick={() => router.push('/campaigns/create')}
+              >
+                <span className="text-2xl">+</span> Create a Campaign
+              </button>
             </div>
           ) : (
-            <div ref={tableRef}>
-              <ReactTabulator
-                data={campaigns}
-                columns={columns}
-                options={options}
-              />
-            </div>
+            <>
+              <h3 className="text-xl font-bold mb-4">Campaigns</h3>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {/* Add new campaign card */}
+                {isAdmin && (
+                  <div
+                    className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-8 cursor-pointer hover:bg-gray-50 transition"
+                    onClick={() => router.push('/campaigns/create')}
+                  >
+                    <span className="text-4xl text-gray-400 mb-2">+</span>
+                    <span className="font-semibold text-gray-600">Add a new campaign</span>
+                  </div>
+                )}
+                {/* Campaign cards */}
+                {campaigns.map((campaign) => (
+                  <div key={campaign.id} className="bg-white rounded-lg shadow p-6 flex flex-col">
+                    {/* Placeholder for logo */}
+                    <div className="flex items-center mb-4">
+                      <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mr-3">
+                        {/* Use first letter of title as logo placeholder */}
+                        <span className="text-xl font-bold text-gray-400">{campaign.title[0]}</span>
+                      </div>
+                      <div>
+                        <div className="font-bold text-lg">{campaign.title}</div>
+                        <div className="text-xs text-gray-400">Société générale</div> {/* Placeholder company */}
+                      </div>
+                    </div>
+                    <div className="flex-1 text-gray-600 mb-4">
+                      {campaign.job_description.length > 120
+                        ? campaign.job_description.substring(0, 120) + '...'
+                        : campaign.job_description}
+                    </div>
+                    <button
+                      className="mt-auto bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700 transition"
+                      onClick={() => router.push(`/campaigns/${campaign.id}`)}
+                    >
+                      Campaign details
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </>
           )}
         </div>
       </PageTemplate>

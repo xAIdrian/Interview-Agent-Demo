@@ -22,6 +22,7 @@ import { Toast } from '@/components/ui/Toast';
 import { useRouter } from 'next/router';
 import { useAuth } from '@/app/components/AuthProvider';
 import { Dialog } from '@headlessui/react';
+import { MicrophoneIcon, PhoneXMarkIcon, VideoCameraIcon } from '@heroicons/react/24/outline';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://main-service-48k0.onrender.com';
 
@@ -40,6 +41,7 @@ interface LiveKitInterviewComponentProps {
   room: string;
   submissionId: string;
   onDisconnect: () => void;
+  candidateName: string;
 }
 
 interface MessageProps {
@@ -95,263 +97,21 @@ const SimpleVoiceAssistant: React.FC<{ onTranscriptUpdate: (transcript: any[]) =
 
   return (
     <div className="voice-assistant-container">
-      <div className="interview-status mb-4">
-        <span className="status-indicator inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
-          <span className="h-2 w-2 bg-green-500 rounded-full mr-2"></span>
-          Interview in progress
-        </span>
-      </div>
-      <div className="visualizer-container mb-6">
-        <BarVisualizer state={state} barCount={7} trackRef={audioTrack} />
-      </div>
-      <div className="control-section">
-        <div className="mb-4">
-          <VoiceAssistantControlBar />
-        </div>
-        <div className="conversation rounded-lg bg-white shadow overflow-hidden">
-          <div className="px-4 py-3 bg-gray-50 border-b">
-            <h3 className="text-lg font-medium text-gray-900">Conversation</h3>
-          </div>
-          <div className="p-4 h-80 overflow-y-auto">
-            {messages.length === 0 && (
-              <div className="interview-instructions text-center py-8 text-gray-500">
-                {isWaitingForFirstResponse ? (
-                  <div className="flex flex-col items-center space-y-3">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                    <p>Waiting for the interviewer to begin...</p>
-                  </div>
-                ) : (
-                <p>The interviewer will ask you questions. Answer naturally as if in a real interview.</p>
-                )}
+        <div className="p-4 overflow-y-auto">
+          {messages.length === 0 && isWaitingForFirstResponse && (
+            <div className="interview-instructions text-center py-8 bg-black text-white rounded-lg">
+              <div className="flex flex-col items-center space-y-3">
+                <div className="animate-spin rounded-full h-8 w-8 border-2 border-white"></div>
+                <p>Waiting for the interviewer to begin...</p>
               </div>
-            )}
-            {messages.map((msg, index) => (
-              <Message key={msg.id || index} type={msg.type} text={msg.text} />
-            ))}
-          </div>
+            </div>
+          )}
         </div>
       </div>
-    </div>
   );
 };
 
-const InstructionsModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => {
-  const [currentStep, setCurrentStep] = useState(1);
-  const totalSteps = 3;
-  const [interviewCode, setInterviewCode] = useState('');
-  const [isCodeValid, setIsCodeValid] = useState(false);
-  const [isValidating, setIsValidating] = useState(false);
-  const [codeError, setCodeError] = useState('');
-  const router = useRouter();
-  const { campaignId } = router.query;
-
-  // Prevent closing modal with escape key
-  useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        e.stopPropagation();
-      }
-    };
-    window.addEventListener('keydown', handleEscape);
-    return () => window.removeEventListener('keydown', handleEscape);
-  }, []);
-
-  const handleNext = async () => {
-    if (currentStep === 1) {
-      if (!interviewCode.trim()) {
-        setCodeError('Please enter an interview code');
-        return;
-      }
-
-      // Validate code format (8 characters)
-      if (interviewCode.trim().length !== 8) {
-        setCodeError('Interview code must be 8 characters long');
-        return;
-      }
-      
-      setIsValidating(true);
-      setCodeError('');
-      
-      try {
-        const response = await axios.post(
-          `${API_URL}/api/campaigns/${campaignId}/validate-access-code`,
-          { access_code: interviewCode.trim() }
-        );
-
-        if (response.data.status === 'accepted') {
-          setIsCodeValid(true);
-          setCurrentStep(currentStep + 1);
-        } else {
-          setCodeError(response.data.message || 'Invalid interview code. Please try again.');
-        }
-      } catch (error) {
-        setCodeError('Error validating code. Please try again.');
-        console.error('Error validating access code:', error);
-      } finally {
-        setIsValidating(false);
-      }
-    } else if (currentStep < totalSteps) {
-      setCurrentStep(currentStep + 1);
-    } else {
-      onClose();
-    }
-  };
-
-  const handleBack = () => {
-    if (currentStep > 1) {
-      setCurrentStep(currentStep - 1);
-    }
-  };
-
-  const handleCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.toUpperCase();
-    if (value.length <= 8) {
-      setInterviewCode(value);
-      setCodeError('');
-    }
-  };
-
-  const renderStepContent = () => {
-    switch (currentStep) {
-      case 1:
-        return (
-          <div className="space-y-4">
-            <h3 className="text-xl font-semibold text-blue-800 mb-3">Welcome to Your AI Interview! 🎯</h3>
-            <p className="text-lg text-gray-700">
-              To begin your interview, please enter the interview code provided to you:
-            </p>
-            <div className="space-y-2">
-              <div className="relative">
-                <input
-                  type="text"
-                  value={interviewCode}
-                  onChange={handleCodeChange}
-                  placeholder="Enter your interview code"
-                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
-                    codeError 
-                      ? 'border-red-300 focus:ring-red-200' 
-                      : 'border-gray-300 focus:ring-blue-200'
-                  }`}
-                />
-                {isValidating && (
-                  <div className="absolute right-3 top-2.5">
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
-                  </div>
-                )}
-              </div>
-              {codeError && (
-                <p className="text-sm text-red-600">{codeError}</p>
-              )}
-            </div>
-            <div className="bg-blue-50 p-4 rounded-lg mt-4">
-              <h4 className="text-lg font-semibold text-blue-800 mb-2">Don't have an interview code?</h4>
-              <p className="text-blue-700">
-                If you haven't received an interview code, please contact your recruiter or the hiring team.
-              </p>
-            </div>
-          </div>
-        );
-      case 2:
-        return (
-          <div className="space-y-4">
-            <h3 className="text-xl font-semibold text-blue-800 mb-3">How the Interview Works</h3>
-            <div className="space-y-4">
-              <div className="bg-blue-50 p-4 rounded-lg">
-                <h4 className="text-lg font-semibold text-blue-800 mb-2">Interview Process:</h4>
-                <ol className="space-y-3 text-blue-700 list-decimal list-inside">
-                  <li>The AI interviewer will ask you a series of questions</li>
-                  <li>Take your time to think and respond naturally</li>
-                  <li>Your responses will be evaluated for content and clarity</li>
-                  <li>The interview will last approximately 15-20 minutes</li>
-                </ol>
-              </div>
-              <p className="text-gray-600">
-                You'll see a transcript of the conversation in real-time, helping you track the discussion.
-              </p>
-            </div>
-          </div>
-        );
-      case 3:
-        return (
-          <div className="space-y-4">
-            <h3 className="text-xl font-semibold text-blue-800 mb-3">Ready to Begin?</h3>
-            <div className="space-y-4">
-              <p className="text-lg text-gray-700">
-                You're all set to start your interview! Remember:
-              </p>
-              <div className="bg-blue-50 p-4 rounded-lg">
-                <ul className="space-y-3 text-blue-700">
-                  <li className="flex items-start">
-                    <span className="mr-2">🎙️</span>
-                    Find a quiet space where you won't be interrupted
-                  </li>
-                  <li className="flex items-start">
-                    <span className="mr-2">💡</span>
-                    Take your time to provide complete, thoughtful answers
-                  </li>
-                  <li className="flex items-start">
-                    <span className="mr-2">🎯</span>
-                    Be yourself - we want to get to know the real you!
-                  </li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        );
-      default:
-        return null;
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50" style={{ pointerEvents: 'none' }}>
-      <div style={{ pointerEvents: 'auto' }}>
-        <Modal 
-          isOpen={isOpen} 
-          onClose={() => {}} // Empty function to prevent closing
-          title={`Step ${currentStep} of ${totalSteps}`}
-        >
-          <div className="space-y-6">
-            {renderStepContent()}
-            
-            <div className="flex justify-between mt-8">
-              <button
-                onClick={handleBack}
-                disabled={currentStep === 1}
-                className={`px-4 py-2 rounded ${
-                  currentStep === 1
-                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                Back
-              </button>
-              <button
-                onClick={handleNext}
-                disabled={currentStep === 1 && (isValidating || !interviewCode.trim())}
-                className={`px-4 py-2 rounded ${
-                  currentStep === 1 && (isValidating || !interviewCode.trim())
-                    ? 'bg-blue-400 cursor-not-allowed'
-                    : 'bg-blue-600 hover:bg-blue-700'
-                } text-white`}
-              >
-                {isValidating 
-                  ? 'Validating...' 
-                  : currentStep === totalSteps 
-                    ? 'Start Interview' 
-                    : 'Next'
-                }
-              </button>
-            </div>
-          </div>
-        </Modal>
-      </div>
-    </div>
-  );
-};
-
-const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, room, submissionId, onDisconnect }: LiveKitInterviewComponentProps) => {
+const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, room, submissionId, onDisconnect, candidateName }: LiveKitInterviewComponentProps) => {
   const livekitUrl = 'wss://default-test-oyjqa9xh.livekit.cloud';
   const [showInstructions, setShowInstructions] = useState(true);
   const [isLivekitConnected, setIsLivekitConnected] = useState(false);
@@ -470,6 +230,15 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
 
           setIsProcessingSubmission(false);
           onInterviewComplete(submissionId); // Call the callback instead of redirecting
+          router.push({
+            pathname: '/complete',
+            query: {
+              campaignId,
+              retakeCount: submissionStatus.max_submissions - submissionStatus.completed_submissions,
+              maxAttempts: submissionStatus.max_submissions,
+              isSubmitted: 'true',
+            },
+          });
         } else {
           console.error('❌ Interview submission failed:', response.data.error);
           setHasSubmitted(false); // Reset submission flag on failure
@@ -536,8 +305,8 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
 
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center py-10">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-700"></div>
+      <div className="flex justify-center items-center min-h-screen bg-[#181A20]">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-400"></div>
       </div>
     );
   }
@@ -552,76 +321,87 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
   }
 
   return (
-    <div className="livekit-interview space-y-6">
-      {showToast && (
-        <Toast
-          message={toastMessage}
-          duration={5000}
-          onClose={() => setShowToast(false)}
-        />
-      )}
-      
-      <InstructionsModal 
-        isOpen={showInstructions} 
-        onClose={() => {
-          setShowInstructions(false);
-          setIsLivekitConnected(true); // Start LiveKit connection when instructions are complete
-        }} 
-      />
-
-      {/* Interview Interface */}
-      <div className="bg-white rounded-lg overflow-hidden shadow-lg">
-        <div className="p-4 bg-blue-600 text-white">
-          <div className="flex justify-between items-center">
-            <h2 className="text-xl font-bold">Interview Session: {user?.name}</h2>
-            <button 
-              onClick={() => {
-                console.log('End Interview clicked', {
-                  hasSubmitted,
-                  isProcessingSubmission,
-                  transcript,
-                  submissionId
-                });
-                handleDisconnect();
-              }}
-              disabled={hasSubmitted || isProcessingSubmission}
-              className={`px-3 py-1 bg-white text-blue-600 rounded transition-colors ${
-                (hasSubmitted || isProcessingSubmission) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-50'
-              }`}
-            >
-              {isProcessingSubmission ? 'Processing...' : hasSubmitted ? 'Submitted' : 'End Interview'}
+    <LiveKitRoom
+      token={token}
+      serverUrl={livekitUrl}
+      connect={true}
+      audio={true}
+      video={true}
+    >
+      <RoomAudioRenderer />
+      <SimpleVoiceAssistant onTranscriptUpdate={(transcript) => handleTranscriptUpdate(false, transcript)} />
+      <div className="min-h-screen bg-[#181A20] flex flex-col justify-center items-center py-8">
+        {showToast && (
+          <Toast
+            message={toastMessage}
+            duration={5000}
+            onClose={() => setShowToast(false)}
+          />
+        )}
+        <div className="flex flex-col items-center w-full max-w-5xl">
+          {/* Tiles Row */}
+          <div className="flex flex-row gap-8 w-full justify-center mb-8">
+            {/* Video Tile (left) */}
+            <div className="flex-1 max-w-xl bg-[#23242A] rounded-2xl border-4 border-transparent shadow-lg flex flex-col relative overflow-hidden min-h-[420px]">
+              {/* Name label */}
+              <div className="absolute top-4 left-4 bg-black/80 text-white text-sm px-3 py-1 rounded-full flex items-center gap-2 z-10">
+                <span className="w-2 h-2 bg-green-400 rounded-full inline-block"></span>
+                {candidateName}
+              </div>
+              {/* Avatar circle */}
+              <div className="flex-1 flex flex-col items-center justify-center">
+                <div className="w-40 h-40 rounded-full bg-[#6B7280] flex items-center justify-center text-6xl font-bold text-white mb-6">
+                  {candidateName.split(' ').map(n => n[0]).join('')}
+                </div>
+                <div className="text-2xl text-white font-semibold tracking-wide">{candidateName}</div>
+              </div>
+            </div>
+            {/* Avatar Tile (right) */}
+            <div className="flex-1 max-w-xl bg-[#23242A] rounded-2xl border-4 border-transparent shadow-lg flex flex-col relative overflow-hidden min-h-[420px]">
+              {/* Name label */}
+              <div className="absolute top-4 left-4 bg-black/80 text-white text-sm px-3 py-1 rounded-full flex items-center gap-2 z-10">
+                <span className="w-2 h-2 bg-green-400 rounded-full inline-block"></span>
+                NOOR AI
+              </div>
+              {/* Avatar circle */}
+              <div className="flex-1 flex flex-col items-center justify-center">
+                <div className="w-40 h-40 rounded-full bg-[#8B6AFF] flex items-center justify-center text-6xl font-bold text-white mb-6">
+                  NA
+                </div>
+                <div className="text-2xl text-white font-semibold tracking-wide">NOOR AI</div>
+              </div>
+            </div>
+          </div>
+          {/* Control Bar */}
+          <div className="flex flex-row items-center justify-center gap-6 bg-[#23242A] rounded-xl px-8 py-4 mt-2 shadow-lg">
+            {/* Mic button */}
+            <button className="w-12 h-12 rounded-full bg-[#23242A] border-2 border-gray-600 flex items-center justify-center text-2xl text-gray-200 hover:bg-green-700 hover:border-green-500 transition-colors duration-150 focus:outline-none">
+              <MicrophoneIcon className="w-7 h-7" />
+            </button>
+            {/* Hangup button */}
+            <button className="w-12 h-12 rounded-full bg-red-600 flex items-center justify-center text-2xl text-white hover:bg-red-700 transition-colors duration-150 focus:outline-none" onClick={handleDisconnect} disabled={hasSubmitted || isProcessingSubmission}>
+              <PhoneXMarkIcon className="w-7 h-7" />
+            </button>
+            {/* Video button (disabled for now) */}
+            <button className="w-12 h-12 rounded-full bg-[#23242A] border-2 border-gray-600 flex items-center justify-center text-2xl text-gray-200 opacity-50 cursor-not-allowed">
+              <VideoCameraIcon className="w-7 h-7" />
             </button>
           </div>
         </div>
-        
-        <div className="p-6">
-          <LiveKitRoom
-            serverUrl={livekitUrl}
-            token={token}
-            connect={isLivekitConnected}
-            video={false}
-            audio={true}
-            onDisconnected={handleDisconnect}
-          >
-            <RoomAudioRenderer />
-            <SimpleVoiceAssistant onTranscriptUpdate={(transcript) => handleTranscriptUpdate(false, transcript)} />
-          </LiveKitRoom>
-        </div>
+        {/* Processing Modal */}
+        <Modal 
+          isOpen={isProcessingSubmission}
+          onClose={() => {}}
+        >
+          <div className="flex flex-col items-center space-y-4">
+            <Spinner size="large" />
+            <p className="text-gray-600 text-center">
+              Please wait while we process your interview responses and calculate scores...
+            </p>
+          </div>
+        </Modal>
       </div>
-
-      {/* Processing Modal */}
-      <Modal 
-        isOpen={isProcessingSubmission}
-        onClose={() => {}}
-      >
-        <div className="flex flex-col items-center space-y-4">
-          <Spinner size="large" />
-          <p className="text-gray-600 text-center">
-            Please wait while we process your interview responses and calculate scores...
-          </p>
-        </div>
-      </Modal>
-    </div>
+    </LiveKitRoom>
   );
 };
 

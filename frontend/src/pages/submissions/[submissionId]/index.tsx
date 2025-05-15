@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { PageTemplate } from '../../../components/PageTemplate';
 import { PrimaryButton } from '../../../components/Button/PrimaryButton';
 import { AuthLogger } from '../../../utils/logging';
+import { Tab } from '@headlessui/react';
 
 // API base URL
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://main-service-48k0.onrender.com';
@@ -198,6 +199,9 @@ const SubmissionDetailsPage = () => {
   const [savingError, setSavingError] = useState('');
   const [questions, setQuestions] = useState<Question[]>([]);
   const [resumeAnalysis, setResumeAnalysis] = useState<ResumeAnalysis | null>(null);
+  const [activeTab, setActiveTab] = useState('analysis');
+  const [candidateUser, setCandidateUser] = useState<User | null>(null);
+  const [campaignId, setCampaignId] = useState<string | null>(null);
 
   const fetchSubmissionData = async () => {
     if (!submissionId) return;
@@ -237,6 +241,24 @@ const SubmissionDetailsPage = () => {
       console.error('Error fetching resume analysis:', error);
     }
   };
+
+  // Fetch candidate user info from query param as soon as possible
+  useEffect(() => {
+    const userId = router.query.userId as string;
+    if (userId) {
+      axios.get(`${API_BASE_URL}/api/users/${userId}`)
+        .then(res => setCandidateUser(res.data))
+        .catch(() => setCandidateUser(null));
+    }
+  }, [router.query.userId]);
+
+  // Fetch campaignId from query param as soon as possible
+  useEffect(() => {
+    const campaignIdParam = router.query.campaignId as string;
+    if (campaignIdParam) {
+      setCampaignId(campaignIdParam);
+    }
+  }, [router.query.campaignId]);
 
   useEffect(() => {
     if (submissionId) {
@@ -364,8 +386,49 @@ const SubmissionDetailsPage = () => {
     return new Date(dateString).toLocaleString();
   };
 
+  // Breadcrumbs header for submission details
+  const renderBreadcrumbs = () => (
+    <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8 py-2">
+      <nav className="flex items-center text-sm text-gray-500 mb-4" aria-label="Breadcrumb">
+        <button
+          onClick={() => router.push(`/campaigns/${campaignId}`)}
+          className="mr-3 p-1 rounded hover:bg-gray-200 focus:outline-none flex items-center"
+          aria-label="Back to campaign"
+          type="button"
+        >
+          <svg className="h-5 w-5 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+        <span
+          className="hover:text-blue-600 font-medium cursor-pointer"
+          onClick={() => router.push('/campaigns')}
+        >
+          Home
+        </span>
+        <span className="mx-2">/</span>
+        <span
+          className="hover:text-blue-600 font-medium cursor-pointer"
+          onClick={() => router.push(`/campaigns/${campaignId}`)}
+        >
+          Campaign
+        </span>
+        <span className="mx-2">/</span>
+        <span
+          className="hover:text-blue-600 font-medium cursor-pointer"
+          onClick={() => router.push(`/campaigns/${campaignId}`)}
+        >
+          Submissions
+        </span>
+        <span className="mx-2">/</span>
+        <span className="text-gray-700 font-semibold">{candidateUser?.name || 'Candidate'}</span>
+      </nav>
+    </div>
+  );
+
   return (
-    <PageTemplate title="Submission Details" maxWidth="lg">
+    <PageTemplate maxWidth="full">
+      {renderBreadcrumbs()}
       {isLoading ? (
         <div className="flex justify-center items-center py-10">
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-700"></div>
@@ -375,237 +438,159 @@ const SubmissionDetailsPage = () => {
           {error}
         </div>
       ) : submission ? (
-        <div className="bg-white shadow-md rounded-lg p-6">
-          {/* Action buttons */}
-          <div className="flex justify-between mb-6">
-            <div className="flex space-x-3">
-              <Link 
-                href={returnToCampaign 
-                  ? `/campaigns/${returnToCampaign}` 
-                  : `/campaigns/${submission.campaign_id}`}
-                className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-700"
-              >
-                Back to Campaign Submissions
-              </Link>
-              <button
-                onClick={deleteSubmission}
-                className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-700"
-              >
-                Delete Submission
-              </button>
-            </div>
-            
-            {isDirty && (
-              <PrimaryButton 
-                onClick={saveChanges} 
-                disabled={isSaving}
-              >
-                {isSaving ? 'Saving...' : 'Save Changes'}
-              </PrimaryButton>
-            )}
-          </div>
-          
-          {/* Error message for save operation */}
-          {savingError && (
-            <div className="mb-6 p-3 bg-red-100 text-red-700 rounded-md">
-              {savingError}
-            </div>
-          )}
-          
-          {/* Breadcrumbs */}
-          <div className="text-sm text-gray-500 mb-6">
-            <Link 
-              href={returnToCampaign 
-                ? `/campaigns/${returnToCampaign}/submissions` 
-                : `/campaigns/${submission.campaign_id}/submissions`} 
-              className="hover:text-blue-500"
+        <div className="flex flex-col gap-8 px-12">
+          <div className="flex justify-between items-center mb-6">
+            <h1 className="text-2xl font-bold text-gray-900 mb-4">{candidateUser?.name}</h1>
+            <button
+              onClick={deleteSubmission}
+              className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-700 font-semibold"
             >
-              {submission.campaign?.title || 'Campaign'} Submissions
-            </Link>
-            {' / '}
-            <span className="text-gray-700">Submission at {formatDate(submission.created_at)}</span>
+              Delete submission
+            </button>
           </div>
-          
-          {/* Submission details */}
-          {submission.user && (
-            <div className="mb-6">
-              <h2 className="text-lg font-semibold mb-2">Candidate Information</h2>
-              <p><span className="font-medium">Name:</span> {submission.user.name || 'N/A'}</p>
-              <p><span className="font-medium">Email:</span> {submission.user.email}</p>
-              <Link 
-                href={`/admin/users/${submission.user_id}`}
-                className="inline-block mt-2 px-3 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
-              >
-                View User Profile
-              </Link>
-            </div>
-          )}
-          
-          {/* Resume Analysis Section */}
-          {resumeAnalysis && (
-            <div className="mb-6">
-              <div className="mt-6">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-lg font-semibold mb-2">Overall Fit</h3>
-                  <div className="relative group">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400 cursor-help" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <div className="absolute left-0 mt-2 w-64 bg-white p-2 rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10">
-                      <p className="text-xs text-gray-600">A comprehensive assessment of how well your skills, experience, and responses align with the position requirements.</p>
-                    </div>
+          <div className="flex flex-col md:flex-row gap-8">
+            {/* Left Column: Candidate Info */}
+            <div className="w-full md:w-1/3 bg-white rounded-2xl shadow p-0 mb-6 md:mb-0 flex flex-col">
+              {/* Header with avatar, name, job title, badge (horizontal row) */}
+              <div className="flex items-center justify-between bg-blue-50 rounded-t-2xl px-6 py-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-full bg-blue-600 flex items-center justify-center text-xl font-bold text-white">
+                    {candidateUser?.name ? candidateUser.name.split(' ').map(n => n[0]?.toUpperCase() || '').join('').slice(0,2) : 'ZZ'}
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-base font-bold text-gray-900 leading-tight">{candidateUser?.name || 'Zakia ZAGHRARI'}</span>
+                    <span className="text-sm text-blue-500 leading-tight">Business developer</span>
                   </div>
                 </div>
-                <p className="text-gray-700 mb-4">{resumeAnalysis.overall_fit}</p>
-                
-                <p className="text-gray-600 mt-2 text-sm">{resumeAnalysis.percent_match_reason}</p>
-                <div className="flex items-center space-x-4">
-                  <div className="flex-1">
-                    <div className="h-4 bg-gray-200 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-blue-500 rounded-full" 
-                        style={{ width: `${resumeAnalysis.percent_match}%` }}
-                      />
-                    </div>
-                  </div>
-                  <span className="text-lg font-semibold">{resumeAnalysis.percent_match}% Match</span>
-                </div>
+                <span className="bg-blue-500 text-white text-xs font-semibold px-4 py-1.5 rounded-full flex items-center whitespace-nowrap">
+                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                  Qualified profile
+                </span>
               </div>
-              <div className="bg-gray-50 rounded-lg p-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Info fields */}
+              <div className="flex flex-col divide-y divide-gray-100">
+                <div className="flex items-center gap-3 px-6 py-4">
+                  <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 11c0-2.21 1.79-4 4-4s4 1.79 4 4-1.79 4-4 4-4-1.79-4-4z" /></svg>
                   <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-lg font-semibold mb-2">Strengths</h3>
-                      <div className="relative group">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400 cursor-help" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <div className="absolute left-0 mt-2 w-64 bg-white p-2 rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10">
-                          <p className="text-xs text-gray-600">Detailed scoring of your responses to each interview question, evaluating technical knowledge, problem-solving, and communication skills.</p>
-                        </div>
-                      </div>
-                    </div>
-                    <ul className="list-disc pl-5 space-y-1">
-                      {resumeAnalysis.strengths.map((strength, index) => (
-                        <li key={index} className="text-green-600">{strength}</li>
-                      ))}
-                    </ul>
+                    <div className="text-xs text-gray-400">Poste</div>
+                    <div className="text-sm font-medium text-gray-900">Business Developer</div>
                   </div>
-                  
+                </div>
+                <div className="flex items-center gap-3 px-6 py-4">
+                  <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8m-9 4v8" /></svg>
                   <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-lg font-semibold mb-2">Weaknesses</h3>
-                      <div className="relative group">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400 cursor-help" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <div className="absolute left-0 mt-2 w-64 bg-white p-2 rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10">
-                          <p className="text-xs text-gray-600">Detailed scoring of your responses to each interview question, evaluating technical knowledge, problem-solving, and communication skills.</p>
-                        </div>
-                      </div>
-                    </div>
-                    <ul className="list-disc pl-5 space-y-1">
-                      {resumeAnalysis.weaknesses.map((weakness, index) => (
-                        <li key={index} className="text-red-600">{weakness}</li>
-                      ))}
-                    </ul>
+                    <div className="text-xs text-gray-400">Téléphone</div>
+                    <div className="text-sm font-medium text-gray-900">+2126 08 6466 31</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 px-6 py-4">
+                  <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M16 12H8m8 0a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+                  <div>
+                    <div className="text-xs text-gray-400">Adresse mail</div>
+                    <div className="text-sm font-medium text-gray-900">z.zaghrari@gmail.com</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 px-6 py-4">
+                  <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 12.414a4 4 0 10-5.657 5.657l4.243 4.243a8 8 0 1011.314-11.314l-4.243 4.243z" /></svg>
+                  <div>
+                    <div className="text-xs text-gray-400">Localisation</div>
+                    <div className="text-sm font-medium text-gray-900">Casablanca, Morocco</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 px-6 py-4">
+                  <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 14l9-5-9-5-9 5 9 5zm0 7v-7" /></svg>
+                  <div>
+                    <div className="text-xs text-gray-400">Niveau d'étude</div>
+                    <div className="text-sm font-medium text-gray-900">Bac + 5</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 px-6 py-4">
+                  <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M8 17l4-4 4 4m0 0V3m0 14H4" /></svg>
+                  <div>
+                    <div className="text-xs text-gray-400">Experiences</div>
+                    <div className="text-sm font-medium text-gray-900">3 ans</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 px-6 py-4">
+                  <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm0 8v2m0-10V4" /></svg>
+                  <div>
+                    <div className="text-xs text-gray-400">Salaire actuelle</div>
+                    <div className="text-sm font-medium text-gray-900">20 000 Dhs Net</div>
                   </div>
                 </div>
               </div>
             </div>
-          )}
-          
-          {/* Detailed Answers Section */}
-          <div className="mt-8">
-            <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-              <div className="px-4 py-5 sm:px-6">
-                <h2 className="text-lg leading-6 font-medium text-gray-900">Detailed Answer Analysis</h2>
-                <p className="mt-1 text-sm text-gray-500">
-                  Comprehensive view of all answers with transcripts and scoring details
-                </p>
-              </div>
-              
-              <div className="border-t border-gray-200">
-                {detailedAnswers.length > 0 ? (
-                  <div className="divide-y divide-gray-200">
-                    {detailedAnswers.map((answer, index) => (
-                      <div key={answer.id} className="p-6">
-                        <div className="mb-4">
-                          <h3 className="text-lg font-medium text-gray-900">
-                            Question {index + 1}: {answer.body}
-                          </h3>
-                          <p className="mt-2 text-sm text-gray-600">{answer.body}</p>
-                        </div>
-                        
-                        <div className="bg-gray-50 rounded-lg p-4 mt-4">
-                          <div className="mb-4">
-                            <h4 className="text-sm font-medium text-gray-700">Transcript:</h4>
-                            <p className="mt-2 text-sm text-gray-600 whitespace-pre-wrap">
-                              {answer.transcript || 'No transcript available'}
-                            </p>
+            {/* Right Column: Main Content */}
+            <div className="w-full md:w-2/3">
+              {/* Tabs and Main Content */}
+              <Tab.Group selectedIndex={activeTab === 'analysis' ? 0 : 1} onChange={i => setActiveTab(i === 0 ? 'analysis' : 'answers')}>
+                <Tab.List className="flex space-x-8 border-b mb-6">
+                  <Tab className={({ selected }) => selected ? 'text-blue-700 border-b-2 border-blue-700 pb-2 font-semibold' : 'text-gray-500 pb-2'}>Resume Analysis</Tab>
+                  <Tab className={({ selected }) => selected ? 'text-blue-700 border-b-2 border-blue-700 pb-2 font-semibold' : 'text-gray-500 pb-2'}>Questions & Answers</Tab>
+                </Tab.List>
+                <Tab.Panels>
+                  {/* Resume Analysis Tab */}
+                  <Tab.Panel>
+                    {resumeAnalysis && (
+                      <div>
+                        <div className="mb-6 bg-white rounded-lg shadow p-6">
+                          <div className="flex items-center mb-2">
+                            <h2 className="text-xl font-bold text-gray-900 mr-4">Overall Fit</h2>
                           </div>
-                          
-                          {answer.video_path && (
-                            <div className="mb-4">
-                              <h4 className="text-sm font-medium text-gray-700">Video Response:</h4>
-                              <div className="mt-2">
-                                <video 
-                                  src={answer.video_path} 
-                                  controls 
-                                  className="max-w-full h-auto rounded"
-                                >
-                                  Your browser does not support the video tag.
-                                </video>
-                              </div>
-                            </div>
-                          )}
-                          
-                          <div className="border-t border-gray-200 pt-4 mt-4">
-                            <div className="flex justify-between items-start">
-                              <div>
-                                <h4 className="text-sm font-medium text-gray-700">Score:</h4>
-                                <p className="mt-1 text-lg font-semibold text-gray-900">
-                                  {answer.score !== null ? (
-                                    <span>
-                                      {answer.score}
-                                    </span>
-                                  ) : (
-                                    'Not scored'
-                                  )}
-                                </p>
-                              </div>
-                              {answer.score_rationale && (
-                                <div className="ml-6 flex-1">
-                                  <h4 className="text-sm font-medium text-gray-700">Scoring Rationale:</h4>
-                                  <p className="mt-1 text-sm text-gray-600">{answer.score_rationale}</p>
-                                </div>
-                              )}
-                            </div>
+                            <span className="text-base font-semibold text-blue-700">Overall Score: {resumeAnalysis.percent_match}% Match</span>
+                          <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden mb-2">
+                            <div className="h-full bg-blue-500 rounded-full" style={{ width: `${resumeAnalysis.percent_match}%` }} />
+                          </div>
+                          <p className="text-gray-700 mb-2">{resumeAnalysis.overall_fit}</p>
+                        </div>
+                        <div className="flex flex-col gap-6">
+                          {/* Strengths Card */}
+                          <div className="bg-green-50 border border-green-200 rounded-lg p-6">
+                            <h3 className="text-green-700 font-bold mb-2">STRENGTHS</h3>
+                            <ul className="list-disc pl-5 space-y-1">
+                              {resumeAnalysis.strengths.map((s, i) => (
+                                <li key={i} className="text-green-900">{s}</li>
+                              ))}
+                            </ul>
+                          </div>
+                          {/* Weaknesses Card */}
+                          <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+                            <h3 className="text-red-700 font-bold mb-2">WEAKNESSES</h3>
+                            <ul className="list-disc pl-5 space-y-1">
+                              {resumeAnalysis.weaknesses.map((w, i) => (
+                                <li key={i} className="text-red-900">{w}</li>
+                              ))}
+                            </ul>
                           </div>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="px-4 py-5 sm:px-6 text-center text-gray-500">
-                    No detailed answers available for this submission.
-                  </div>
-                )}
-              </div>
+                    )}
+                  </Tab.Panel>
+                  {/* Questions & Answers Tab */}
+                  <Tab.Panel>
+                    <div className="bg-white rounded-lg shadow p-6">
+                      <div className="space-y-4">
+                        {detailedAnswers.length > 0 ? detailedAnswers.map((answer, index) => (
+                          <div key={answer.id} className="border-b border-gray-200 pb-4 last:border-b-0 last:pb-0">
+                            <div className="flex items-center justify-between mb-2">
+                              <h4 className="text-sm font-medium text-gray-900">{answer.question_title}</h4>
+                              <span className="text-sm font-medium text-gray-900">{answer.score !== null ? answer.score : 'Not scored'}</span>
+                            </div>
+                            <p className="text-sm text-gray-600 mb-2">{answer.transcript}</p>
+                            {answer.score_rationale && (
+                              <p className="text-sm text-gray-500 italic">{answer.score_rationale}</p>
+                            )}
+                          </div>
+                        )) : (
+                          <div className="text-gray-500 text-center">No answers available.</div>
+                        )}
+                      </div>
+                    </div>
+                  </Tab.Panel>
+                </Tab.Panels>
+              </Tab.Group>
             </div>
           </div>
-          
-          {/* Bottom save button when dirty */}
-          {isDirty && (
-            <div className="mt-6 flex justify-end">
-              <PrimaryButton 
-                onClick={saveChanges} 
-                disabled={isSaving}
-              >
-                {isSaving ? 'Saving...' : 'Save Changes'}
-              </PrimaryButton>
-            </div>
-          )}
         </div>
       ) : (
         <div className="text-center py-8 text-gray-500">

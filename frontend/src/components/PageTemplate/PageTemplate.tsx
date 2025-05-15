@@ -16,7 +16,7 @@ export const PageTemplate: React.FC<PageTemplateProps> = ({
   children,
   title,
   centered = false,
-  maxWidth = 'lg',
+  maxWidth = 'full',
 }) => {
   const router = useRouter();
   const { user, isAuthenticated, isAdmin, logout } = useAuth();
@@ -83,17 +83,6 @@ export const PageTemplate: React.FC<PageTemplateProps> = ({
                     Positions
                   </Link>
                 )}
-                
-                {isAuthenticated && isAdmin && (
-                  <>
-                    <Link href="/campaigns" className="inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700">
-                      Campaigns
-                    </Link>
-                    <Link href="/submissions" className="inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700">
-                      Submissions
-                    </Link>
-                  </>
-                )}
               </div>
             </div>
             
@@ -101,9 +90,6 @@ export const PageTemplate: React.FC<PageTemplateProps> = ({
             <div className="hidden md:flex md:items-center md:space-x-4">
               {isAuthenticated ? (
                 <>
-                  <div className="text-sm text-gray-500">
-                    Signed in as <span className="font-medium text-gray-800">{user?.name}</span>
-                  </div>
                   <Link 
                     href="/profile" 
                     className="text-gray-600 hover:text-gray-900"
@@ -228,33 +214,6 @@ export const PageTemplate: React.FC<PageTemplateProps> = ({
         </div>
       </nav>
 
-      {/* Breadcrumbs */}
-      {showBreadcrumbs && (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
-          <nav className="flex" aria-label="Breadcrumb">
-            <ol className="flex items-center space-x-1 md:space-x-3">
-              {breadcrumbs.map((breadcrumb, index) => (
-                <li key={breadcrumb.href} className="flex items-center">
-                  {index > 0 && (
-                    <span className="mx-1 text-gray-400">/</span>
-                  )}
-                  <Link
-                    href={breadcrumb.href}
-                    className={`text-sm font-medium ${
-                      index === breadcrumbs.length - 1
-                        ? 'text-gray-700 hover:text-gray-900'
-                        : 'text-gray-500 hover:text-gray-700'
-                    }`}
-                  >
-                    {breadcrumb.label}
-                  </Link>
-                </li>
-              ))}
-            </ol>
-          </nav>
-        </div>
-      )}
-
       {/* Page title */}
       {title && (
         <header className="bg-white shadow">
@@ -265,7 +224,7 @@ export const PageTemplate: React.FC<PageTemplateProps> = ({
       )}
 
       {/* Page content */}
-      <main className={`max-w-${maxWidth} mx-auto py-6 px-4 sm:px-6 lg:px-8 ${centered ? 'flex items-center justify-center' : ''}`}>
+      <main className={`max-w-${maxWidth} mx-auto ${centered ? 'flex items-center justify-center' : ''}`}>
         {children}
       </main>
     </div>
