@@ -8,7 +8,7 @@ import { AuthLogger } from '../../../utils/logging';
 import { Tab } from '@headlessui/react';
 
 // API base URL
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://main-service-48k0.onrender.com';
+const API_BASE_URL = 'https://main-service-48k0.onrender.com';
 
 // Interfaces
 interface User {
