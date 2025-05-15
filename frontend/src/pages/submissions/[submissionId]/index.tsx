@@ -221,24 +221,31 @@ const SubmissionDetailsPage = () => {
   };
 
   const fetchDetailedAnswers = async () => {
-    if (!submissionId) return;
     try {
-      const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/submission_answers`, {
-        params: { submission_id: submissionId }
+      const response = await axios.get(`${API_BASE_URL}/api/submission_answers`, {
+        params: {
+          submission_id: submissionId
+        }
       });
       setDetailedAnswers(response.data);
     } catch (error) {
       console.error('Error fetching detailed answers:', error);
+      setError('Failed to load submission answers');
     }
   };
 
   const fetchResumeAnalysis = async () => {
-    if (!submissionId) return;
     try {
-      const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/resume_analysis/${submissionId}`);
-      setResumeAnalysis(response.data);
+      const response = await axios.get(`${API_BASE_URL}/api/resume_analysis/${submissionId}`);
+      if (submission) {
+        setSubmission({
+          ...submission,
+          resume_analysis: response.data
+        });
+      }
     } catch (error) {
       console.error('Error fetching resume analysis:', error);
+      // Don't set error state as this is optional data
     }
   };
 

@@ -138,6 +138,7 @@ const CampaignSubmissionsPage = () => {
             analyses[submission.id] = res.data;
           } catch (err) {
             // If not found or error, skip
+            console.error('Error fetching resume analysis:', err);
           }
         })
       );
