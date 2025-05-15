@@ -231,9 +231,7 @@ const CampaignSubmissionsPage = () => {
               
               // If not clicking on a link, navigate to view submission
               const submissionId = String(cell.getValue());
-              const data = cell.getRow().getData() as Submission;
-              const safeReturnToCampaign = typeof campaignId === 'string' ? campaignId : Array.isArray(campaignId) ? campaignId[0] : '';
-              router.push(`/submissions/${submissionId}/answers?returnToCampaign=${encodeURIComponent(safeReturnToCampaign)}&userId=${encodeURIComponent(data.user_id)}&campaignId=${encodeURIComponent(data.campaign_id)}`);
+              router.push(`/submissions/${submissionId}?userId=${encodeURIComponent(cell.getRow().getData().user_id)}&campaignId=${encodeURIComponent(cell.getRow().getData().campaign_id)}`);
             }
           }
         ],
