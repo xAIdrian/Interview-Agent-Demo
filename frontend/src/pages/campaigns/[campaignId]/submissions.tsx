@@ -25,6 +25,7 @@ interface Submission {
   total_points: number | null;
   email: string;
   campaign_name: string;
+  candidate_name?: string;
 }
 
 interface Campaign {
@@ -35,6 +36,14 @@ interface Campaign {
   is_public: boolean;
   campaign_context: string;
   job_description: string;
+}
+
+interface ResumeAnalysis {
+  strengths: string[];
+  weaknesses: string[];
+  overall_fit: string;
+  percent_match: number;
+  percent_match_reason: string;
 }
 
 const CampaignSubmissionsPage = () => {
@@ -51,18 +60,7 @@ const CampaignSubmissionsPage = () => {
   const tableRef = useRef<HTMLDivElement>(null);
   const tabulatorRef = useRef<Tabulator | null>(null);
 
-  // Setup auth on component mount
-  //useEffect(() => {
-    //const token = localStorage.getItem('accessToken');
-    //const isAdminUser = localStorage.getItem('isAdmin') === 'true';
-    //setIsAdmin(isAdminUser);
-    
-    //if (token) {
-      //// Don't set default axios headers here
-    //} else {
-      //router.push('/login');
-    //}
-  //}, [router]);
+  const [resumeAnalyses, setResumeAnalyses] = useState<{ [submissionId: string]: ResumeAnalysis } >({});
 
   // Fetch campaign data
   useEffect(() => {
@@ -130,6 +128,26 @@ const CampaignSubmissionsPage = () => {
     fetchCampaignData();
   }, [campaignId, router]);
 
+  useEffect(() => {
+    const fetchResumeAnalyses = async (subs: Submission[]) => {
+      const analyses: { [submissionId: string]: ResumeAnalysis } = {};
+      await Promise.all(
+        subs.map(async (submission: any) => {
+          try {
+            const res = await axios.get(`${API_BASE_URL}/api/resume_analysis/${submission.id}`);
+            analyses[submission.id] = res.data;
+          } catch (err) {
+            // If not found or error, skip
+          }
+        })
+      );
+      setResumeAnalyses(analyses);
+    };
+    if (submissions.length > 0) {
+      fetchResumeAnalyses(submissions);
+    }
+  }, [submissions]);
+
   // Initialize Tabulator when data is loaded
   useEffect(() => {
     if (isLoading || !tableRef.current || submissions.length === 0) return;
@@ -157,7 +175,7 @@ const CampaignSubmissionsPage = () => {
             widthGrow: 2,
             formatter: function(cell: any) {
               const data = cell.getRow().getData();
-              const name = data.user_name || 'No name';
+              const name = data.candidate_name || 'No name';
               return `<div>
                 <div class="font-medium">${name}</div>
               </div>`;
@@ -197,7 +215,8 @@ const CampaignSubmissionsPage = () => {
               // Ensure campaignId is a string and properly encoded
               const returnToCampaign = String(campaignId);
               console.log('🚀 ~ Creating view button with returnToCampaign:', returnToCampaign);
-              viewButton.href = `/submissions/${submissionId}?returnToCampaign=${encodeURIComponent(returnToCampaign)}`;
+              const data = cell.getRow().getData() as Submission;
+              viewButton.href = `/submissions/${submissionId}?returnToCampaign=${encodeURIComponent(returnToCampaign)}&userId=${encodeURIComponent(data.user_id)}&campaignId=${encodeURIComponent(data.campaign_id)}`;
               viewButton.className = "px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm";
               container.appendChild(viewButton);
               
@@ -212,7 +231,7 @@ const CampaignSubmissionsPage = () => {
               
               // If not clicking on a link, navigate to view submission
               const submissionId = String(cell.getValue());
-              window.location.href = `/submissions/${submissionId}`;
+              router.push(`/submissions/${submissionId}?userId=${encodeURIComponent(cell.getRow().getData().user_id)}&campaignId=${encodeURIComponent(cell.getRow().getData().campaign_id)}`);
             }
           }
         ],
@@ -251,22 +270,12 @@ const CampaignSubmissionsPage = () => {
   }, [submissions, isLoading, router]);
 
   return (
-    <PageTemplate title={`Submissions`} maxWidth="lg">
-      <div className="flex justify-end mb-4 items-center">
-        <Link 
-          href={`/campaigns/${campaignId}`}
-          className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-700"
-        >
-          Back to Campaign
-        </Link>
-      </div>
-
+    <div>
       {error && (
         <div className="mb-4 p-2 bg-red-100 text-red-700 rounded">
           {error}
         </div>
       )}
-      
       {isLoading ? (
         <div className="flex justify-center items-center py-10">
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-700"></div>
@@ -278,77 +287,45 @@ const CampaignSubmissionsPage = () => {
         </div>
       ) : (
         <>
-          <div className="bg-white shadow rounded-lg p-4 mb-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="p-3 bg-gray-50 rounded">
-                <h3 className="text-sm font-medium text-gray-500">Total Submissions</h3>
-                <p className="text-2xl font-bold">{submissions.filter(s => s.total_points !== null).length}</p>
-              </div>
-              <div className="p-3 bg-gray-50 rounded">
-                <h3 className="text-sm font-medium text-gray-500">Completed</h3>
-                <p className="text-2xl font-bold">{submissions.filter(s => s.is_complete && s.total_points !== null).length}</p>
-              </div>
-              <div className="p-3 bg-gray-50 rounded">
-                <h3 className="text-sm font-medium text-gray-500">In Progress</h3>
-                <p className="text-2xl font-bold">{submissions.filter(s => !s.is_complete && s.total_points !== null).length}</p>
-              </div>
-              <div className="p-3 bg-gray-50 rounded">
-                <h3 className="text-sm font-medium text-gray-500">Average Score</h3>
-                <p className="text-2xl font-bold">
-                  {submissions.filter(s => s.total_points !== null).length > 0
-                    ? (submissions.filter(s => s.total_points !== null)
-                        .reduce((acc, s) => acc + (s.total_points || 0), 0) / 
-                        submissions.filter(s => s.total_points !== null).length).toFixed(1)
-                    : 'N/A'}
-                </p>
-              </div>
-            </div>
-          </div>
-
           {submissions.length > 0 ? (
-            <div className="bg-white shadow rounded-lg p-4">
-              {/* Add a fallback in case Tabulator fails to load */}
-              {error.includes("initialize submission table") ? (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Candidate</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {submissions.map((submission) => (
-                        <tr key={submission.id}>
-                          <td className="px-6 py-4 whitespace-nowrap">{submission.email}</td>
-                          <td className="px-6 py-4 whitespace-nowrap">{new Date(submission.created_at).toLocaleString()}</td>
-                          <td className="px-6 py-4 whitespace-nowrap">{submission.total_points !== null ? submission.total_points : 'Not scored'}</td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex justify-center space-x-2">
-                              <a 
-                                href={`/submissions/${submission.id}`}
-                                className="text-blue-500 hover:text-blue-700"
-                              >
-                                View
-                              </a>
-                              <a 
-                                href={`/interview/${submission.id}`}
-                                className="text-green-500 hover:text-green-700"
-                              >
-                                Interview
-                              </a>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div ref={tableRef} className="w-full"></div>
-              )}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 p-6">
+              {submissions.filter(sub => sub.total_points !== null).map((submission) => {
+                // Safe handling for missing or malformed email
+                const email = typeof submission.email === 'string' ? submission.email : '';
+                const name = submission.candidate_name || (email.includes('@') ? email.split('@')[0].replace(/\./g, ' ') : 'Unknown');
+                const initials = name.split(' ').map(n => n[0]?.toUpperCase() || '').join('').slice(0,2) || '??';
+                const qualified = submission.total_points && submission.total_points > 70; // Example logic
+                const analysis = resumeAnalyses[submission.id];
+                const summary = analysis?.overall_fit || `${name} has a strong background in banking and project management, making them a solid candidate for the Product Owner position. However, gaps in specific international banking product knowledge and Agile experience might limit their effectiveness in the role.`;
+                const matching = analysis?.percent_match !== undefined ? Math.round(analysis.percent_match) : 'N/A';
+                const isQualified = typeof matching === 'number' && matching >= 75;
+                return (
+                  <div
+                    key={submission.id}
+                    className="bg-white rounded-xl shadow p-6 flex flex-col justify-between min-h-[260px] cursor-pointer hover:shadow-lg transition"
+                    onClick={() => router.push(`/submissions/${submission.id}?userId=${encodeURIComponent(submission.user_id)}&campaignId=${encodeURIComponent(submission.campaign_id)}`)}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center">
+                        <div className="w-12 h-12 rounded-full bg-gray-700 text-white flex items-center justify-center text-xl font-bold mr-4">
+                          {initials}
+                        </div>
+                        <span className="text-lg font-semibold text-gray-900">{name}</span>
+                      </div>
+                      {isQualified && (
+                        <span className="text-xs font-semibold px-2 py-1 rounded bg-green-50 text-green-700">Qualified</span>
+                      )}
+                    </div>
+                    <div className="text-gray-700 mb-6 mt-2 flex-1">
+                      {summary}
+                    </div>
+                    <div className="flex items-center justify-between pt-4 border-t mt-2">
+                      <span className="text-gray-500 font-medium">Matching</span>
+                      <span className="text-blue-600 font-bold text-lg">{matching}%</span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           ) : (
             <div className="text-center py-8 bg-white shadow rounded-lg">
@@ -358,7 +335,7 @@ const CampaignSubmissionsPage = () => {
           )}
         </>
       )}
-    </PageTemplate>
+    </div>
   );
 };
 

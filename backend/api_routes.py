@@ -428,9 +428,8 @@ def handle_submissions():
 
             # Build the base query with joins
             query = """
-                SELECT s.*, c.title AS campaign_title, u.name AS user_name, u.email AS user_email
+                SELECT s.*, u.name AS candidate_name, u.email AS user_email
                 FROM submissions s
-                JOIN campaigns c ON s.campaign_id = c.id
                 LEFT JOIN users u ON s.user_id = u.id
             """
 
@@ -1856,7 +1855,7 @@ def submit_interview():
         cursor.execute(
             """
             SELECT id, body, scoring_prompt, max_points 
-            FROM questions 
+            FROM questions
             WHERE campaign_id = ?
             """,
             (submission["campaign_id"],),
