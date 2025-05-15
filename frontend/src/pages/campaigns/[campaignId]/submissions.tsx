@@ -161,7 +161,7 @@ const CampaignSubmissionsPage = () => {
       
       // Configure and initialize Tabulator
       tabulatorRef.current = new Tabulator(tableRef.current, {
-        data: submissions,
+        data: submissions.filter(submission => submission.total_points !== null),
         layout: "fitColumns",
         pagination: true,
         paginationSize: 10,
