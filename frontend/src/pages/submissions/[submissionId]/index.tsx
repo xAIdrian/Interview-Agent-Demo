@@ -236,13 +236,10 @@ const SubmissionDetailsPage = () => {
 
   const fetchResumeAnalysis = async () => {
     try {
+      console.log('Fetching resume analysis for submission:', submissionId);
       const response = await axios.get(`${API_BASE_URL}/api/resume_analysis/${submissionId}`);
-      if (submission) {
-        setSubmission({
-          ...submission,
-          resume_analysis: response.data
-        });
-      }
+      console.log('Resume analysis response:', response.data);
+      setResumeAnalysis(response.data);
     } catch (error) {
       console.error('Error fetching resume analysis:', error);
       // Don't set error state as this is optional data
@@ -544,7 +541,7 @@ const SubmissionDetailsPage = () => {
                           <div className="flex items-center mb-2">
                             <h2 className="text-xl font-bold text-gray-900 mr-4">Overall Fit</h2>
                           </div>
-                            <span className="text-base font-semibold text-blue-700">Overall Score: {resumeAnalysis.percent_match}% Match</span>
+                          <span className="text-base font-semibold text-blue-700">Overall Score: {resumeAnalysis.percent_match}% Match</span>
                           <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden mb-2">
                             <div className="h-full bg-blue-500 rounded-full" style={{ width: `${resumeAnalysis.percent_match}%` }} />
                           </div>
