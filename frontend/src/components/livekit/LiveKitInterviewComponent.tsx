@@ -122,7 +122,6 @@ const InterviewControlBar: React.FC<{
 
   // Ensure microphone starts disabled
   useEffect(() => {
-    console.log('localParticipant', localParticipant);
     handleMicPress();
     handleMicRelease();
   }, [localParticipant]);
@@ -150,6 +149,7 @@ const InterviewControlBar: React.FC<{
   };
 
   return (
+    <>
     <div className="flex flex-row items-center justify-center gap-6 bg-[#23242A] rounded-xl px-8 py-4 mt-2 shadow-lg">
       {/* Mic button */}
       <div className="flex flex-col items-center gap-2">
@@ -163,7 +163,6 @@ const InterviewControlBar: React.FC<{
         >
           <MicrophoneIcon className="w-7 h-7" />
         </button>
-        <span className="text-sm text-gray-400">Hold to Speak</span>
       </div>
       {/* Hangup button */}
       <button className="w-12 h-12 rounded-full bg-red-600 flex items-center justify-center text-2xl text-white hover:bg-red-700 transition-colors duration-150 focus:outline-none" onClick={onDisconnect} disabled={hasSubmitted || isProcessingSubmission}>
@@ -174,6 +173,8 @@ const InterviewControlBar: React.FC<{
         <VideoCameraIcon className="w-7 h-7" />
       </button>
     </div>
+    <span className="text-sm text-gray-400">Hold down microphone to speak</span>
+    </>
   );
 };
 
