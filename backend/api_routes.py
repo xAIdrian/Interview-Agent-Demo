@@ -1700,7 +1700,7 @@ def upload_resume():
     except Exception as e:
         # Log the error
         logger.error(f"Error processing resume: {str(e)}")
-        return jsonify({"error": f"Error processing resume: {str(e)}"}), 500
+        return jsonify({"error": f"Error processing resume: {str(e)}"}), 200
     finally:
         # Clean up the temporary file if it exists
         if temp_path and os.path.exists(temp_path):

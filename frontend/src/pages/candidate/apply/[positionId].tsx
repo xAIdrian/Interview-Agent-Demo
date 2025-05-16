@@ -198,15 +198,31 @@ const ApplicationPage = () => {
       formData.append('user_id', userId.toString());
       formData.append('submission_id', submissionId.toString());
       
-      // Upload the resume
-      await axios.post(`${API_BASE_URL}/api/upload_resume`, formData, {
+      // Upload the resume and wait for successful response
+      const resumeResponse = await axios.post(`${API_BASE_URL}/api/upload_resume`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
         }
       });
-      
-      // Redirect to the interview room
-      router.push(`/interview/${submissionId}`);
+
+      // Check for specific error cases in the response
+      if (resumeResponse.data.error) {
+        if (resumeResponse.data.error.includes('No text could be extracted')) {
+          throw new Error('The resume file appears to be empty or corrupted. Please upload a valid PDF file with readable text.');
+        } else if (resumeResponse.data.error.includes('Invalid file type')) {
+          throw new Error('Please upload a valid PDF file.');
+        } else {
+          throw new Error(resumeResponse.data.error || 'Failed to process resume. Please try again with a different file.');
+        }
+      }
+
+      // Only proceed with navigation if we have a success message
+      if (resumeResponse.data.message) {
+        // Redirect to the interview room
+        router.push(`/interview/${submissionId}`);
+      } else {
+        throw new Error('Failed to upload resume. Please try again.');
+      }
       
     } catch (err) {
       console.error('Error creating application:', err);
@@ -218,7 +234,7 @@ const ApplicationPage = () => {
           setError('Failed to submit your application');
         }
       } else {
-        setError('An unexpected error occurred: ' + err);
+        setError(err instanceof Error ? err.message : 'An unexpected error occurred');
       }
       
       // If upload fails, delete the submission
@@ -229,6 +245,7 @@ const ApplicationPage = () => {
           console.error('Failed to delete submission after upload error:', deleteErr);
         }
       }
+    } finally {
       setIsUploading(false);
     }
   };
