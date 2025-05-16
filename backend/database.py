@@ -65,6 +65,8 @@ def create_users_table():
                 name VARCHAR(255) NOT NULL,
                 password_hash VARCHAR(255),
                 is_admin BOOLEAN NOT NULL DEFAULT FALSE,
+                phone_number VARCHAR(20) DEFAULT NULL,
+                country_code VARCHAR(10) DEFAULT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
