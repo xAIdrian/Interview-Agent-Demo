@@ -54,6 +54,8 @@ const LiveKitInterviewPage: React.FC = () => {
   const [maxAttemptsMessage, setMaxAttemptsMessage] = useState<string | null>(null);
   const [isInterviewComplete, setIsInterviewComplete] = useState(false);
   const [showMicTest, setShowMicTest] = useState(false);
+  const [showErrorDialog, setShowErrorDialog] = useState(false);
+  const [errorDialogMessage, setErrorDialogMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (campaignId) {
@@ -119,11 +121,7 @@ const LiveKitInterviewPage: React.FC = () => {
       setError('Please upload your resume');
       return;
     }
-    // Instead of starting the interview, show the mic test stage
-    setShowMicTest(true);
-  };
 
-  const handleMicTestSuccess = async () => {
     setIsCreatingUser(true);
     setError(null);
     let newSubmissionId: string | null = null;
@@ -177,13 +175,32 @@ const LiveKitInterviewPage: React.FC = () => {
           'Content-Type': 'multipart/form-data',
         },
       });
-      if (!resumeResponse.data.message) {
-        throw new Error('Failed to upload resume');
+      console.log("resumeResponse", resumeResponse.data.message);
+      if (resumeResponse.data.error) {
+        setErrorDialogMessage(resumeResponse.data.error);
+        setShowErrorDialog(true);
+        setShowMicTest(false);
+        setIsCreatingUser(false);
+        return;
       }
+      // Instead of starting the interview, show the mic test stage
+      setShowMicTest(true);
+    } catch (err) {
+      console.error('Error uploading resume:', err);
+      setErrorDialogMessage(err instanceof Error ? err.message : 'Failed to upload resume');
+      setShowErrorDialog(true);
+      setShowMicTest(false);
+      setIsCreatingUser(false);
+    }
+
+  };
+
+  const handleMicTestSuccess = async () => {
+    try{
       // Get LiveKit token
       const tokenResponse = await axios.get(`${API_BASE_URL}/api/livekit/token`, {
         params: {
-          room: `interview-${newSubmissionId}`,
+          room: `interview-${submissionId}`,
           campaignId
         }
       });
@@ -193,9 +210,9 @@ const LiveKitInterviewPage: React.FC = () => {
       setShowMicTest(false);
     } catch (err) {
       console.error('Error starting interview:', err);
-      if (newSubmissionId) {
+      if (submissionId) {
         try {
-          await axios.delete(`${API_BASE_URL}/api/submissions/${newSubmissionId}`);
+          await axios.delete(`${API_BASE_URL}/api/submissions/${submissionId}`);
         } catch (cleanupErr) {
           console.error('Failed to cleanup submission:', cleanupErr);
         }
@@ -379,12 +396,38 @@ const LiveKitInterviewPage: React.FC = () => {
           </div>
       </div>
 
-      {/* Maximum Attempts Modal - Updated to be non-closeable */}
+      {/* Error Dialog */}
+      <Modal
+        isOpen={showErrorDialog}
+        onClose={() => setShowErrorDialog(false)}
+        title="Error"
+      >
+        <div className="p-6">
+          <div className="text-center">
+            <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
+              <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <p className="text-gray-600 mb-6">
+              {errorDialogMessage}
+            </p>
+            <button
+              onClick={() => setShowErrorDialog(false)}
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Maximum Attempts Modal */}
       <Modal
         isOpen={showMaxAttemptsModal}
-        onClose={() => {}} // Empty function to prevent closing
+        onClose={() => {}}
         title="Maximum Attempts Reached"
-        hideCloseButton={true} // Add this prop to Modal component
+        hideCloseButton={true}
       >
         <div className="p-6">
           <div className="text-center">
