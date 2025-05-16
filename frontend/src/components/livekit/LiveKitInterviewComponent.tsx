@@ -111,6 +111,72 @@ const SimpleVoiceAssistant: React.FC<{ onTranscriptUpdate: (transcript: any[]) =
   );
 };
 
+const InterviewControlBar: React.FC<{
+  onDisconnect: () => void;
+  hasSubmitted: boolean;
+  isProcessingSubmission: boolean;
+}> = ({ onDisconnect, hasSubmitted, isProcessingSubmission }) => {
+  const [isMicMuted, setIsMicMuted] = useState(true);
+  const [isHoldingMic, setIsHoldingMic] = useState(false);
+  const { localParticipant } = useLocalParticipant();
+
+  // Ensure microphone starts disabled
+  useEffect(() => {
+    console.log('localParticipant', localParticipant);
+    handleMicPress();
+    handleMicRelease();
+  }, [localParticipant]);
+
+  const handleMicPress = async () => {
+    setIsHoldingMic(true);
+    setIsMicMuted(false);
+    try {
+      // Enable the microphone using LiveKit's built-in method
+      await localParticipant.setMicrophoneEnabled(true);
+    } catch (err) {
+      console.error('Error enabling microphone:', err);
+    }
+  };
+
+  const handleMicRelease = async () => {
+    setIsHoldingMic(false);
+    setIsMicMuted(true);
+    try {
+      // Disable the microphone using LiveKit's built-in method
+      await localParticipant.setMicrophoneEnabled(false);
+    } catch (err) {
+      console.error('Error disabling microphone:', err);
+    }
+  };
+
+  return (
+    <div className="flex flex-row items-center justify-center gap-6 bg-[#23242A] rounded-xl px-8 py-4 mt-2 shadow-lg">
+      {/* Mic button */}
+      <div className="flex flex-col items-center gap-2">
+        <button 
+          className={`w-12 h-12 rounded-full ${isHoldingMic ? 'bg-green-700 border-green-500' : 'bg-[#23242A] border-gray-600'} border-2 flex items-center justify-center text-2xl text-gray-200 transition-colors duration-150 focus:outline-none`}
+          onMouseDown={handleMicPress}
+          onMouseUp={handleMicRelease}
+          onMouseLeave={handleMicRelease}
+          onTouchStart={handleMicPress}
+          onTouchEnd={handleMicRelease}
+        >
+          <MicrophoneIcon className="w-7 h-7" />
+        </button>
+        <span className="text-sm text-gray-400">Hold to Speak</span>
+      </div>
+      {/* Hangup button */}
+      <button className="w-12 h-12 rounded-full bg-red-600 flex items-center justify-center text-2xl text-white hover:bg-red-700 transition-colors duration-150 focus:outline-none" onClick={onDisconnect} disabled={hasSubmitted || isProcessingSubmission}>
+        <PhoneXMarkIcon className="w-7 h-7" />
+      </button>
+      {/* Video button (disabled for now) */}
+      <button className="w-12 h-12 rounded-full bg-[#23242A] border-2 border-gray-600 flex items-center justify-center text-2xl text-gray-200 opacity-50 cursor-not-allowed">
+        <VideoCameraIcon className="w-7 h-7" />
+      </button>
+    </div>
+  );
+};
+
 const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, room, submissionId, onDisconnect, candidateName }: LiveKitInterviewComponentProps) => {
   const livekitUrl = 'wss://default-test-oyjqa9xh.livekit.cloud';
   const [showInstructions, setShowInstructions] = useState(true);
@@ -373,20 +439,11 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
             </div>
           </div>
           {/* Control Bar */}
-          <div className="flex flex-row items-center justify-center gap-6 bg-[#23242A] rounded-xl px-8 py-4 mt-2 shadow-lg">
-            {/* Mic button */}
-            <button className="w-12 h-12 rounded-full bg-[#23242A] border-2 border-gray-600 flex items-center justify-center text-2xl text-gray-200 hover:bg-green-700 hover:border-green-500 transition-colors duration-150 focus:outline-none">
-              <MicrophoneIcon className="w-7 h-7" />
-            </button>
-            {/* Hangup button */}
-            <button className="w-12 h-12 rounded-full bg-red-600 flex items-center justify-center text-2xl text-white hover:bg-red-700 transition-colors duration-150 focus:outline-none" onClick={handleDisconnect} disabled={hasSubmitted || isProcessingSubmission}>
-              <PhoneXMarkIcon className="w-7 h-7" />
-            </button>
-            {/* Video button (disabled for now) */}
-            <button className="w-12 h-12 rounded-full bg-[#23242A] border-2 border-gray-600 flex items-center justify-center text-2xl text-gray-200 opacity-50 cursor-not-allowed">
-              <VideoCameraIcon className="w-7 h-7" />
-            </button>
-          </div>
+          <InterviewControlBar 
+            onDisconnect={handleDisconnect}
+            hasSubmitted={hasSubmitted}
+            isProcessingSubmission={isProcessingSubmission}
+          />
         </div>
         {/* Processing Modal */}
         <Modal 
