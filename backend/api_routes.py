@@ -202,7 +202,7 @@ def get_user(id):
         result = map_row_to_dict(user, columns)
         return jsonify(result)
     else:
-        return jsonify({"error": "User not found"}), 404
+        return jsonify({"error": "User not found"}), 200
 
 
 # Update GET /campaigns to include job_description and use helper function
@@ -346,7 +346,7 @@ def get_campaign(id):
             return jsonify(result)
         else:
             print("Campaign not found")  # Debug log
-            return jsonify({"error": "Campaign not found"}), 404
+            return jsonify({"error": "Campaign not found"}), 200
 
     except Exception as e:
         print(f"Error retrieving campaign: {str(e)}")  # Debug log
@@ -416,7 +416,7 @@ def get_question(id):
         result = map_row_to_dict(question, columns)
         return jsonify(result)
     else:
-        return jsonify({"error": "Question not found"}), 404
+        return jsonify({"error": "Question not found"}), 200
 
 
 @api_bp.route("/submissions", methods=["GET", "POST"])
@@ -629,7 +629,7 @@ def get_submission_by_id(id):
         submission = cursor.fetchone()
 
         if not submission:
-            return jsonify({"error": "Submission not found"}), 404
+            return jsonify({"error": "Submission not found"}), 200
 
             # Get submission answers with question details
         cursor.execute(
@@ -794,7 +794,7 @@ def update_user(id):
         cursor.execute("SELECT id FROM users WHERE id = ?", (id,))
         if not cursor.fetchone():
             conn.close()
-            return jsonify({"error": "User not found"}), 404
+            return jsonify({"error": "User not found"}), 200
 
         # Update the user fields
         if data:
@@ -937,7 +937,7 @@ def update_submission(id):
         cursor.execute("SELECT id FROM submissions WHERE id = ?", (id,))
         if not cursor.fetchone():
             conn.close()
-            return jsonify({"error": "Submission not found"}), 404
+            return jsonify({"error": "Submission not found"}), 200
 
         # Handle transcript separately if provided
         if "transcript" in data:
@@ -1029,7 +1029,7 @@ def update_submission_answer(id):
         cursor.execute("SELECT id FROM submission_answers WHERE id = ?", (id,))
         if not cursor.fetchone():
             conn.close()
-            return jsonify({"error": "Submission answer not found"}), 404
+            return jsonify({"error": "Submission answer not found"}), 200
 
         # Convert transcript to JSON string if it's a list
         transcript = data.get("transcript")
@@ -1061,7 +1061,7 @@ def update_submission_answer(id):
         result = cursor.fetchone()
         if not result:
             conn.rollback()
-            return jsonify({"error": "Submission answer not found"}), 404
+            return jsonify({"error": "Submission answer not found"}), 200
 
         submission_id = result[0]
 
@@ -1130,7 +1130,7 @@ def delete_campaign(id):
         # First verify the campaign exists
         cursor.execute("SELECT id FROM campaigns WHERE id = ?", (id,))
         if not cursor.fetchone():
-            return jsonify({"success": False, "message": "Campaign not found"}), 404
+            return jsonify({"success": False, "message": "Campaign not found"}), 200
 
         # Delete the campaign - this will cascade to questions, submissions, and access codes
         cursor.execute("DELETE FROM campaigns WHERE id = ?", (id,))
@@ -1250,7 +1250,7 @@ def get_current_user_profile():
         conn.close()
 
         if not user:
-            return jsonify({"error": "User not found"}), 404
+            return jsonify({"error": "User not found"}), 200
 
         # Convert ID to string for frontend consistency
         user["id"] = str(user["id"])
@@ -1431,7 +1431,7 @@ def update_current_user_profile():
         if cursor.rowcount == 0:
             conn.rollback()
             conn.close()
-            return jsonify({"error": "User not found"}), 404
+            return jsonify({"error": "User not found"}), 200
 
         conn.commit()
 
@@ -1512,7 +1512,7 @@ def change_current_user_password():
 
             if not result:
                 conn.close()
-                return jsonify({"error": "User not found"}), 404
+                return jsonify({"error": "User not found"}), 200
 
             stored_password_hash = result["password_hash"]
 
@@ -1533,7 +1533,7 @@ def change_current_user_password():
         if cursor.rowcount == 0:
             conn.rollback()
             conn.close()
-            return jsonify({"error": "User not found"}), 404
+            return jsonify({"error": "User not found"}), 200
 
         conn.commit()
         conn.close()
@@ -1741,7 +1741,7 @@ def complete_submission(id):
                         "error": "Submission not found or you don't have permission to modify it"
                     }
                 ),
-                404,
+                200,
             )
 
         # Update submission as complete
@@ -1824,7 +1824,7 @@ def submit_interview():
         submission_row = cursor.fetchone()
         if not submission_row:
             conn.close()
-            return jsonify({"error": "Submission not found"}), 404
+            return jsonify({"error": "Submission not found"}), 200
 
         # Map the row to a dictionary
         submission = map_row_to_dict(
@@ -2318,9 +2318,10 @@ def get_resume_analysis(submission_id):
                     {
                         "error": "Submission not found",
                         "message": "The requested submission does not exist",
+                        "status": "not_found",
                     }
                 ),
-                404,
+                200,
             )
 
         # Fetch resume analysis data
@@ -2344,7 +2345,7 @@ def get_resume_analysis(submission_id):
                         "status": "pending",
                     }
                 ),
-                404,
+                200,
             )
 
         # Format the response
@@ -2354,6 +2355,7 @@ def get_resume_analysis(submission_id):
             "overall_fit": result[2] if result[2] else "",
             "percent_match": float(result[3]) if result[3] is not None else 0,
             "percent_match_reason": result[4] if result[4] else "",
+            "status": "complete",
         }
 
         return jsonify(resume_analysis)
@@ -2366,6 +2368,7 @@ def get_resume_analysis(submission_id):
                     "error": "Failed to fetch resume analysis",
                     "message": "An unexpected error occurred while fetching the resume analysis",
                     "details": str(e),
+                    "status": "error",
                 }
             ),
             500,
@@ -2425,7 +2428,7 @@ def validate_campaign_token(campaign_id):
         campaign = cursor.fetchone()
 
         if not campaign:
-            return jsonify({"error": "Campaign not found"}), 404
+            return jsonify({"error": "Campaign not found"}), 200
 
         conn.commit()
 
@@ -2470,7 +2473,7 @@ def handle_campaign_link(id):
 
             if result:
                 return jsonify({"link_url": result[0]})
-            return jsonify({"link_url": None}), 404
+            return jsonify({"link_url": None}), 200
 
         elif request.method == "POST":
             # Generate or update the campaign link
@@ -2526,7 +2529,7 @@ def get_campaign_access_code(campaign_id):
             response = jsonify({"error": "Campaign not found"})
             response.headers.add("Access-Control-Allow-Origin", "*")
             response.headers.add("Access-Control-Allow-Credentials", "true")
-            return response, 404
+            return response, 200
 
         # Get the access code
         cursor.execute(
@@ -2545,7 +2548,7 @@ def get_campaign_access_code(campaign_id):
             response = jsonify({"error": "No access code found for this campaign"})
             response.headers.add("Access-Control-Allow-Origin", "*")
             response.headers.add("Access-Control-Allow-Credentials", "true")
-            return response, 404
+            return response, 200
 
         response = jsonify({"success": True, "data": {"access_code": result[0]}})
         response.headers.add("Access-Control-Allow-Origin", "*")

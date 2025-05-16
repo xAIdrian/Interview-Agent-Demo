@@ -8,7 +8,7 @@ import { AuthLogger } from '../../../utils/logging';
 import { Tab } from '@headlessui/react';
 
 // API base URL
-const API_BASE_URL = 'https://main-service-48k0.onrender.com';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://main-service-48k0.onrender.com';
 
 // Interfaces
 interface User {
@@ -239,10 +239,31 @@ const SubmissionDetailsPage = () => {
       console.log('Fetching resume analysis for submission:', submissionId);
       const response = await axios.get(`${API_BASE_URL}/api/resume_analysis/${submissionId}`);
       console.log('Resume analysis response:', response.data);
-      setResumeAnalysis(response.data);
+      
+      // Handle different response statuses
+      if (response.data && typeof response.data === 'object') {
+        if (response.data.status === 'complete') {
+          setResumeAnalysis(response.data);
+        } else if (response.data.status === 'pending' || response.data.status === 'not_found') {
+          console.log('Resume analysis not available:', response.data.message);
+          setResumeAnalysis(null);
+        } else if (response.data.error === 'Submission not found') {
+          console.log('Submission not found:', response.data.message);
+          setResumeAnalysis(null);
+          // Optionally set an error state if you want to show this to the user
+          setError('This submission no longer exists');
+        } else {
+          console.warn('Unexpected resume analysis status:', response.data.status);
+          setResumeAnalysis(null);
+        }
+      } else {
+        console.warn('Invalid resume analysis response format:', response.data);
+        setResumeAnalysis(null);
+      }
     } catch (error) {
       console.error('Error fetching resume analysis:', error);
       // Don't set error state as this is optional data
+      setResumeAnalysis(null);
     }
   };
 
