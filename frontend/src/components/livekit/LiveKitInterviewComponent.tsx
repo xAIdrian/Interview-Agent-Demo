@@ -372,9 +372,17 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
 
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center min-h-screen bg-[#181A20]">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-400"></div>
-      </div>
+      <Modal 
+        isOpen={true}
+        onClose={() => {}}
+      >
+        <div className="flex flex-col items-center space-y-4">
+          <Spinner size="large" />
+          <p className="text-gray-600 text-center">
+            Please wait while we prepare your interview...
+          </p>
+        </div>
+      </Modal>
     );
   }
 
