@@ -94,6 +94,13 @@ def create_campaigns_table():
                 campaign_context TEXT,
                 job_description TEXT,
                 created_by TEXT,
+                position VARCHAR(255),
+                location VARCHAR(255),
+                work_mode VARCHAR(255),
+                education_level VARCHAR(255),
+                experience VARCHAR(255),
+                salary VARCHAR(255),
+                contract VARCHAR(255),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (created_by) REFERENCES users(id)
@@ -336,6 +343,41 @@ def migrate_campaigns_table_id_type():
         conn.close()
 
 
+def migrate_campaigns_add_details():
+    """Add new campaign details fields to the campaigns table"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        # Add new columns if they don't exist
+        new_columns = [
+            ("position", "VARCHAR(255)"),
+            ("location", "VARCHAR(255)"),
+            ("work_mode", "VARCHAR(255)"),
+            ("education_level", "VARCHAR(255)"),
+            ("experience", "VARCHAR(255)"),
+            ("salary", "VARCHAR(255)"),
+            ("contract", "VARCHAR(255)"),
+        ]
+
+        for column_name, column_type in new_columns:
+            cursor.execute(f"PRAGMA table_info(campaigns)")
+            columns = [row[1] for row in cursor.fetchall()]
+
+            if column_name not in columns:
+                cursor.execute(
+                    f"ALTER TABLE campaigns ADD COLUMN {column_name} {column_type}"
+                )
+                print(f"Added {column_name} column to campaigns table")
+
+        conn.commit()
+        print("Successfully migrated campaigns table to include new details fields")
+    except Exception as e:
+        print(f"Error migrating campaigns table: {str(e)}")
+        conn.rollback()
+    finally:
+        conn.close()
+
+
 def create_tables():
     create_users_table()
     create_campaigns_table()
@@ -347,6 +389,7 @@ def create_tables():
     create_campaign_access_codes_table()
     migrate_campaigns_table_id_type()
     migrate_submissions_table_add_resume_columns()
+    migrate_campaigns_add_details()
 
 
 def migrate_submissions_table_add_resume_columns():

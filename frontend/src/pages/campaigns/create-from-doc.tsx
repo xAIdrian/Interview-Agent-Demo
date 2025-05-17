@@ -711,7 +711,7 @@ const CreateCampaignFromDocPage = () => {
       <Modal 
         isOpen={showSuccessModal}
         title="Campaign Created Successfully"
-        shareUrl={typeof window !== 'undefined' ? `${window.location.origin}/live-interview/${campaignId}` : ''}
+        shareUrl={typeof window !== 'undefined' ? `${window.location.origin}/start/${campaignId}` : ''}
       >
         <div className="flex flex-col items-center space-y-4">
           <CheckCircleIcon className="h-12 w-12 text-green-500" />

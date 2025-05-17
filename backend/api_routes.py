@@ -266,6 +266,13 @@ def handle_campaigns():
                 "created_by",
                 "created_at",
                 "updated_at",
+                "position",
+                "location",
+                "work_mode",
+                "education_level",
+                "experience",
+                "salary",
+                "contract",
             ]
 
             # Map rows to dictionaries with string IDs
@@ -849,11 +856,14 @@ def update_campaign_with_questions(id):
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # Update campaign properties
+    # Update campaign properties with new fields
     cursor.execute(
         """
         UPDATE campaigns
-        SET title = ?, max_user_submissions = ?, is_public = ?, campaign_context = ?, job_description = ?
+        SET title = ?, max_user_submissions = ?, is_public = ?, 
+            campaign_context = ?, job_description = ?,
+            position = ?, location = ?, work_mode = ?,
+            education_level = ?, experience = ?, salary = ?, contract = ?
         WHERE id = ?
     """,
         (
@@ -862,6 +872,13 @@ def update_campaign_with_questions(id):
             data["is_public"],
             data["campaign_context"],
             data["job_description"],
+            data.get("position", ""),
+            data.get("location", ""),
+            data.get("work_mode", ""),
+            data.get("education_level", ""),
+            data.get("experience", ""),
+            data.get("salary", ""),
+            data.get("contract", ""),
             id,
         ),
     )
@@ -1384,7 +1401,7 @@ def login():
                     "email": user["email"],
                     "name": user["name"],
                     "is_admin": bool(user["is_admin"]),
-                    "redirect_to": "/admin" if bool(user["is_admin"]) else "/candidate",
+                    "redirect_to": "/campaigns",
                 }
             ),
             200,
@@ -2123,9 +2140,7 @@ def get_livekit_token():
 @api_bp.route("/test-campaigns", methods=["POST", "OPTIONS"])
 def test_create_campaign():
     if request.method == "OPTIONS":
-        # Handle preflight request
         response = jsonify({"status": "ok"})
-        # Let the global CORS middleware handle the headers
         return response, 200
 
     try:
@@ -2149,13 +2164,15 @@ def test_create_campaign():
                 str(data.get("user_id")) if data.get("user_id") is not None else None
             )
 
-            # Insert campaign
+            # Insert campaign with all fields
             cursor.execute(
                 """
                 INSERT INTO campaigns (
                     id, title, max_user_submissions, max_points, 
-                    is_public, campaign_context, job_description, created_by
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    is_public, campaign_context, job_description, created_by,
+                    position, location, work_mode, education_level,
+                    experience, salary, contract
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     campaign_id,
@@ -2165,7 +2182,14 @@ def test_create_campaign():
                     data.get("is_public", False),
                     data.get("campaign_context", ""),
                     data.get("job_description", ""),
-                    user_id,  # Now using the string version of user_id
+                    user_id,
+                    data.get("position", ""),
+                    data.get("location", ""),
+                    data.get("work_mode", ""),
+                    data.get("education_level", ""),
+                    data.get("experience", ""),
+                    data.get("salary", ""),
+                    data.get("contract", ""),
                 ),
             )
 
@@ -2221,7 +2245,7 @@ def test_create_campaign():
             base_url = request.host_url.rstrip("/")
             direct_access_url = f"{base_url}/live-interview/{campaign_id}"
 
-            # Prepare response
+            # Prepare response with all fields
             response = jsonify(
                 {
                     "success": True,
@@ -2234,6 +2258,13 @@ def test_create_campaign():
                         "max_user_submissions": data.get("max_user_submissions", 1),
                         "max_points": total_max_points,
                         "is_public": data.get("is_public", False),
+                        "position": data.get("position", ""),
+                        "location": data.get("location", ""),
+                        "work_mode": data.get("work_mode", ""),
+                        "education_level": data.get("education_level", ""),
+                        "experience": data.get("experience", ""),
+                        "salary": data.get("salary", ""),
+                        "contract": data.get("contract", ""),
                         "questions": questions_created,
                         "direct_access_url": direct_access_url,
                         "access_code": access_code,
