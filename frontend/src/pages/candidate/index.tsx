@@ -18,9 +18,7 @@ const CandidateIndexPage = () => {
   useEffect(() => {
     // Check if user is admin
     const user = JSON.parse(localStorage.getItem('user') || '{}');
-    if (user.is_admin) {
-      router.push('/admin');
-    }
+    router.push('/campaigns');
   }, [router]);
 
   return (

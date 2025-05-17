@@ -12,6 +12,7 @@ import {
   VoiceAssistantControlBar,
   useTrackTranscription,
   useLocalParticipant,
+  useMaybeRoomContext,
 } from '@livekit/components-react';
 import '@livekit/components-styles';
 import { Track } from 'livekit-client';
@@ -42,6 +43,7 @@ interface LiveKitInterviewComponentProps {
   submissionId: string;
   onDisconnect: () => void;
   candidateName: string;
+  language: 'en' | 'fr';
 }
 
 interface MessageProps {
@@ -99,8 +101,8 @@ const SimpleVoiceAssistant: React.FC<{ onTranscriptUpdate: (transcript: any[]) =
     <div className="voice-assistant-container">
         <div className="p-4 overflow-y-auto">
           {messages.length === 0 && isWaitingForFirstResponse && (
-            <div className="interview-instructions text-center py-8 bg-black text-white rounded-lg">
-              <div className="flex flex-col items-center space-y-3">
+            <div className="interview-instructions text-center bg-black text-white rounded-lg">
+              <div className="flex flex-col items-center">
                 <div className="animate-spin rounded-full h-8 w-8 border-2 border-white"></div>
                 <p>Waiting for the interviewer to begin...</p>
               </div>
@@ -111,7 +113,74 @@ const SimpleVoiceAssistant: React.FC<{ onTranscriptUpdate: (transcript: any[]) =
   );
 };
 
-const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, room, submissionId, onDisconnect, candidateName }: LiveKitInterviewComponentProps) => {
+const InterviewControlBar: React.FC<{
+  onDisconnect: () => void;
+  hasSubmitted: boolean;
+  isProcessingSubmission: boolean;
+}> = ({ onDisconnect, hasSubmitted, isProcessingSubmission }) => {
+  const [isMicMuted, setIsMicMuted] = useState(true);
+  const [isHoldingMic, setIsHoldingMic] = useState(false);
+  const { localParticipant } = useLocalParticipant();
+
+  // Ensure microphone starts disabled
+  useEffect(() => {
+    handleMicPress();
+    handleMicRelease();
+  }, [localParticipant]);
+
+  const handleMicPress = async () => {
+    setIsHoldingMic(true);
+    setIsMicMuted(false);
+    try {
+      // Enable the microphone using LiveKit's built-in method
+      await localParticipant.setMicrophoneEnabled(true);
+    } catch (err) {
+      console.error('Error enabling microphone:', err);
+    }
+  };
+
+  const handleMicRelease = async () => {
+    setIsHoldingMic(false);
+    setIsMicMuted(true);
+    try {
+      // Disable the microphone using LiveKit's built-in method
+      await localParticipant.setMicrophoneEnabled(false);
+    } catch (err) {
+      console.error('Error disabling microphone:', err);
+    }
+  };
+
+  return (
+    <>
+    <div className="flex flex-row items-center justify-center gap-6 bg-[#23242A] rounded-xl px-8 py-4 mt-2 shadow-lg">
+      {/* Mic button */}
+      <div className="flex flex-col items-center gap-2">
+        <button 
+          className={`w-12 h-12 rounded-full ${isHoldingMic ? 'bg-green-700 border-green-500' : 'bg-[#23242A] border-gray-600'} border-2 flex items-center justify-center text-2xl text-gray-200 transition-colors duration-150 focus:outline-none`}
+          onMouseDown={handleMicPress}
+          onMouseUp={handleMicRelease}
+          onMouseLeave={handleMicRelease}
+          onTouchStart={handleMicPress}
+          onTouchEnd={handleMicRelease}
+        >
+          <MicrophoneIcon className="w-7 h-7" />
+        </button>
+      </div>
+      {/* Hangup button */}
+      <button className="w-12 h-12 rounded-full bg-red-600 flex items-center justify-center text-2xl text-white hover:bg-red-700 transition-colors duration-150 focus:outline-none" onClick={onDisconnect} disabled={hasSubmitted || isProcessingSubmission}>
+        <PhoneXMarkIcon className="w-7 h-7" />
+      </button>
+      {/* Video button (disabled for now) */}
+      <button className="w-12 h-12 rounded-full bg-[#23242A] border-2 border-gray-600 flex items-center justify-center text-2xl text-gray-200 opacity-50 cursor-not-allowed">
+        <VideoCameraIcon className="w-7 h-7" />
+      </button>
+    </div>
+    <span className="text-sm text-gray-400">Hold down microphone to speak</span>
+    </>
+  );
+};
+
+const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, room, submissionId, onDisconnect, candidateName, language }: LiveKitInterviewComponentProps) => {
   const livekitUrl = 'wss://default-test-oyjqa9xh.livekit.cloud';
   const [showInstructions, setShowInstructions] = useState(true);
   const [isLivekitConnected, setIsLivekitConnected] = useState(false);
@@ -132,6 +201,7 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
   });
   const { user } = useAuth();
   const router = useRouter();
+  const livekitRoom = useMaybeRoomContext();
 
   useEffect(() => {
     const fetchSubmissionStatus = async () => {
@@ -273,8 +343,12 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
 
       setIsProcessingSubmission(true);
       
-      // Wait a short time for any final transcriptions to be processed
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Step 1: Stop LiveKit voice/mute
+      if (livekitRoom) {
+        // Disable microphone first
+        const localParticipant = livekitRoom.localParticipant;
+        await localParticipant.setMicrophoneEnabled(false);
+      }
       
       // Check if transcript is empty
       if (!transcript || transcript.length === 0) {
@@ -290,24 +364,44 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
         transcriptLength: transcript.length
       });
 
-      // Submit the final transcript
-      await handleTranscriptUpdate(true, transcript);
-      
-      // Call onDisconnect after successful submission
-      onDisconnect();
+      // Step 2: Submit the final transcript
+      try {
+        await handleTranscriptUpdate(true, transcript);
+        
+        // Step 3: Only disconnect and navigate after successful submission
+        if (livekitRoom) {
+          await livekitRoom.disconnect();
+        }
+        onDisconnect();
+        
+        // Navigation is handled in handleTranscriptUpdate after successful submission
+      } catch (submitError) {
+        console.error('Error submitting transcript:', submitError);
+        setError('Failed to submit interview. Please try again.');
+        setHasSubmitted(false);
+        setIsProcessingSubmission(false);
+      }
     } catch (err) {
       console.error('Error during disconnect:', err);
       setError('Failed to properly disconnect. Please try again.');
-      setHasSubmitted(false); // Reset submission flag on error
+      setHasSubmitted(false);
       setIsProcessingSubmission(false);
     } 
   };
 
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center min-h-screen bg-[#181A20]">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-400"></div>
-      </div>
+      <Modal 
+        isOpen={true}
+        onClose={() => {}}
+      >
+        <div className="flex flex-col items-center space-y-4">
+          <Spinner size="large" />
+          <p className="text-gray-600 text-center">
+            Please wait while we prepare your interview...
+          </p>
+        </div>
+      </Modal>
     );
   }
 
@@ -373,20 +467,11 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
             </div>
           </div>
           {/* Control Bar */}
-          <div className="flex flex-row items-center justify-center gap-6 bg-[#23242A] rounded-xl px-8 py-4 mt-2 shadow-lg">
-            {/* Mic button */}
-            <button className="w-12 h-12 rounded-full bg-[#23242A] border-2 border-gray-600 flex items-center justify-center text-2xl text-gray-200 hover:bg-green-700 hover:border-green-500 transition-colors duration-150 focus:outline-none">
-              <MicrophoneIcon className="w-7 h-7" />
-            </button>
-            {/* Hangup button */}
-            <button className="w-12 h-12 rounded-full bg-red-600 flex items-center justify-center text-2xl text-white hover:bg-red-700 transition-colors duration-150 focus:outline-none" onClick={handleDisconnect} disabled={hasSubmitted || isProcessingSubmission}>
-              <PhoneXMarkIcon className="w-7 h-7" />
-            </button>
-            {/* Video button (disabled for now) */}
-            <button className="w-12 h-12 rounded-full bg-[#23242A] border-2 border-gray-600 flex items-center justify-center text-2xl text-gray-200 opacity-50 cursor-not-allowed">
-              <VideoCameraIcon className="w-7 h-7" />
-            </button>
-          </div>
+          <InterviewControlBar 
+            onDisconnect={handleDisconnect}
+            hasSubmitted={hasSubmitted}
+            isProcessingSubmission={isProcessingSubmission}
+          />
         </div>
         {/* Processing Modal */}
         <Modal 

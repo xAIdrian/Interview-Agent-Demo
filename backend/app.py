@@ -295,22 +295,7 @@ def login():
         session["user_id"] = user["id"]
         session["is_admin"] = user["is_admin"]
 
-        return (
-            jsonify(
-                {
-                    "success": True,
-                    "message": "Login successful",
-                    "user": {
-                        "id": user["id"],
-                        "email": user["email"],
-                        "name": user["name"],
-                        "is_admin": user["is_admin"],
-                    },
-                    "redirect_to": "/admin" if user["is_admin"] else "/candidate",
-                }
-            ),
-            200,
-        )
+        return redirect("/campaigns")
 
     except sqlite3.Error as e:
         print(f"Database error during login: {e}")

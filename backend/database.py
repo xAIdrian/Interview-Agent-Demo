@@ -4,6 +4,7 @@ from sqlalchemy.pool import QueuePool
 from config import Config
 import sqlite3
 import os
+import datetime
 
 # Create SQLAlchemy engine with connection pooling for SQLite
 db_path = os.path.join(os.path.dirname(__file__), "interview_agent.db")
@@ -65,6 +66,8 @@ def create_users_table():
                 name VARCHAR(255) NOT NULL,
                 password_hash VARCHAR(255),
                 is_admin BOOLEAN NOT NULL DEFAULT FALSE,
+                phone_number VARCHAR(20) DEFAULT NULL,
+                country_code VARCHAR(10) DEFAULT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
@@ -91,6 +94,13 @@ def create_campaigns_table():
                 campaign_context TEXT,
                 job_description TEXT,
                 created_by TEXT,
+                position VARCHAR(255),
+                location VARCHAR(255),
+                work_mode VARCHAR(255),
+                education_level VARCHAR(255),
+                experience VARCHAR(255),
+                salary VARCHAR(255),
+                contract VARCHAR(255),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (created_by) REFERENCES users(id)
@@ -333,6 +343,41 @@ def migrate_campaigns_table_id_type():
         conn.close()
 
 
+def migrate_campaigns_add_details():
+    """Add new campaign details fields to the campaigns table"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        # Add new columns if they don't exist
+        new_columns = [
+            ("position", "VARCHAR(255)"),
+            ("location", "VARCHAR(255)"),
+            ("work_mode", "VARCHAR(255)"),
+            ("education_level", "VARCHAR(255)"),
+            ("experience", "VARCHAR(255)"),
+            ("salary", "VARCHAR(255)"),
+            ("contract", "VARCHAR(255)"),
+        ]
+
+        for column_name, column_type in new_columns:
+            cursor.execute(f"PRAGMA table_info(campaigns)")
+            columns = [row[1] for row in cursor.fetchall()]
+
+            if column_name not in columns:
+                cursor.execute(
+                    f"ALTER TABLE campaigns ADD COLUMN {column_name} {column_type}"
+                )
+                print(f"Added {column_name} column to campaigns table")
+
+        conn.commit()
+        print("Successfully migrated campaigns table to include new details fields")
+    except Exception as e:
+        print(f"Error migrating campaigns table: {str(e)}")
+        conn.rollback()
+    finally:
+        conn.close()
+
+
 def create_tables():
     create_users_table()
     create_campaigns_table()
@@ -344,6 +389,7 @@ def create_tables():
     create_campaign_access_codes_table()
     migrate_campaigns_table_id_type()
     migrate_submissions_table_add_resume_columns()
+    migrate_campaigns_add_details()
 
 
 def migrate_submissions_table_add_resume_columns():
@@ -384,7 +430,7 @@ def ensure_string_id(id_value):
 
 def map_row_to_dict(row, columns, string_id_columns=None):
     """
-    Map a database row to a dictionary, ensuring ID columns are strings.
+    Map a database row to a dictionary, ensuring ID columns are strings and handling datetime values.
 
     Args:
         row: Database row (tuple)
@@ -405,13 +451,40 @@ def map_row_to_dict(row, columns, string_id_columns=None):
             "created_by",
         ]
 
+    # Columns that should always be strings
+    string_columns = string_id_columns + ["phone_number", "country_code"]
+
+    # Create a dictionary mapping column names to their values
     result = {}
-    for i, column in enumerate(columns):
-        if i < len(row):
-            # For ID columns, ensure the value is a string if it's not None
-            if column in string_id_columns and row[i] is not None:
-                result[column] = str(row[i])
-            else:
-                result[column] = row[i]
+
+    # If row is None, return empty dict
+    if row is None:
+        return result
+
+    # Get the actual column names from the cursor description
+    if hasattr(row, "keys"):
+        # If row is a dict-like object (e.g., sqlite3.Row)
+        for column in columns:
+            if column in row:
+                value = row[column]
+                # Convert datetime to string if it's a datetime object
+                if isinstance(value, (datetime.datetime, datetime.date)):
+                    value = value.isoformat()
+                # For string columns, ensure the value is a string if it's not None
+                elif column in string_columns and value is not None:
+                    value = str(value)
+                result[column] = value
+    else:
+        # If row is a tuple/list, we need to match columns by index
+        for i, column in enumerate(columns):
+            if i < len(row):
+                value = row[i]
+                # Convert datetime to string if it's a datetime object
+                if isinstance(value, (datetime.datetime, datetime.date)):
+                    value = value.isoformat()
+                # For string columns, ensure the value is a string if it's not None
+                elif column in string_columns and value is not None:
+                    value = str(value)
+                result[column] = value
 
     return result
