@@ -202,6 +202,8 @@ const ProfilePage = () => {
         confirm_password: ''
       });
       
+      router.push('/campaigns');
+      
     } catch (err) {
       AuthLogger.error('Error updating profile:', err);
       
