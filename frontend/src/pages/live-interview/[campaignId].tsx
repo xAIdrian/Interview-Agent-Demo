@@ -56,6 +56,7 @@ const LiveKitInterviewPage: React.FC = () => {
   const [showMicTest, setShowMicTest] = useState(false);
   const [showErrorDialog, setShowErrorDialog] = useState(false);
   const [errorDialogMessage, setErrorDialogMessage] = useState<string | null>(null);
+  const [selectedLanguage, setSelectedLanguage] = useState<'en' | 'fr'>('en');
 
   useEffect(() => {
     if (campaignId) {
@@ -201,7 +202,8 @@ const LiveKitInterviewPage: React.FC = () => {
       const tokenResponse = await axios.get(`${API_BASE_URL}/api/livekit/token`, {
         params: {
           room: `interview-${submissionId}`,
-          campaignId
+          campaignId,
+          language: selectedLanguage
         }
       });
       // If successful, proceed with the interview
@@ -265,6 +267,7 @@ const LiveKitInterviewPage: React.FC = () => {
         onDisconnect={onDisconnect}
         submissionId={submissionId!}
         candidateName={candidateData.name}
+        language={selectedLanguage}
       />
     );
   }
@@ -382,6 +385,36 @@ const LiveKitInterviewPage: React.FC = () => {
                 {error}
               </div>
             )}
+            {/* Language Selection */}
+            <div className="mb-6">
+              <label className="block text-lg font-medium text-gray-700 mb-2">
+                Select Interview Language
+              </label>
+              <div className="flex gap-6">
+                <label className="inline-flex items-center">
+                  <input
+                    type="radio"
+                    className="form-radio h-5 w-5 text-blue-600"
+                    name="language"
+                    value="en"
+                    checked={selectedLanguage === 'en'}
+                    onChange={(e) => setSelectedLanguage(e.target.value as 'en' | 'fr')}
+                  />
+                  <span className="ml-2 text-lg">English</span>
+                </label>
+                <label className="inline-flex items-center">
+                  <input
+                    type="radio"
+                    className="form-radio h-5 w-5 text-blue-600"
+                    name="language"
+                    value="fr"
+                    checked={selectedLanguage === 'fr'}
+                    onChange={(e) => setSelectedLanguage(e.target.value as 'en' | 'fr')}
+                  />
+                  <span className="ml-2 text-lg">Français</span>
+                </label>
+              </div>
+            </div>
             <button
               type="submit"
               disabled={isCreatingUser}

@@ -123,7 +123,15 @@ def handle_users():
             cursor.execute(f"SELECT * FROM users {filter_query}", filter_values)
 
             users = cursor.fetchall()
-            columns = ["id", "email", "name", "password_hash", "is_admin"]
+            columns = [
+                "id",
+                "email",
+                "name",
+                "password_hash",
+                "is_admin",
+                "phone_number",
+                "country_code",
+            ]
             result = [map_row_to_dict(user, columns) for user in users]
 
             conn.close()
@@ -162,8 +170,8 @@ def handle_users():
             # Insert new user
             cursor.execute(
                 """
-                INSERT INTO users (id, email, name, password_hash, is_admin)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO users (id, email, name, password_hash, is_admin, phone_number, country_code)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     user_id,
@@ -171,6 +179,8 @@ def handle_users():
                     data["name"],
                     password_hash,  # Can be None for candidate users
                     data.get("is_admin", False),
+                    data.get("phone_number"),
+                    data.get("country_code"),
                 ),
             )
 
@@ -198,7 +208,15 @@ def get_user(id):
     conn.close()
 
     if user:
-        columns = ["id", "email", "name", "password_hash", "is_admin"]
+        columns = [
+            "id",
+            "email",
+            "name",
+            "password_hash",
+            "is_admin",
+            "phone_number",
+            "country_code",
+        ]
         result = map_row_to_dict(user, columns)
         return jsonify(result)
     else:
@@ -1239,7 +1257,7 @@ def get_current_user_profile():
 
         cursor.execute(
             """
-            SELECT id, email, name, is_admin, created_at
+            SELECT id, email, name, is_admin, created_at, phone_number, country_code
             FROM users
             WHERE id = ?
         """,
@@ -2080,6 +2098,7 @@ def get_livekit_token():
     # Get parameters from the request
     campaign_id = request.args.get("campaignId", "")
     room = request.args.get("room")
+    language = request.args.get("language", "en")  # Default to English if not specified
 
     try:
         # Generate room name if not provided
@@ -2089,8 +2108,8 @@ def get_livekit_token():
 
             room = f"interview-{str(uuid.uuid4())[:8]}"
 
-        # Generate token
-        token = LiveKitTokenServer.generate_token(campaign_id, room)
+        # Generate token with language parameter
+        token = LiveKitTokenServer.generate_token(campaign_id, room, language)
 
         # Create response without explicit CORS headers (let global middleware handle it)
         response = jsonify({"token": token, "room": room})

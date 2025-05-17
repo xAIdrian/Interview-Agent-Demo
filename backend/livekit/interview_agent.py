@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 import sys
 import os
 import requests
+import json
 from typing import Dict, Any
 
 # API_BASE_URL = "https://main-service-48k0.onrender.com"
@@ -17,7 +18,7 @@ sys.path.insert(0, backend_dir)
 
 from database import get_db_connection, map_row_to_dict
 from interview_api import AssistantFnc
-from prompts import INTERVIEW_PROMPT_TEMPLATE
+from prompts import INTERVIEW_PROMPT_TEMPLATE, INTERVIEW_PROMPT_TEMPLATE_EN
 import logging
 
 # Load environment variables
@@ -36,6 +37,19 @@ async def entrypoint(ctx: JobContext):
     await ctx.connect(auto_subscribe=AutoSubscribe.SUBSCRIBE_ALL)
     participant = await ctx.wait_for_participant()
     print(f"\n👤 Participant joined: {participant}")
+
+    # Extract language from token metadata
+    language = "en"  # Default to English
+    if participant.metadata:
+        try:
+            metadata = json.loads(participant.metadata)
+            language = metadata.get("language", "en")
+        except json.JSONDecodeError:
+            logger.warning(
+                "Failed to parse participant metadata, using default language"
+            )
+
+    print(f"🌍 Interview language: {language}")
 
     # Use the identity directly as the campaign ID
     campaign_id = participant.identity
@@ -83,8 +97,15 @@ async def entrypoint(ctx: JobContext):
             ]
         )
 
+        # Select prompt template based on language
+        prompt_template = (
+            INTERVIEW_PROMPT_TEMPLATE
+            if language == "fr"
+            else INTERVIEW_PROMPT_TEMPLATE_EN
+        )
+
         # Create the interview prompt
-        interview_prompt = INTERVIEW_PROMPT_TEMPLATE.format(
+        interview_prompt = prompt_template.format(
             job_description=campaign_data["job_description"], questions=questions_prompt
         )
 

@@ -12,6 +12,7 @@ import {
   VoiceAssistantControlBar,
   useTrackTranscription,
   useLocalParticipant,
+  useMaybeRoomContext,
 } from '@livekit/components-react';
 import '@livekit/components-styles';
 import { Track } from 'livekit-client';
@@ -42,6 +43,7 @@ interface LiveKitInterviewComponentProps {
   submissionId: string;
   onDisconnect: () => void;
   candidateName: string;
+  language: 'en' | 'fr';
 }
 
 interface MessageProps {
@@ -99,8 +101,8 @@ const SimpleVoiceAssistant: React.FC<{ onTranscriptUpdate: (transcript: any[]) =
     <div className="voice-assistant-container">
         <div className="p-4 overflow-y-auto">
           {messages.length === 0 && isWaitingForFirstResponse && (
-            <div className="interview-instructions text-center py-8 bg-black text-white rounded-lg">
-              <div className="flex flex-col items-center space-y-3">
+            <div className="interview-instructions text-center bg-black text-white rounded-lg">
+              <div className="flex flex-col items-center">
                 <div className="animate-spin rounded-full h-8 w-8 border-2 border-white"></div>
                 <p>Waiting for the interviewer to begin...</p>
               </div>
@@ -178,7 +180,7 @@ const InterviewControlBar: React.FC<{
   );
 };
 
-const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, room, submissionId, onDisconnect, candidateName }: LiveKitInterviewComponentProps) => {
+const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, room, submissionId, onDisconnect, candidateName, language }: LiveKitInterviewComponentProps) => {
   const livekitUrl = 'wss://default-test-oyjqa9xh.livekit.cloud';
   const [showInstructions, setShowInstructions] = useState(true);
   const [isLivekitConnected, setIsLivekitConnected] = useState(false);
@@ -199,6 +201,7 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
   });
   const { user } = useAuth();
   const router = useRouter();
+  const livekitRoom = useMaybeRoomContext();
 
   useEffect(() => {
     const fetchSubmissionStatus = async () => {
@@ -340,8 +343,12 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
 
       setIsProcessingSubmission(true);
       
-      // Wait a short time for any final transcriptions to be processed
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Step 1: Stop LiveKit voice/mute
+      if (livekitRoom) {
+        // Disable microphone first
+        const localParticipant = livekitRoom.localParticipant;
+        await localParticipant.setMicrophoneEnabled(false);
+      }
       
       // Check if transcript is empty
       if (!transcript || transcript.length === 0) {
@@ -357,15 +364,27 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
         transcriptLength: transcript.length
       });
 
-      // Submit the final transcript
-      await handleTranscriptUpdate(true, transcript);
-      
-      // Call onDisconnect after successful submission
-      onDisconnect();
+      // Step 2: Submit the final transcript
+      try {
+        await handleTranscriptUpdate(true, transcript);
+        
+        // Step 3: Only disconnect and navigate after successful submission
+        if (livekitRoom) {
+          await livekitRoom.disconnect();
+        }
+        onDisconnect();
+        
+        // Navigation is handled in handleTranscriptUpdate after successful submission
+      } catch (submitError) {
+        console.error('Error submitting transcript:', submitError);
+        setError('Failed to submit interview. Please try again.');
+        setHasSubmitted(false);
+        setIsProcessingSubmission(false);
+      }
     } catch (err) {
       console.error('Error during disconnect:', err);
       setError('Failed to properly disconnect. Please try again.');
-      setHasSubmitted(false); // Reset submission flag on error
+      setHasSubmitted(false);
       setIsProcessingSubmission(false);
     } 
   };
