@@ -3,6 +3,7 @@ from livekit import api
 from dotenv import load_dotenv
 import uuid
 import logging
+import json
 
 logger = logging.getLogger("livekit-token")
 logger.setLevel(logging.INFO)
@@ -29,16 +30,13 @@ class LiveKitTokenServer:
         return [room.name for room in rooms.rooms]
 
     @staticmethod
-    def generate_token(campaign_id, room=None):
-        """Generate a LiveKit access token"""
-        logger.info(f"Generating token for {campaign_id} in room {room}")
+    def generate_token(campaign_id: str, room: str, language: str = "en") -> str:
+        """Generate a LiveKit token for joining a room"""
+        api_key = os.getenv("LIVEKIT_API_KEY")
+        api_secret = os.getenv("LIVEKIT_API_SECRET")
 
-        # Check for required environment variables
-        if not os.getenv("LIVEKIT_API_KEY") or not os.getenv("LIVEKIT_API_SECRET"):
-            logger.error("LIVEKIT_API_KEY or LIVEKIT_API_SECRET not set")
-            raise ValueError(
-                "LiveKit API key and secret must be set in environment variables"
-            )
+        if not api_key or not api_secret:
+            raise ValueError("LiveKit API key and secret must be set")
 
         # Create token
         token = (
@@ -48,6 +46,7 @@ class LiveKitTokenServer:
             .with_identity(campaign_id)
             .with_name(campaign_id)
             .with_grants(api.VideoGrants(room_join=True, room=room))
+            .with_metadata(json.dumps({"language": language}))
         )
 
         return token.to_jwt()

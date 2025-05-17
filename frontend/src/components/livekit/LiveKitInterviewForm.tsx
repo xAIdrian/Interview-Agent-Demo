@@ -21,6 +21,7 @@ interface LiveKitInterviewFormProps {
 const LiveKitInterviewForm = ({ campaignId, onStartInterview }: LiveKitInterviewFormProps) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [selectedLanguage, setSelectedLanguage] = useState<'en' | 'fr'>('en');
   const { user } = useAuth();
   const [submissionStatus, setSubmissionStatus] = useState<SubmissionStatus>({
     total_submissions: 0,
@@ -92,6 +93,37 @@ const LiveKitInterviewForm = ({ campaignId, onStartInterview }: LiveKitInterview
       <h2 className="text-2xl font-bold mb-4">Interview Details</h2>
 
       <div className="flex flex-col items-center">
+        {/* Language Selection */}
+        <div className="mb-6 w-full max-w-md">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Select Interview Language
+          </label>
+          <div className="flex gap-4">
+            <label className="inline-flex items-center">
+              <input
+                type="radio"
+                className="form-radio h-4 w-4 text-blue-600"
+                name="language"
+                value="en"
+                checked={selectedLanguage === 'en'}
+                onChange={(e) => setSelectedLanguage(e.target.value as 'en' | 'fr')}
+              />
+              <span className="ml-2">English</span>
+            </label>
+            <label className="inline-flex items-center">
+              <input
+                type="radio"
+                className="form-radio h-4 w-4 text-blue-600"
+                name="language"
+                value="fr"
+                checked={selectedLanguage === 'fr'}
+                onChange={(e) => setSelectedLanguage(e.target.value as 'en' | 'fr')}
+              />
+              <span className="ml-2">Français</span>
+            </label>
+          </div>
+        </div>
+
         <button
           onClick={handleStart}
           disabled={!submissionStatus.can_submit}

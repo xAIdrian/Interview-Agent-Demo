@@ -35,6 +35,13 @@ interface Campaign {
   max_user_submissions: number;
   is_public: boolean;
   questions: Question[];
+  position: string;
+  location: string;
+  work_mode: string;
+  education_level: string;
+  experience: string;
+  salary: string;
+  contract: string;
 }
 
 const CreateCampaignPage = () => {
@@ -69,7 +76,14 @@ const CreateCampaignPage = () => {
     job_description: '',
     max_user_submissions: 1,
     is_public: false,
-    questions: []
+    questions: [],
+    position: '',
+    location: '',
+    work_mode: '',
+    education_level: '',
+    experience: '',
+    salary: '',
+    contract: ''
   });
   
   // AI optimization states
@@ -314,18 +328,38 @@ const CreateCampaignPage = () => {
         }
       }
 
-      // Prepare questions data
+      // Prepare questions data with all required fields
       const questionsData = campaign.questions.map(q => ({
-        ...q,
-        body: q.title // Set body to title when submitting
+        title: q.title,
+        body: q.title, // Set body to title when submitting
+        scoring_prompt: q.scoring_prompt,
+        max_points: q.max_points,
+        order_index: 0 // Add order_index as required by backend
       }));
 
-      // Create the campaign
-      const response = await axios.post(`${API_BASE_URL}/api/test-campaigns`, {
-        ...campaign,
+      // Prepare the complete campaign payload
+      const campaignPayload = {
+        title: campaign.title.trim(),
+        campaign_context: campaign.campaign_context.trim(),
+        job_description: campaign.job_description.trim(),
+        max_user_submissions: campaign.max_user_submissions,
+        is_public: campaign.is_public,
         questions: questionsData,
-        user_id: user.id
-      }, {
+        user_id: user.id,
+        // Include all campaign details fields
+        position: campaign.position.trim() || null,
+        location: campaign.location.trim() || null,
+        work_mode: campaign.work_mode.trim() || null,
+        education_level: campaign.education_level.trim() || null,
+        experience: campaign.experience.trim() || null,
+        salary: campaign.salary.trim() || null,
+        contract: campaign.contract.trim() || null
+      };
+
+      console.log('Sending campaign payload:', campaignPayload); // Debug log
+
+      // Create the campaign with all fields
+      const response = await axios.post(`${API_BASE_URL}/api/test-campaigns`, campaignPayload, {
         headers: {
           'Content-Type': 'application/json'
         }
@@ -335,7 +369,7 @@ const CreateCampaignPage = () => {
         const campaignId = response.data.data.id;
         setCampaignId(campaignId);
         // Construct the direct access URL using localhost:3000
-        const directUrl = `${API_BASE_URL}/live-interview/${campaignId}`;
+        const directUrl = `${API_BASE_URL}/start/${campaignId}`;
         setDirectAccessUrl(directUrl);
         setResponse(response.data);
         setShowSuccessModal(true);
@@ -419,7 +453,14 @@ const CreateCampaignPage = () => {
       job_description: '',
       max_user_submissions: 1,
       is_public: false,
-      questions: []
+      questions: [],
+      position: '',
+      location: '',
+      work_mode: '',
+      education_level: '',
+      experience: '',
+      salary: '',
+      contract: ''
     });
     
     // Switch to manual mode
@@ -586,7 +627,7 @@ const CreateCampaignPage = () => {
                             name="template_type"
                             value={selectedTemplate}
                             onChange={handleTemplateChange}
-                            className="block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500"
+                            className="block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500 cursor-text focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                           >
                             {Object.entries(templates).map(([key, description]) => (
                               <option key={key} value={key}>
@@ -675,10 +716,106 @@ const CreateCampaignPage = () => {
                     name="title"
                     value={campaign.title}
                     onChange={handleCampaignChange}
-                    className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                    placeholder="e.g., Senior Software Engineer Position"
+                    className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 cursor-text focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     required
                   />
                 </div>
+
+                <div className="grid grid-cols-2 gap-4 mb-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Position</label>
+                    <input
+                      type="text"
+                      name="position"
+                      value={campaign.position}
+                      onChange={handleCampaignChange}
+                      placeholder="e.g., Senior Software Engineer"
+                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 cursor-text focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+                    <input
+                      type="text"
+                      name="location"
+                      value={campaign.location}
+                      onChange={handleCampaignChange}
+                      placeholder="e.g., New York, NY"
+                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 cursor-text focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 mb-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Work Mode</label>
+                    <input
+                      type="text"
+                      name="work_mode"
+                      value={campaign.work_mode}
+                      onChange={handleCampaignChange}
+                      placeholder="e.g., Remote, Hybrid, On-site"
+                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 cursor-text focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Education Level</label>
+                    <input
+                      type="text"
+                      name="education_level"
+                      value={campaign.education_level}
+                      onChange={handleCampaignChange}
+                      placeholder="e.g., Bachelor's Degree"
+                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 cursor-text focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 mb-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Experience</label>
+                    <input
+                      type="text"
+                      name="experience"
+                      value={campaign.experience}
+                      onChange={handleCampaignChange}
+                      placeholder="e.g., 3-5 years"
+                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 cursor-text focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Salary</label>
+                    <input
+                      type="text"
+                      name="salary"
+                      value={campaign.salary}
+                      onChange={handleCampaignChange}
+                      placeholder="e.g., $50,000 - $70,000"
+                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 cursor-text focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Contract</label>
+                  <input
+                    type="text"
+                    name="contract"
+                    value={campaign.contract}
+                    onChange={handleCampaignChange}
+                    placeholder="e.g., Full Time"
+                    className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 cursor-text focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  />
+                </div>
+
                 <div className="mb-6">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Job Description</label>
                   <textarea
@@ -686,22 +823,12 @@ const CreateCampaignPage = () => {
                     value={campaign.job_description}
                     onChange={handleCampaignChange}
                     rows={6}
-                    className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                    placeholder="Enter the detailed job description..."
+                    className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 cursor-text focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     required
                   />
                 </div>
-                <div className="mb-8">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Max submissions</label>
-                  <input
-                    type="number"
-                    name="max_user_submissions"
-                    value={campaign.max_user_submissions}
-                    onChange={handleCampaignChange}
-                    min="1"
-                    className="block w-32 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                    required
-                  />
-                </div>
+
                 <div className="flex w-full justify-between items-center mt-8">
                   <button
                     type="button"
@@ -723,14 +850,15 @@ const CreateCampaignPage = () => {
             )}
             {currentStep === 3 && (
               <div className="bg-white rounded-lg shadow-md p-8 w-full max-w-2xl mx-auto">
-                <div className="mb-8">
+                <div className="mb-6">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Campaign Context</label>
                   <textarea
                     name="campaign_context"
                     value={campaign.campaign_context}
                     onChange={handleCampaignChange}
                     rows={6}
-                    className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                    placeholder="Enter the campaign context and requirements..."
+                    className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 cursor-text focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     required
                   />
                 </div>
@@ -762,7 +890,7 @@ const CreateCampaignPage = () => {
                     value={candidateEmails}
                     onChange={e => setCandidateEmails(e.target.value)}
                     rows={12}
-                    className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                    className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 cursor-text focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="Enter one email per line"
                     required
                   />
@@ -809,7 +937,8 @@ const CreateCampaignPage = () => {
                           name="title"
                           value={question.title}
                           onChange={(e) => handleQuestionChange(index, e)}
-                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                          placeholder="e.g., Describe your experience with React"
+                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 cursor-text focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                           required
                         />
                       </div>
@@ -820,7 +949,8 @@ const CreateCampaignPage = () => {
                           value={question.scoring_prompt}
                           onChange={(e) => handleQuestionChange(index, e)}
                           rows={3}
-                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                          placeholder="Enter the scoring criteria for this question..."
+                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 cursor-text focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                           required
                         />
                       </div>
@@ -832,7 +962,8 @@ const CreateCampaignPage = () => {
                           value={question.max_points}
                           onChange={(e) => handleQuestionChange(index, e)}
                           min="1"
-                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                          placeholder="e.g., 10"
+                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 cursor-text focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                           required
                         />
                       </div>
@@ -994,7 +1125,7 @@ const CreateCampaignPage = () => {
         isOpen={showSuccessModal}
         onClose={handleSuccessModalClose}
         title="Campaign Created Successfully"
-        shareUrl={typeof window !== 'undefined' ? `${window.location.origin}/live-interview/${campaignId}` : ''}
+        shareUrl={typeof window !== 'undefined' ? `${window.location.origin}/start/${campaignId}` : ''}
       >
         <div className="flex flex-col items-center space-y-4 w-full">
             <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 w-full">

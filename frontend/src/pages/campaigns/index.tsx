@@ -67,6 +67,37 @@ const CampaignsPage = () => {
   const [showToast, setShowToast] = useState(false);
   const tableRef = useRef<HTMLDivElement>(null);
 
+  // Calculate stats from campaign data and assignments
+  const calculateStats = () => {
+    const ongoingCampaigns = campaigns.length;
+    
+    // Calculate total profiles interviewed (total assignments across all campaigns)
+    const profilesInterviewed = Object.values(campaignAssignments).reduce(
+      (total, assignments) => total + assignments.length,
+      0
+    );
+
+    // Calculate qualified profiles (campaigns that have reached max submissions)
+    const qualifiedProfiles = campaigns.reduce((total, campaign) => {
+      const assignments = campaignAssignments[campaign.id] || [];
+      return total + (assignments.length >= campaign.max_user_submissions ? 1 : 0);
+    }, 0);
+
+    // Calculate remaining credits (assuming each campaign costs 10 credits)
+    const creditsUsed = campaigns.length * 10;
+    const credits = Math.max(0, 120 - creditsUsed); // Starting with 120 credits
+
+    return {
+      ongoingCampaigns,
+      profilesInterviewed,
+      qualifiedProfiles,
+      credits
+    };
+  };
+
+  // Get stats
+  const stats = calculateStats();
+
   // Use client-side only rendering to avoid hydration mismatch
   useEffect(() => {
     setIsClient(true);
@@ -142,7 +173,6 @@ const CampaignsPage = () => {
 
   const handleActionClick = (id: string) => {
     router.push(`/campaigns/${id}`);
-
   };
 
   const columns: ColumnDefinition[] = [
@@ -204,13 +234,6 @@ const CampaignsPage = () => {
     return <div className="loading">Loading...</div>;
   }
 
-  // Derive stats from available data
-  const ongoingCampaigns = campaigns.length;
-  // Placeholder values for stats (since we only have campaigns data)
-  const profilesInterviewed = 2;
-  const qualifiedProfiles = 12;
-  const credits = 120;
-
   return (
     <>
       <PageTemplate>
@@ -224,37 +247,45 @@ const CampaignsPage = () => {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 -mt-8 mx-16">
           <div className="bg-gray-50 rounded-lg flex shadow-md">
             <div className="flex items-center px-2">
-              <span className="text-xl font-bold text-gray-400 w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mr-3">{campaigns[0]?.title[0]}</span>
+              <span className="text-xl font-bold text-gray-400 w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mr-3">
+                <DocumentTextIcon className="h-5 w-5" />
+              </span>
               <div className="p-4 flex flex-col">
                 <span className="text-xs text-gray-500 mt-1">ON GOING CAMPAIGNS</span>
-                <span className="text-lg font-bold">{ongoingCampaigns}</span>
+                <span className="text-lg font-bold">{stats.ongoingCampaigns}</span>
               </div>
             </div>
           </div>
           <div className="bg-gray-50 rounded-lg flex shadow-md">
             <div className="flex items-center px-2">
-              <span className="text-xl font-bold text-gray-400 w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mr-3">{campaigns[0]?.title[0]}</span>
+              <span className="text-xl font-bold text-gray-400 w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mr-3">
+                <UserPlusIcon className="h-5 w-5" />
+              </span>
               <div className="p-4 flex flex-col">
                 <span className="text-xs text-gray-500 mt-1">PROFILES INTERVIEWED</span>
-                <span className="text-lg font-bold">{profilesInterviewed}</span>
+                <span className="text-lg font-bold">{stats.profilesInterviewed}</span>
               </div>
             </div>
           </div>
           <div className="bg-gray-50 rounded-lg flex shadow-md">
             <div className="flex items-center px-2">
-              <span className="text-xl font-bold text-gray-400 w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mr-3">{campaigns[0]?.title[0]}</span>
+              <span className="text-xl font-bold text-gray-400 w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mr-3">
+                <CheckCircleIcon className="h-5 w-5" />
+              </span>
               <div className="p-4 flex flex-col">
                 <span className="text-xs text-gray-500 mt-1">QUALIFIED PROFILES</span>
-                <span className="text-lg font-bold">{qualifiedProfiles}</span>
+                <span className="text-lg font-bold">{stats.qualifiedProfiles}</span>
               </div>
             </div>
           </div>
           <div className="bg-gray-50 rounded-lg flex shadow-md">
             <div className="flex items-center px-2">
-              <span className="text-xl font-bold text-gray-400 w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mr-3">{campaigns[0]?.title[0]}</span>
+              <span className="text-xl font-bold text-gray-400 w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mr-3">
+                <DocumentPlusIcon className="h-5 w-5" />
+              </span>
               <div className="p-4 flex flex-col">
                 <span className="text-xs text-gray-500 mt-1">CREDITS</span>
-                <span className="text-lg font-bold">{credits}</span>
+                <span className="text-lg font-bold">{stats.credits}</span>
               </div>
             </div>
           </div>
@@ -313,7 +344,7 @@ const CampaignsPage = () => {
                     </div>
                     <button
                       className="mt-auto bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700 transition"
-                      onClick={() => router.push(`/campaigns/${campaign.id}`)}
+                      onClick={() => handleActionClick(campaign.id)}
                     >
                       Campaign details
                     </button>

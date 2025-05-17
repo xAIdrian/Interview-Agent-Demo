@@ -22,6 +22,13 @@ interface Campaign {
   campaign_context: string;
   job_description: string;
   access_code?: string;
+  position?: string;
+  location?: string;
+  work_mode?: string;
+  education_level?: string;
+  experience?: string;
+  salary?: string;
+  contract?: string;
 }
 
 interface Question {
@@ -100,9 +107,7 @@ const CampaignDetailsPage = () => {
           axios.get(`${API_BASE_URL}/api/campaigns/${campaignId}/access-code`)
         ]);
 
-        console.log('Access Code Response:', accessCodeResponse.data);
         const accessCode = accessCodeResponse.data.data.access_code;
-        console.log('Extracted Access Code:', accessCode);
 
         // Add access code to campaign data
         const campaignData = {
@@ -258,33 +263,33 @@ const CampaignDetailsPage = () => {
             {/* Campaign details card */}
             <div className="bg-white rounded-lg shadow p-6 mb-6">
               <div className="mb-4">
-                <div className="text-xs text-gray-400 font-semibold mb-1">Poste</div>
-                <div className="font-medium text-gray-900">{campaign?.title || 'UX/UI Designer'}</div>
+                <div className="text-xs text-gray-400 font-semibold mb-1">Position</div>
+                <div className="font-medium text-gray-900">{campaign?.position || 'Not specified'}</div>
               </div>
               <div className="mb-4">
-                <div className="text-xs text-gray-400 font-semibold mb-1">Localisation</div>
-                <div className="text-gray-700">Casablanca, Morocco</div>
+                <div className="text-xs text-gray-400 font-semibold mb-1">Location</div>
+                <div className="text-gray-700">{campaign?.location || 'Not specified'}</div>
               </div>
               <div className="mb-4">
-                <div className="text-xs text-gray-400 font-semibold mb-1">Mode de travail</div>
-                <div className="text-gray-700">Hybrid</div>
-        </div>
+                <div className="text-xs text-gray-400 font-semibold mb-1">Work Mode</div>
+                <div className="text-gray-700">{campaign?.work_mode || 'Not specified'}</div>
+              </div>
               <div className="mb-4">
-                <div className="text-xs text-gray-400 font-semibold mb-1">Niveau d'étude</div>
-                <div className="text-gray-700">Bac + 5</div>
-        </div>
+                <div className="text-xs text-gray-400 font-semibold mb-1">Education Level</div>
+                <div className="text-gray-700">{campaign?.education_level || 'Not specified'}</div>
+              </div>
               <div className="mb-4">
-                <div className="text-xs text-gray-400 font-semibold mb-1">Experiences</div>
-                <div className="text-gray-700">3 ans → 5 ans</div>
-        </div>
+                <div className="text-xs text-gray-400 font-semibold mb-1">Experience</div>
+                <div className="text-gray-700">{campaign?.experience || 'Not specified'}</div>
+              </div>
               <div className="mb-4">
-                <div className="text-xs text-gray-400 font-semibold mb-1">Salaire</div>
-                <div className="text-gray-700">20 000 Dhs Net</div>
-                </div>
+                <div className="text-xs text-gray-400 font-semibold mb-1">Salary</div>
+                <div className="text-gray-700">{campaign?.salary || 'Not specified'}</div>
+              </div>
               <div>
-                <div className="text-xs text-gray-400 font-semibold mb-1">Contract</div>
-                <div className="text-gray-700">CDI</div>
-                </div>
+                <div className="text-xs text-gray-400 font-semibold mb-1">Contract Type</div>
+                <div className="text-gray-700">{campaign?.contract || 'Not specified'}</div>
+              </div>
             </div>
           </div>
           {/* Right column: unified view with shared background and text sections */}

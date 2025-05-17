@@ -76,7 +76,7 @@ def get_campaign(campaignId):
 
         if not campaign:
             conn.close()
-            return jsonify({"error": "Campaign not found"}), 404
+            return jsonify({"error": "Campaign not found"}), 200
 
         # Get campaign columns
         cursor.execute("PRAGMA table_info(campaigns)")
@@ -114,7 +114,7 @@ def get_campaign_questions(campaignId):
         cursor.execute("SELECT id FROM campaigns WHERE id = ?", (campaignId,))
         if not cursor.fetchone():
             conn.close()
-            return jsonify({"error": "Campaign not found"}), 404
+            return jsonify({"error": "Campaign not found"}), 200
 
         # Get questions
         cursor.execute("SELECT * FROM questions WHERE campaign_id = ?", (campaignId,))
@@ -147,7 +147,7 @@ def start_campaign_interview(campaignId):
 
         if not campaign:
             conn.close()
-            return jsonify({"error": "Campaign not found"}), 404
+            return jsonify({"error": "Campaign not found"}), 200
 
         # Get campaign columns
         cursor.execute("PRAGMA table_info(campaigns)")

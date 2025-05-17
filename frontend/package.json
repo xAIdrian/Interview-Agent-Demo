@@ -29,6 +29,7 @@
     "react": "^19.0.0",
     "react-camera-pro": "^1.4.0",
     "react-dom": "^19.0.0",
+    "react-phone-input-2": "^2.15.1",
     "react-tabulator": "^0.21.0",
     "styled-components": "^6.1.17"
   },
