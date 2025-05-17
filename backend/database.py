@@ -454,16 +454,37 @@ def map_row_to_dict(row, columns, string_id_columns=None):
     # Columns that should always be strings
     string_columns = string_id_columns + ["phone_number", "country_code"]
 
+    # Create a dictionary mapping column names to their values
     result = {}
-    for i, column in enumerate(columns):
-        if i < len(row):
-            value = row[i]
-            # Convert datetime to string if it's a datetime object
-            if isinstance(value, (datetime.datetime, datetime.date)):
-                value = value.isoformat()
-            # For string columns, ensure the value is a string if it's not None
-            elif column in string_columns and value is not None:
-                value = str(value)
-            result[column] = value
+
+    # If row is None, return empty dict
+    if row is None:
+        return result
+
+    # Get the actual column names from the cursor description
+    if hasattr(row, "keys"):
+        # If row is a dict-like object (e.g., sqlite3.Row)
+        for column in columns:
+            if column in row:
+                value = row[column]
+                # Convert datetime to string if it's a datetime object
+                if isinstance(value, (datetime.datetime, datetime.date)):
+                    value = value.isoformat()
+                # For string columns, ensure the value is a string if it's not None
+                elif column in string_columns and value is not None:
+                    value = str(value)
+                result[column] = value
+    else:
+        # If row is a tuple/list, we need to match columns by index
+        for i, column in enumerate(columns):
+            if i < len(row):
+                value = row[i]
+                # Convert datetime to string if it's a datetime object
+                if isinstance(value, (datetime.datetime, datetime.date)):
+                    value = value.isoformat()
+                # For string columns, ensure the value is a string if it's not None
+                elif column in string_columns and value is not None:
+                    value = str(value)
+                result[column] = value
 
     return result

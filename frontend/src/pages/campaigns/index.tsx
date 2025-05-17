@@ -173,7 +173,6 @@ const CampaignsPage = () => {
 
   const handleActionClick = (id: string) => {
     router.push(`/campaigns/${id}`);
-
   };
 
   const columns: ColumnDefinition[] = [
@@ -345,7 +344,7 @@ const CampaignsPage = () => {
                     </div>
                     <button
                       className="mt-auto bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700 transition"
-                      onClick={() => router.push(`/campaigns/${campaign.id}`)}
+                      onClick={() => handleActionClick(campaign.id)}
                     >
                       Campaign details
                     </button>

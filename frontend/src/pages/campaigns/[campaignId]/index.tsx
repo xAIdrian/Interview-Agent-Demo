@@ -107,9 +107,7 @@ const CampaignDetailsPage = () => {
           axios.get(`${API_BASE_URL}/api/campaigns/${campaignId}/access-code`)
         ]);
 
-        console.log('Access Code Response:', accessCodeResponse.data);
         const accessCode = accessCodeResponse.data.data.access_code;
-        console.log('Extracted Access Code:', accessCode);
 
         // Add access code to campaign data
         const campaignData = {

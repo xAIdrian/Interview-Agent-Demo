@@ -239,22 +239,7 @@ def handle_campaigns():
         cursor = conn.cursor()
 
         try:
-            if user_id:
-                # Only fetch campaigns created by or assigned to the specified user
-                cursor.execute(
-                    """
-                    SELECT DISTINCT c.* 
-                    FROM campaigns c
-                    LEFT JOIN campaign_assignments ca ON c.id = ca.campaign_id
-                    WHERE c.created_by = ? OR ca.user_id = ?
-                    """,
-                    (user_id, user_id),
-                )
-            else:
-                # If no user_id, fetch all campaigns
-                cursor.execute("SELECT * FROM campaigns")
-
-            campaigns = cursor.fetchall()
+            # Define columns explicitly to ensure correct order
             columns = [
                 "id",
                 "title",
@@ -274,6 +259,26 @@ def handle_campaigns():
                 "salary",
                 "contract",
             ]
+
+            # Build the SELECT query with explicit columns and table aliases
+            select_columns = ", ".join([f"c.{col}" for col in columns])
+
+            if user_id:
+                # Only fetch campaigns created by or assigned to the specified user
+                cursor.execute(
+                    f"""
+                    SELECT DISTINCT {select_columns}
+                    FROM campaigns c
+                    LEFT JOIN campaign_assignments ca ON c.id = ca.campaign_id
+                    WHERE c.created_by = ? OR ca.user_id = ?
+                    """,
+                    (user_id, user_id),
+                )
+            else:
+                # If no user_id, fetch all campaigns
+                cursor.execute(f"SELECT {select_columns} FROM campaigns c")
+
+            campaigns = cursor.fetchall()
 
             # Map rows to dictionaries with string IDs
             result = [map_row_to_dict(campaign, columns) for campaign in campaigns]
@@ -334,29 +339,17 @@ def handle_campaigns():
             conn.close()
 
 
-@api_bp.route("/campaigns/<string:id>", methods=["GET"])
-def get_campaign(id):
-    conn = get_db_connection()
-    cursor = conn.cursor()
+@api_bp.route("/campaigns/<string:id>", methods=["GET", "PUT", "DELETE", "OPTIONS"])
+def handle_campaign(id):
+    if request.method == "OPTIONS":
+        return jsonify({}), 200
 
-    try:
-        # Ensure ID is a string
-        campaign_id = str(id)
-        print(f"Looking for campaign with ID: {campaign_id}")  # Debug log
+    if request.method == "GET":
+        conn = get_db_connection()
+        cursor = conn.cursor()
 
-        # Get the campaign without authentication check
-        cursor.execute(
-            """
-            SELECT * FROM campaigns 
-            WHERE id = ? OR CAST(id AS TEXT) = ?
-            """,
-            (campaign_id, campaign_id),
-        )
-
-        campaign = cursor.fetchone()
-        print(f"Found campaign: {campaign}")  # Debug log
-
-        if campaign:
+        try:
+            # Define columns explicitly to ensure correct order
             columns = [
                 "id",
                 "title",
@@ -366,18 +359,99 @@ def get_campaign(id):
                 "campaign_context",
                 "job_description",
                 "created_by",
+                "created_at",
+                "updated_at",
+                "position",
+                "location",
+                "work_mode",
+                "education_level",
+                "experience",
+                "salary",
+                "contract",
             ]
-            result = map_row_to_dict(campaign, columns)
-            return jsonify(result)
-        else:
-            print("Campaign not found")  # Debug log
-            return jsonify({"error": "Campaign not found"}), 200
 
-    except Exception as e:
-        print(f"Error retrieving campaign: {str(e)}")  # Debug log
-        return jsonify({"error": f"Error retrieving campaign: {str(e)}"}), 500
-    finally:
-        conn.close()
+            # Build the SELECT query with explicit columns
+            select_columns = ", ".join(columns)
+
+            cursor.execute(
+                f"SELECT {select_columns} FROM campaigns WHERE id = ?",
+                (id,),
+            )
+            campaign = cursor.fetchone()
+
+            if campaign is None:
+                conn.close()
+                return jsonify({"error": "Campaign not found"}), 404
+
+            # Map row to dictionary with string ID
+            result = map_row_to_dict(campaign, columns)
+
+            # Get questions for this campaign
+            cursor.execute(
+                """
+                SELECT id, campaign_id, title, body, scoring_prompt, max_points, order_index
+                FROM questions
+                WHERE campaign_id = ?
+                ORDER BY order_index
+                """,
+                (id,),
+            )
+            questions = cursor.fetchall()
+            result["questions"] = [
+                map_row_to_dict(
+                    q,
+                    [
+                        "id",
+                        "campaign_id",
+                        "title",
+                        "body",
+                        "scoring_prompt",
+                        "max_points",
+                        "order_index",
+                    ],
+                )
+                for q in questions
+            ]
+
+            conn.close()
+            return jsonify(result)
+        except Exception as e:
+            conn.close()
+            return jsonify({"error": str(e)}), 500
+
+    if request.method == "PUT":
+        data = request.json
+        update_table("campaigns", id, data)
+        return jsonify({"message": "Campaign updated successfully"}), 200
+
+    if request.method == "DELETE":
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        try:
+            # First verify the campaign exists
+            cursor.execute("SELECT id FROM campaigns WHERE id = ?", (id,))
+            if not cursor.fetchone():
+                return jsonify({"success": False, "message": "Campaign not found"}), 200
+
+            # Delete the campaign - this will cascade to questions, submissions, and access codes
+            cursor.execute("DELETE FROM campaigns WHERE id = ?", (id,))
+
+            if cursor.rowcount == 0:
+                return (
+                    jsonify({"success": False, "message": "Failed to delete campaign"}),
+                    400,
+                )
+
+            conn.commit()
+            return jsonify(
+                {"success": True, "message": "Campaign deleted successfully"}
+            )
+        except Exception as e:
+            conn.rollback()
+            return jsonify({"success": False, "message": str(e)}), 400
+        finally:
+            conn.close()
 
 
 @api_bp.route("/questions", methods=["GET"])
