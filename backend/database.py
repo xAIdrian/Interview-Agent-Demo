@@ -4,6 +4,7 @@ from sqlalchemy.pool import QueuePool
 from config import Config
 import sqlite3
 import os
+import datetime
 
 # Create SQLAlchemy engine with connection pooling for SQLite
 db_path = os.path.join(os.path.dirname(__file__), "interview_agent.db")
@@ -386,7 +387,7 @@ def ensure_string_id(id_value):
 
 def map_row_to_dict(row, columns, string_id_columns=None):
     """
-    Map a database row to a dictionary, ensuring ID columns are strings.
+    Map a database row to a dictionary, ensuring ID columns are strings and handling datetime values.
 
     Args:
         row: Database row (tuple)
@@ -407,13 +408,19 @@ def map_row_to_dict(row, columns, string_id_columns=None):
             "created_by",
         ]
 
+    # Columns that should always be strings
+    string_columns = string_id_columns + ["phone_number", "country_code"]
+
     result = {}
     for i, column in enumerate(columns):
         if i < len(row):
-            # For ID columns, ensure the value is a string if it's not None
-            if column in string_id_columns and row[i] is not None:
-                result[column] = str(row[i])
-            else:
-                result[column] = row[i]
+            value = row[i]
+            # Convert datetime to string if it's a datetime object
+            if isinstance(value, (datetime.datetime, datetime.date)):
+                value = value.isoformat()
+            # For string columns, ensure the value is a string if it's not None
+            elif column in string_columns and value is not None:
+                value = str(value)
+            result[column] = value
 
     return result
