@@ -40,6 +40,8 @@ frontend/*.tsbuildinfo
 frontend/next-env.d.ts
 node_modules/*
 
+deploy_frontend/
+
 # Environment files in all directories
 **/.env
 **/.env.local
