@@ -49,7 +49,7 @@ export const PageTemplate: React.FC<PageTemplateProps> = ({
   const breadcrumbs = generateBreadcrumbs();
 
   // Hide breadcrumbs on home, login, and register pages
-  const showBreadcrumbs = !['/', '/login', '/register'].includes(router.pathname);
+  const showBreadcrumbs = !['/', '/login', '/registration'].includes(router.pathname);
 
   const onLogout = async () => {
     AuthLogger.info('User logging out from PageTemplate');
@@ -108,7 +108,7 @@ export const PageTemplate: React.FC<PageTemplateProps> = ({
                   <Link href="/login" className="text-gray-600 hover:text-gray-900">
                     Log in
                   </Link>
-                  <Link href="/register" className="text-blue-600 hover:text-blue-800">
+                  <Link href="/registration" className="text-blue-600 hover:text-blue-800">
                     Sign up
                   </Link>
                 </>
@@ -205,7 +205,7 @@ export const PageTemplate: React.FC<PageTemplateProps> = ({
                 <Link href="/login" className="block px-4 py-2 text-base font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-800">
                   Log in
                 </Link>
-                <Link href="/register" className="block px-4 py-2 text-base font-medium text-blue-600 hover:bg-gray-100 hover:text-blue-800">
+                <Link href="/registration" className="block px-4 py-2 text-base font-medium text-blue-600 hover:bg-gray-100 hover:text-blue-800">
                   Sign up
                 </Link>
               </div>

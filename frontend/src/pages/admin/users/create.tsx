@@ -75,7 +75,7 @@ const CreateUserPage = () => {
   };
 
   return (
-    <PageTemplate title="Create New Admin">
+    <PageTemplate>
       <div className="bg-white shadow-md rounded-lg p-6">
         <div className="flex items-center mb-6">
           <ShieldCheckIcon className="h-6 w-6 text-indigo-600 mr-2" />

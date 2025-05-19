@@ -9,7 +9,7 @@ import axios from 'axios';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://main-service-48k0.onrender.com';
 
-const RegisterPage = () => {
+const RegistrationPage = () => {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -119,7 +119,7 @@ const RegisterPage = () => {
       <Head>
         <title>Register</title>
       </Head>
-      <PageTemplate title="Create an Account">
+      <PageTemplate>
         <div className="flex min-h-full flex-col justify-center py-12 sm:px-6 lg:px-8">
           <div className="sm:mx-auto sm:w-full sm:max-w-md">
             <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900">
@@ -246,4 +246,4 @@ const RegisterPage = () => {
   );
 };
 
-export default RegisterPage;
+export default RegistrationPage;

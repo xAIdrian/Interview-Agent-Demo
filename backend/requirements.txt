@@ -27,3 +27,4 @@ bcrypt
 pandas
 openai[datalib]
 openai[voice_helpers]
+supervisor

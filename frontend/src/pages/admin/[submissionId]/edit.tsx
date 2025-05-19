@@ -234,7 +234,7 @@ const EditSubmissionPage = () => {
   };
 
   return (
-    <PageTemplate title="Edit Submission" maxWidth="lg">
+    <PageTemplate maxWidth="lg">
       <div className="flex justify-between mb-4">
         <h1 className="text-2xl font-bold">Edit Submission</h1>
       </div>

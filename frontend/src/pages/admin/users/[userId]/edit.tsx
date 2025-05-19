@@ -123,7 +123,7 @@ const EditUserPage = () => {
   };
 
   return (
-    <PageTemplate title="Edit User">
+    <PageTemplate>
       <div className="w-full bg-white shadow-md rounded-lg p-6">
         <h1 className="text-2xl font-bold mb-6">Edit User</h1>
         

@@ -231,7 +231,7 @@ const ProfilePage = () => {
         <title>My Profile</title>
       </Head>
       <ProtectedRoute>
-        <PageTemplate title="Edit Profile" maxWidth="md">
+        <PageTemplate maxWidth="md">
           <div className="w-full bg-white shadow-md rounded-lg p-6">
             <h1 className="text-2xl font-bold mb-6">Edit Profile</h1>
             

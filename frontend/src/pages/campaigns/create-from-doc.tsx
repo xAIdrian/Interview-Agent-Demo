@@ -425,7 +425,7 @@ const CreateCampaignFromDocPage = () => {
   };
 
   return (
-    <PageTemplate title="Create Campaign from Document" maxWidth="lg">
+    <PageTemplate maxWidth="lg">
       <div className="w-full bg-white shadow-md rounded-lg p-6">
         <h2 className="text-2xl font-bold mb-6">Create Campaign from Document</h2>
         

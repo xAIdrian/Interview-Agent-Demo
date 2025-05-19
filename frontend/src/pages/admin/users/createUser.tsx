@@ -56,7 +56,7 @@ const CreateUserPage = () => {
   };
 
   return (
-    <PageTemplate title="Create User" maxWidth="sm">
+    <PageTemplate maxWidth="sm">
       <div className="w-full bg-white shadow-md rounded-lg p-6">
         <h2 className="text-2xl font-bold mb-6">Create New User</h2>
         

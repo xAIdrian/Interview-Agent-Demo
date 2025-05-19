@@ -135,7 +135,7 @@ const InterviewControlBar: React.FC<{
       // Enable the microphone using LiveKit's built-in method
       await localParticipant.setMicrophoneEnabled(true);
     } catch (err) {
-      console.error('Error enabling microphone:', err);
+      console.log('Error enabling microphone:', err);
     }
   };
 
@@ -146,7 +146,7 @@ const InterviewControlBar: React.FC<{
       // Disable the microphone using LiveKit's built-in method
       await localParticipant.setMicrophoneEnabled(false);
     } catch (err) {
-      console.error('Error disabling microphone:', err);
+      console.log('Error disabling microphone:', err);
     }
   };
 
@@ -229,7 +229,7 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
         });
 
       } catch (err) {
-        console.error('Error fetching submission status:', err);
+        console.log('Error fetching submission status:', err);
         setError('Failed to load submission status');
       } finally {
         setIsLoading(false);
@@ -241,7 +241,7 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
 
   const handleTranscriptUpdate = async (submitInterview: boolean = false, newTranscript: any[]) => {
     if (!user?.id || !submissionId) {
-      console.error('Missing required data:', { user_id: user?.id, submissionId });
+      console.log('Missing required data:', { user_id: user?.id, submissionId });
       return;
     }
 
@@ -256,7 +256,7 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
         // Ensure transcript is an array and not empty
         const formattedTranscript = Array.isArray(newTranscript) ? newTranscript : [];
         if (formattedTranscript.length === 0) {
-          console.error('Cannot submit interview: transcript is empty');
+          console.log('Cannot submit interview: transcript is empty');
           setError('Cannot submit interview: no conversation recorded');
           return;
         }
@@ -310,7 +310,7 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
             },
           });
         } else {
-          console.error('❌ Interview submission failed:', response.data.error);
+          console.log('❌ Interview submission failed:', response.data.error);
           setHasSubmitted(false); // Reset submission flag on failure
           throw new Error(response.data.error || 'Failed to submit interview');
         }
@@ -318,9 +318,9 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
         setTranscript(newTranscript);
       }
     } catch (err) {
-      console.error('❌ Error submitting interview:', err);
+      console.log('❌ Error submitting interview:', err);
       if (axios.isAxiosError(err)) {
-        console.error('Response data:', err.response?.data);
+        console.log('Response data:', err.response?.data);
       }
       setError('Failed to submit interview. Please try again.');
       setIsProcessingSubmission(false);
@@ -331,7 +331,7 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
   const handleDisconnect = async () => {
     try {
       if (!submissionId) {
-        console.error('No submissionId available for submission');
+        console.log('No submissionId available for submission');
         setError('Missing submission ID');
         return;
       }
@@ -376,13 +376,13 @@ const LiveKitInterviewComponent = ({ campaignId, onInterviewComplete, token, roo
         
         // Navigation is handled in handleTranscriptUpdate after successful submission
       } catch (submitError) {
-        console.error('Error submitting transcript:', submitError);
+        console.log('Error submitting transcript:', submitError);
         setError('Failed to submit interview. Please try again.');
         setHasSubmitted(false);
         setIsProcessingSubmission(false);
       }
     } catch (err) {
-      console.error('Error during disconnect:', err);
+      console.log('Error during disconnect:', err);
       setError('Failed to properly disconnect. Please try again.');
       setHasSubmitted(false);
       setIsProcessingSubmission(false);

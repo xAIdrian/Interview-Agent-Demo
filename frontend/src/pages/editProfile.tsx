@@ -26,7 +26,7 @@ const EditProfile = () => {
     };
 
     return (
-        <PageTemplate title="Edit Profile" centered maxWidth="sm">
+        <PageTemplate centered maxWidth="sm">
             <div className="w-full bg-white shadow-md rounded-lg p-6">
                 <h2 className="text-2xl font-bold text-center mb-6">Edit Profile</h2>
                 <form onSubmit={handleSubmit} className="space-y-4">
