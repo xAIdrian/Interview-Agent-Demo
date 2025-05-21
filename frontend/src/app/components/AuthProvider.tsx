@@ -6,7 +6,7 @@ import { isAxiosError } from 'axios';
 import axios from '../../utils/axios';
 import { AuthLogger } from '../../utils/logging';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://main-service-48k0.onrender.com';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.kwiks.io';
 
 interface User {
   id: string;

@@ -5,7 +5,7 @@ import { PageTemplate } from '../../../components/PageTemplate';
 import Link from 'next/link';
 
 // Define API base URL for consistent usage
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://main-service-48k0.onrender.com';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.kwiks.io';
 
 interface Position {
   id: string;

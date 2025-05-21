@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useAuth } from '@/app/components/AuthProvider';
 
 // Define API base URL for consistent usage
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://main-service-48k0.onrender.com';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.kwiks.io';
 
 interface Position {
   id: string;

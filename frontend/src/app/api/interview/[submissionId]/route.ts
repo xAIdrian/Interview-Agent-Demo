@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import axios from 'axios';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://main-service-48k0.onrender.com';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.kwiks.io';
 
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);

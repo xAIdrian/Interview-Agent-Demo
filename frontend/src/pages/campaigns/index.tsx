@@ -54,7 +54,7 @@ interface CampaignAssignment {
 }
 
 // Define API base URL for consistent usage
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://main-service-48k0.onrender.com';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.kwiks.io';
 
 const CampaignsPage = () => {
   const router = useRouter();
@@ -66,6 +66,13 @@ const CampaignsPage = () => {
   const [isClient, setIsClient] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const tableRef = useRef<HTMLDivElement>(null);
+
+  // Add authentication check
+  useEffect(() => {
+    if (isClient && (!isAuthenticated || !user)) {
+      router.push('/login');
+    }
+  }, [isClient, isAuthenticated, user, router]);
 
   // Calculate stats from campaign data and assignments
   const calculateStats = () => {

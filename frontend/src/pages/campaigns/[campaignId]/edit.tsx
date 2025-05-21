@@ -18,7 +18,7 @@ import "../../../styles/tabulator.css"; // Import custom tabulator styles
 // Initialize Tabulator with required dependencies
 configureTabulatorDependencies();
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://main-service-48k0.onrender.com';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.kwiks.io';
 
 // Define interface for Question object
 interface Question {
@@ -564,7 +564,7 @@ const EditCampaignPage = () => {
   }
   
   return (
-    <PageTemplate title="Edit Campaign" maxWidth="lg">
+    <PageTemplate maxWidth="full">
       <div className="w-full bg-white shadow-md rounded-lg p-6">
         <div className="flex justify-between items-center mb-6">
           <div className="flex items-center space-x-4">

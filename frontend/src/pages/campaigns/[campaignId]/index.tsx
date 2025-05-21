@@ -11,7 +11,7 @@ import { PrimaryButton } from '../../../components/Button/PrimaryButton';
 import CampaignSubmissionsPage from './submissions';
 
 // Define API base URL for consistent usage
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://main-service-48k0.onrender.com';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.kwiks.io';
 
 interface Campaign {
   id: string;
@@ -238,7 +238,35 @@ const CampaignDetailsPage = () => {
       </div>
       {/* Header Title */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-4">
-        <h1 className="text-3xl font-bold text-gray-900">{campaign ? campaign.title : 'Campaign Title'}</h1>
+        <div className="flex justify-between items-center">
+          <h1 className="text-3xl font-bold text-gray-900">{campaign ? campaign.title : 'Campaign Title'}</h1>
+          {isAdmin && (
+            <div className="flex gap-2">
+              <button
+                className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-700 transition"
+                onClick={() => router.push(`/campaigns/${campaignId}/edit`)}
+              >
+                Edit
+              </button>
+              <button
+                className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-700 transition"
+                onClick={async () => {
+                  if (window.confirm('Are you sure you want to delete this campaign? This action cannot be undone.')) {
+                    try {
+                      await axios.delete(`${API_BASE_URL}/api/campaigns/${campaignId}`);
+                      router.push('/campaigns');
+                    } catch (error) {
+                      console.error('Error deleting campaign:', error);
+                      setError('Failed to delete campaign. Please try again.');
+                    }
+                  }
+                }}
+              >
+                Delete
+              </button>
+            </div>
+          )}
+        </div>
       </div>
       {/* Menu as text headers */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex gap-8">

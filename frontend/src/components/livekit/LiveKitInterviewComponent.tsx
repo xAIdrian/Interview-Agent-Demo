@@ -25,7 +25,7 @@ import { useAuth } from '@/app/components/AuthProvider';
 import { Dialog } from '@headlessui/react';
 import { MicrophoneIcon, PhoneXMarkIcon, VideoCameraIcon } from '@heroicons/react/24/outline';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://main-service-48k0.onrender.com';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.kwiks.io';
 
 interface SubmissionStatus {
   total_submissions: number;

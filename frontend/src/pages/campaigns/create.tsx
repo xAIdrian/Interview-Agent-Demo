@@ -16,7 +16,7 @@ import {
   XCircleIcon
 } from '@heroicons/react/24/outline';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://main-service-48k0.onrender.com';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.kwiks.io';
 
 // Define interface for Question object
 interface Question {

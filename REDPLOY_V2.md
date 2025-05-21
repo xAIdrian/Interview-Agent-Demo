@@ -126,3 +126,21 @@ stderr_logfile=next.err.log
 stdout_logfile=next.out.log
 environment=NODE_ENV="production",PATH="/usr/bin:%(ENV_PATH)s"
 ```
+
+### Just useful commans
+
+If we want to start and check status
+```
+supervisord -c supervisord.conf && supervisorctl -c supervisord.conf status
+```
+
+If we want to stop
+```
+supervisorctl -c supervisord.conf stop all && pkill supervisord
+```
+
+**Getting to HTTPS**
+
+sudo yum install -y certbot python3-certbot-nginx
+
+sudo certbot --nginx -d api.kwiks.io -d noor.kwiks.io

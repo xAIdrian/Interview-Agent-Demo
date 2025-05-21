@@ -9,7 +9,7 @@ import { useAuth } from '@/app/components/AuthProvider';
 import { Modal } from '@/components/Modal';
 import MicTest from '@/components/livekit/MicTest';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://main-service-48k0.onrender.com';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.kwiks.io';
 
 interface Campaign {
   id: string;
