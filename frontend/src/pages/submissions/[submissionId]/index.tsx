@@ -16,12 +16,25 @@ interface User {
   email: string;
   name: string;
   is_admin: boolean;
+  phone_number?: string;
+  country_code?: string;
 }
 
 interface Campaign {
   id: string;
   title: string;
   max_points: number;
+  campaign_context: string;
+  job_description: string;
+  max_user_submissions: number;
+  is_public: boolean;
+  position?: string;
+  location?: string;
+  work_mode?: string;
+  education_level?: string;
+  experience?: string;
+  salary?: string;
+  contract?: string;
 }
 
 interface Question {
@@ -202,6 +215,7 @@ const SubmissionDetailsPage = () => {
   const [activeTab, setActiveTab] = useState('analysis');
   const [candidateUser, setCandidateUser] = useState<User | null>(null);
   const [campaignId, setCampaignId] = useState<string | null>(null);
+  const [campaign, setCampaign] = useState<Campaign | null>(null);
 
   const fetchSubmissionData = async () => {
     if (!submissionId) return;
@@ -267,13 +281,51 @@ const SubmissionDetailsPage = () => {
     }
   };
 
+  const fetchCampaign = async () => {
+    if (!submission?.campaign_id) {
+      console.error('No campaign ID available');
+      return;
+    }
+
+    try {
+      const campaignResponse = await axios.get(`${API_BASE_URL}/api/campaigns/${submission.campaign_id}`);
+      const campaignData = campaignResponse.data;
+      
+      setCampaign({
+        id: campaignData.id,
+        title: campaignData.title,
+        campaign_context: campaignData.campaign_context || '',
+        job_description: campaignData.job_description || '',
+        max_user_submissions: parseInt(campaignData.max_user_submissions) || 0,
+        max_points: parseInt(campaignData.max_points) || 0,
+        is_public: campaignData.is_public || false,
+        position: campaignData.position || '',
+        location: campaignData.location || '',
+        work_mode: campaignData.work_mode || '',
+        education_level: campaignData.education_level || '',
+        experience: campaignData.experience || '',
+        salary: campaignData.salary || '',
+        contract: campaignData.contract || ''
+      });
+    } catch (error) {
+      console.error('Error fetching campaign:', error);
+    }
+  };
+
   // Fetch candidate user info from query param as soon as possible
   useEffect(() => {
     const userId = router.query.userId as string;
     if (userId) {
       axios.get(`${API_BASE_URL}/api/users/${userId}`)
-        .then(res => setCandidateUser(res.data))
-        .catch(() => setCandidateUser(null));
+        .then(res => {
+          setCandidateUser(res.data);
+          AuthLogger.info('User data loaded successfully', res.data);
+        })
+        .catch(err => {
+          console.error('Error fetching user:', err);
+          setCandidateUser(null);
+          AuthLogger.error('Error fetching user:', err);
+        });
     }
   }, [router.query.userId]);
 
@@ -297,6 +349,13 @@ const SubmissionDetailsPage = () => {
       fetchData();
     }
   }, [submissionId]);
+
+  // Add a separate useEffect for fetchCampaign that depends on submission
+  useEffect(() => {
+    if (submission?.campaign_id) {
+      fetchCampaign();
+    }
+  }, [submission?.campaign_id]);
 
   // Update score for a specific answer
   const updateAnswerScore = (answerId: string, score: number | null, rationale: string | null) => {
@@ -484,7 +543,7 @@ const SubmissionDetailsPage = () => {
                   </div>
                   <div className="flex flex-col">
                     <span className="text-base font-bold text-gray-900 leading-tight">{candidateUser?.name || 'Zakia ZAGHRARI'}</span>
-                    <span className="text-sm text-blue-500 leading-tight">Business developer</span>
+                    <span className="text-sm text-blue-500 leading-tight">{campaign?.position || 'Not Specified'}</span>
                   </div>
                 </div>
                 <span className="bg-blue-500 text-white text-xs font-semibold px-4 py-1.5 rounded-full flex items-center whitespace-nowrap">
@@ -498,49 +557,51 @@ const SubmissionDetailsPage = () => {
                   <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 11c0-2.21 1.79-4 4-4s4 1.79 4 4-1.79 4-4 4-4-1.79-4-4z" /></svg>
                   <div>
                     <div className="text-xs text-gray-400">Poste</div>
-                    <div className="text-sm font-medium text-gray-900">Business Developer</div>
+                    <div className="text-sm font-medium text-gray-900">{campaign?.position || 'Not Specified'}</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 px-6 py-4">
                   <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8m-9 4v8" /></svg>
                   <div>
                     <div className="text-xs text-gray-400">Téléphone</div>
-                    <div className="text-sm font-medium text-gray-900">+2126 08 6466 31</div>
+                    <div className="text-sm font-medium text-gray-900">
+                      {candidateUser?.phone_number ? `${candidateUser.country_code || ''} ${candidateUser.phone_number}` : 'Not Specified'}
+                    </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 px-6 py-4">
                   <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M16 12H8m8 0a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
                   <div>
                     <div className="text-xs text-gray-400">Adresse mail</div>
-                    <div className="text-sm font-medium text-gray-900">z.zaghrari@gmail.com</div>
+                    <div className="text-sm font-medium text-gray-900">{candidateUser?.email || 'Not Specified'}</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 px-6 py-4">
                   <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 12.414a4 4 0 10-5.657 5.657l4.243 4.243a8 8 0 1011.314-11.314l-4.243 4.243z" /></svg>
                   <div>
                     <div className="text-xs text-gray-400">Localisation</div>
-                    <div className="text-sm font-medium text-gray-900">Casablanca, Morocco</div>
+                    <div className="text-sm font-medium text-gray-900">{campaign?.location || 'Not Specified'}</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 px-6 py-4">
                   <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 14l9-5-9-5-9 5 9 5zm0 7v-7" /></svg>
                   <div>
                     <div className="text-xs text-gray-400">Niveau d'étude</div>
-                    <div className="text-sm font-medium text-gray-900">Bac + 5</div>
+                    <div className="text-sm font-medium text-gray-900">{campaign?.education_level || 'Not Specified'}</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 px-6 py-4">
                   <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M8 17l4-4 4 4m0 0V3m0 14H4" /></svg>
                   <div>
                     <div className="text-xs text-gray-400">Experiences</div>
-                    <div className="text-sm font-medium text-gray-900">3 ans</div>
+                    <div className="text-sm font-medium text-gray-900">{campaign?.experience || 'Not Specified'}</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 px-6 py-4">
                   <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm0 8v2m0-10V4" /></svg>
                   <div>
                     <div className="text-xs text-gray-400">Salaire actuelle</div>
-                    <div className="text-sm font-medium text-gray-900">20 000 Dhs Net</div>
+                    <div className="text-sm font-medium text-gray-900">{campaign?.salary || 'Not Specified'}</div>
                   </div>
                 </div>
               </div>
