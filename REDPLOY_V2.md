@@ -2,17 +2,15 @@ See DEPLOY_README.md for configuration of Gunicorn
 
 ### Copy directory and send to server
 
-cp -r backend deploy_backend
+rm -r deploy_backend && cp -r backend deploy_backend && rm -r deploy_backend/venv
 
 ls -la | grep deploy_backend
 
-rm -r deploy_backend/venv
-
 ---
 
-scp -i "NoorIA.pem" -r deploy_backend/* ec2-user@ec2-35-181-155-165.eu-west-3.compute.amazonaws.com:~/noor_ai       
+scp -i "NoorIA.pem" -r deploy_backend/* ec2-user@ec2-13-39-1-131.eu-west-3.compute.amazonaws.com:~/noor_ai  
 
-ssh -i "NoorIA.pem" ec2-user@ec2-35-181-155-165.eu-west-3.compute.amazonaws.com
+ssh -i "NoorIA.pem" ec2-user@ec2-13-39-1-131.eu-west-3.compute.amazonaws.com
 
 ### Configure Supervisor for multi-threading
 
@@ -72,35 +70,13 @@ nano .env
 Add your keys...
 ```
 
----
-
-cd ..
-
-pkill supervisord
-
-supervisord -c supervisord.conf
-
-supervisorctl -c supervisord.conf status
-
-Our goal:
-```
-(venv) [ec2-user@ip-172-31-37-69 ~]$ supervisorctl -c supervisord.conf status
-
-flask_service                    RUNNING   pid 672131, uptime 0:00:07
-worker_service                   RUNNING   pid 672132, uptime 0:00:06
-```
-
 ### Deploy frontend app
 
-cp -r frontend deploy_frontend
+rm -r deploy_frontend && cp -r frontend deploy_frontend && rm -r deploy_frontend/node_modules && rm -r deploy_frontend/.next
 
-cd deploy_frontend
+scp -i "NoorIA.pem" -r deploy_frontend/* ec2-user@ec2-13-39-1-131.eu-west-3.compute.amazonaws.com:~/noor_ui    
 
-rm -r node_modules
-
-scp -i "NoorIA.pem" -r deploy_frontend/* ec2-user@ec2-35-181-155-165.eu-west-3.compute.amazonaws.com:~/noor_ui     
-
-ssh -i "NoorIA.pem" ec2-user@ec2-35-181-155-165.eu-west-3.compute.amazonaws.com
+ssh -i "NoorIA.pem" ec2-user@ec2-13-39-1-131.eu-west-3.compute.amazonaws.com
 
 curl -fsSL https://rpm.nodesource.com/setup_18.x | sudo bash -
 
@@ -127,6 +103,26 @@ stdout_logfile=next.out.log
 environment=NODE_ENV="production",PATH="/usr/bin:%(ENV_PATH)s"
 ```
 
+
+### Multi-threading
+
+cd ..
+
+pkill supervisord
+
+supervisord -c supervisord.conf
+
+supervisorctl -c supervisord.conf status
+
+Our goal:
+```
+(venv) [ec2-user@ip-172-31-37-69 ~]$ supervisorctl -c supervisord.conf status
+
+flask_service                    RUNNING   pid 43703, uptime 0:00:05
+nextjs_app                       RUNNING   pid 43722, uptime 0:00:02
+worker_service                   RUNNING   pid 43705, uptime 0:00:05
+```
+
 ### Just useful commans
 
 If we want to start and check status
@@ -144,3 +140,9 @@ supervisorctl -c supervisord.conf stop all && pkill supervisord
 sudo yum install -y certbot python3-certbot-nginx
 
 sudo certbot --nginx -d api.kwiks.io -d noor.kwiks.io
+
+### Deploy only code changes
+
+rsync -avz --progress -e "ssh -i NoorIA.pem" ./deploy_backend/ ec2-user@ec2-13-39-1-131.eu-west-3.compute.amazonaws.com:/home/ec2-user/noor_ai/
+
+rsync -avz --progress -e "ssh -i NoorIA.pem" ./deploy_frontend/ ec2-user@ec2-13-39-1-131.eu-west-3.compute.amazonaws.com:/home/ec2-user/noor_ui/
