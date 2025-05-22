@@ -5,7 +5,7 @@ import { PrimaryButton } from '../../../components/Button';
 import { PageTemplate } from '../../../components/PageTemplate';
 import { Spinner } from '../../../components/ui/Spinner';
 import { Modal } from '../../../components/ui/Modal';
-import { TrashIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
+import { TrashIcon, CheckCircleIcon, UserIcon, MapPinIcon, BriefcaseIcon, AcademicCapIcon, CalendarIcon, CurrencyDollarIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/app/components/AuthProvider';
 import Link from 'next/link';
 // Import tabulator config before Tabulator
@@ -39,6 +39,13 @@ interface Campaign {
   max_user_submissions: number;
   is_public: boolean;
   questions: Question[];
+  location?: string;
+  work_mode?: string;
+  education_level?: string;
+  experience?: string;
+  salary?: string;
+  contract?: string;
+  position?: string;
 }
 
 // Add Submission interface
@@ -114,9 +121,9 @@ const EditCampaignPage = () => {
         `${API_URL}/api/campaigns/${campaignId}`
       );
       
-      // Fetch questions for this campaign using submission_answers
+      // Fetch questions for this campaign from the canonical questions endpoint
       const questionsResponse = await axios.get(
-        `${API_URL}/api/submission_answers?campaign_id=${campaignId}`
+        `${API_URL}/api/questions?campaign_id=${campaignId}`
       );
 
       // Fetch submissions for this campaign
@@ -125,12 +132,12 @@ const EditCampaignPage = () => {
       );
       
       const campaignData = campaignResponse.data;
-      const questionsData = questionsResponse.data.map((answer: any) => ({
-        id: answer.question_id,
-        title: answer.question_title,
-        body: answer.body || answer.question_title,
-        scoring_prompt: answer.scoring_prompt || '',
-        max_points: parseInt(answer.max_points) || 10
+      const questionsData = questionsResponse.data.map((q: any) => ({
+        id: q.id,
+        title: q.title,
+        body: q.body || q.title,
+        scoring_prompt: q.scoring_prompt || '',
+        max_points: parseInt(q.max_points) || 10
       }));
       const submissionsData = submissionsResponse.data.map((submission: any) => ({
         ...submission,
@@ -146,7 +153,14 @@ const EditCampaignPage = () => {
         job_description: campaignData.job_description || '',
         max_user_submissions: parseInt(campaignData.max_user_submissions),
         is_public: Boolean(campaignData.is_public),
-        questions: questionsData
+        questions: questionsData,
+        location: campaignData.location || '',
+        work_mode: campaignData.work_mode || '',
+        education_level: campaignData.education_level || '',
+        experience: campaignData.experience || '',
+        salary: campaignData.salary || '',
+        contract: campaignData.contract || '',
+        position: campaignData.position || ''
       });
 
       setSubmissions(submissionsData);
@@ -462,7 +476,8 @@ const EditCampaignPage = () => {
           questions: campaign.questions.map(q => ({
             ...q,
             body: q.body || q.title
-          }))
+          })),
+          position: campaign.position || ''
         }
       );
 
@@ -564,350 +579,382 @@ const EditCampaignPage = () => {
   }
   
   return (
-    <PageTemplate maxWidth="full">
-      <div className="w-full bg-white shadow-md rounded-lg p-6">
-        <div className="flex justify-between items-center mb-6">
-          <div className="flex items-center space-x-4">
-            <Link
-              href={`/campaigns/${campaignId}`}
-              className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 flex items-center gap-2"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-              </svg>
-              Back to Campaign
-            </Link>
-          </div>
-          {user?.is_admin && (
-            <button
-              onClick={() => setShowDeleteModal(true)}
-              className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 flex items-center gap-2"
-              disabled={isDeleting}
-            >
-              <TrashIcon className="h-5 w-5" />
-              {isDeleting ? 'Deleting...' : 'Delete Campaign'}
-            </button>
-          )}
+    <PageTemplate>
+      {/* Breadcrumbs */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
+        <nav className="flex items-center text-sm text-gray-500 mb-4" aria-label="Breadcrumb">
+          <button
+            onClick={() => router.push('/campaigns')}
+            className="mr-2 p-1 rounded hover:bg-gray-200 focus:outline-none flex items-center"
+            aria-label="Back to campaigns"
+            type="button"
+          >
+            <svg className="h-5 w-5 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <Link href="/campaigns" className="hover:text-blue-600 font-medium">Campaigns</Link>
+          <span className="mx-2">/</span>
+          <Link href={`/campaigns/${campaignId}`} className="hover:text-blue-600 font-medium">{campaign?.title || 'Campaign'}</Link>
+          <span className="mx-2">/</span>
+          <span className="text-gray-700 font-semibold">Edit</span>
+        </nav>
+      </div>
+
+      {/* Header Title */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-4">
+        <div className="flex justify-between items-center">
+          <h1 className="text-3xl font-bold text-gray-900">Edit Campaign</h1>
         </div>
-        
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Campaign details */}
-          <div className="space-y-4">
-            <div>
-              <label htmlFor="title" className="block text-sm font-medium text-gray-700">
-                Campaign Title
-              </label>
-              <input
-                id="title"
-                name="title"
-                type="text"
-                value={campaign.title}
-                onChange={handleCampaignChange}
-                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500"
-                required
-              />
-            </div>
-            
-            <div>
-              <label htmlFor="campaign_context" className="block text-sm font-medium text-gray-700">
-                Campaign Context
-              </label>
-              <textarea
-                id="campaign_context"
-                name="campaign_context"
-                value={campaign.campaign_context}
-                onChange={handleCampaignChange}
-                rows={4}
-                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Provide context about this role to help guide AI scoring"
-              />
-            </div>
+      </div>
 
-            <div>
-              <label htmlFor="job_description" className="block text-sm font-medium text-gray-700">
-                Job Description
-              </label>
-              <textarea
-                id="job_description"
-                name="job_description"
-                value={campaign.job_description}
-                onChange={handleCampaignChange}
-                rows={4}
-                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Enter the complete job description for this role"
-              />
-            </div>
-          </div>
-          
-          {/* Questions */}
-          <div>
-            <h3 className="text-xl font-bold mb-4">Questions</h3>
-            
-            <div className="space-y-8">
-              {campaign.questions.map((question, index) => (
-                <div key={index} className="p-4 border border-gray-200 rounded-md bg-gray-50">
-                  <div className="space-y-4">
-                    <div>
-                      <label 
-                        htmlFor={`question_${index}_title`}
-                        className="block text-sm font-medium text-gray-700"
-                      >
-                        Question
-                      </label>
-                      <input
-                        id={`question_${index}_title`}
-                        name="title"
-                        type="text"
-                        value={question.title}
-                        onChange={(e) => handleQuestionChange(index, e)}
-                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500"
-                        required
-                      />
-                    </div>
-                    
-                    <div>
-                      <label 
-                        htmlFor={`question_${index}_scoring_prompt`}
-                        className="block text-sm font-medium text-gray-700"
-                      >
-                        Scoring Prompt
-                      </label>
-                      <textarea
-                        id={`question_${index}_scoring_prompt`}
-                        name="scoring_prompt"
-                        value={question.scoring_prompt}
-                        onChange={(e) => handleQuestionChange(index, e)}
-                        rows={4}
-                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500"
-                        required
-                      />
-                      
-                      {/* Optimized prompt container */}
-                      {showOptimized[index] && (
-                        <div className="mt-3">
-                          <label className="block text-sm font-medium text-gray-700">
-                            AI Optimized Prompt:
-                          </label>
-                          <div className="mt-2 p-3 bg-gray-100 border border-gray-300 rounded-md">
-                            {optimizedPrompts[index]}
-                          </div>
-                          <div className="flex space-x-2 mt-2">
-                            <button
-                              type="button"
-                              onClick={() => useOptimizedPrompt(index)}
-                              className="bg-blue-500 text-white px-4 py-1 rounded hover:bg-blue-700 text-sm"
-                            >
-                              Use optimized
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => useOriginalPrompt(index)}
-                              className="bg-gray-500 text-white px-4 py-1 rounded hover:bg-gray-700 text-sm"
-                            >
-                              Use original
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    
-                    <div>
-                      <label 
-                        htmlFor={`question_${index}_max_points`}
-                        className="block text-sm font-medium text-gray-700"
-                      >
-                        Max Points
-                      </label>
-                      <input
-                        id={`question_${index}_max_points`}
-                        name="max_points"
-                        type="number"
-                        value={question.max_points}
-                        onChange={(e) => handleQuestionChange(index, e)}
-                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500"
-                        min="1"
-                        required
-                      />
-                    </div>
-                    
-                    {/* Delete question button (don't show for last question if there's only one) */}
-                    {campaign.questions.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeQuestion(index)}
-                        className="mt-2 bg-red-500 text-white px-4 py-1 rounded hover:bg-red-700 text-sm"
-                      >
-                        Delete Question
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-            
-            {/* Add question button */}
-            <button
-              type="button"
-              onClick={addQuestion}
-              className="mt-4 bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-700"
-            >
-              Add Another Question
-            </button>
-          </div>
-          
-          {/* Submit button */}
-          <div className="pt-4">
-            <PrimaryButton type="submit" disabled={isSubmitting} fullWidth>
-              {isSubmitting ? 'Updating...' : 'Update Campaign'}
-            </PrimaryButton>
-          </div>
-          {/* Display any error message */}
-          {error && (
-            <div className="mb-4 p-2 bg-red-100 text-red-700 rounded">
-              {error}
-            </div>
-          )}
-        </form>
+      {/* Campaign Title Input */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-2 mb-4">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
+          <label className="block text-sm font-medium text-gray-700 mb-1">Campaign Title</label>
+          <input
+            type="text"
+            name="title"
+            value={campaign.title}
+            onChange={handleCampaignChange}
+            className="block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500 text-base font-semibold text-gray-900"
+            placeholder="Enter campaign title"
+            required
+          />
+        </div>
+      </div>
 
-        {/* Submissions Section */}
-        <div className="mt-12 border-t pt-8">
-          <h2 className="text-2xl font-bold mb-6">Submissions</h2>
-          
-          <div className="bg-white rounded-lg">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-              <div className="p-3 bg-gray-50 rounded">
-                <h3 className="text-sm font-medium text-gray-500">Total Submissions</h3>
-                <p className="text-2xl font-bold">{submissions.length}</p>
-              </div>
-              <div className="p-3 bg-gray-50 rounded">
-                <h3 className="text-sm font-medium text-gray-500">Completed</h3>
-                <p className="text-2xl font-bold">{submissions.filter(s => s.is_complete).length}</p>
-              </div>
-              <div className="p-3 bg-gray-50 rounded">
-                <h3 className="text-sm font-medium text-gray-500">In Progress</h3>
-                <p className="text-2xl font-bold">{submissions.filter(s => !s.is_complete).length}</p>
-              </div>
-              <div className="p-3 bg-gray-50 rounded">
-                <h3 className="text-sm font-medium text-gray-500">Average Score</h3>
-                <p className="text-2xl font-bold">
-                  {submissions.length > 0 && submissions.some(s => s.total_points !== null)
-                    ? (submissions.reduce((acc, s) => acc + (s.total_points || 0), 0) / 
-                      submissions.filter(s => s.total_points !== null).length).toFixed(1)
-                    : 'N/A'}
-                </p>
+      {/* Editable Summary Card */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-8">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
+          <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-gray-100">
+            {/* Position */}
+            <div className="flex items-center px-6 py-5">
+              <span className="mr-4 text-blue-500">
+                <UserIcon className="h-6 w-6" />
+              </span>
+              <div className="w-full">
+                <label className="block text-sm text-gray-500 font-medium mb-1">Position</label>
+                <input
+                  type="text"
+                  name="position"
+                  value={campaign.position || ''}
+                  onChange={handleCampaignChange}
+                  className="block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500 text-base font-semibold text-gray-900"
+                  placeholder="Enter position"
+                />
               </div>
             </div>
-
-            {submissions.length > 0 ? (
-              <div className="bg-white rounded-lg">
-                {error.includes("initialize submission table") ? (
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Candidate</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {submissions.map((submission) => (
-                          <tr key={submission.id}>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div>
-                                <div className="font-medium">{submission.user_name || 'No name'}</div>
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">{new Date(submission.created_at).toLocaleString()}</td>
-                            <td className="px-6 py-4 whitespace-nowrap">{submission.total_points !== null ? submission.total_points : 'Not scored'}</td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <Link
-                                href={`/submissions/${submission.id}`}
-                                className="text-blue-600 hover:text-blue-900"
-                              >
-                                View
-                              </Link>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <div ref={tableRef} className="w-full"></div>
-                )}
+            {/* Location */}
+            <div className="flex items-center px-6 py-5">
+              <span className="mr-4 text-blue-500">
+                <MapPinIcon className="h-6 w-6" />
+              </span>
+              <div className="w-full">
+                <label className="block text-sm text-gray-500 font-medium mb-1">Location</label>
+                <input
+                  type="text"
+                  name="location"
+                  value={campaign.location}
+                  onChange={handleCampaignChange}
+                  className="block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500 text-base font-semibold text-gray-900"
+                  placeholder="Enter location"
+                />
               </div>
-            ) : (
-              <div className="text-center py-8 bg-white rounded-lg">
-                <p className="text-gray-500">No submissions found for this campaign.</p>
-                <p className="text-gray-400 mt-2">Submissions will appear here when candidates complete the interview.</p>
+            </div>
+            {/* Work Mode */}
+            <div className="flex items-center px-6 py-5">
+              <span className="mr-4 text-blue-500">
+                <BriefcaseIcon className="h-6 w-6" />
+              </span>
+              <div className="w-full">
+                <label className="block text-sm text-gray-500 font-medium mb-1">Work Mode</label>
+                <input
+                  type="text"
+                  name="work_mode"
+                  value={campaign.work_mode}
+                  onChange={handleCampaignChange}
+                  className="block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500 text-base font-semibold text-gray-900"
+                  placeholder="Enter work mode"
+                />
               </div>
-            )}
+            </div>
+            {/* Education Level */}
+            <div className="flex items-center px-6 py-5">
+              <span className="mr-4 text-blue-500">
+                <AcademicCapIcon className="h-6 w-6" />
+              </span>
+              <div className="w-full">
+                <label className="block text-sm text-gray-500 font-medium mb-1">Education Level</label>
+                <input
+                  type="text"
+                  name="education_level"
+                  value={campaign.education_level}
+                  onChange={handleCampaignChange}
+                  className="block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500 text-base font-semibold text-gray-900"
+                  placeholder="Enter education level"
+                />
+              </div>
+            </div>
+            {/* Experience */}
+            <div className="flex items-center px-6 py-5">
+              <span className="mr-4 text-blue-500">
+                <CalendarIcon className="h-6 w-6" />
+              </span>
+              <div className="w-full">
+                <label className="block text-sm text-gray-500 font-medium mb-1">Experience</label>
+                <input
+                  type="text"
+                  name="experience"
+                  value={campaign.experience}
+                  onChange={handleCampaignChange}
+                  className="block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500 text-base font-semibold text-gray-900"
+                  placeholder="Enter experience"
+                />
+              </div>
+            </div>
+            {/* Salary */}
+            <div className="flex items-center px-6 py-5">
+              <span className="mr-4 text-blue-500">
+                <CurrencyDollarIcon className="h-6 w-6" />
+              </span>
+              <div className="w-full">
+                <label className="block text-sm text-gray-500 font-medium mb-1">Salary</label>
+                <input
+                  type="text"
+                  name="salary"
+                  value={campaign.salary}
+                  onChange={handleCampaignChange}
+                  className="block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500 text-base font-semibold text-gray-900"
+                  placeholder="Enter salary"
+                />
+              </div>
+            </div>
+            {/* Contract */}
+            <div className="flex items-center px-6 py-5">
+              <span className="mr-4 text-blue-500">
+                <DocumentTextIcon className="h-6 w-6" />
+              </span>
+              <div className="w-full">
+                <label className="block text-sm text-gray-500 font-medium mb-1">Contract</label>
+                <input
+                  type="text"
+                  name="contract"
+                  value={campaign.contract}
+                  onChange={handleCampaignChange}
+                  className="block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500 text-base font-semibold text-gray-900"
+                  placeholder="Enter contract type"
+                />
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Loading Modal */}
-      <Modal 
-        isOpen={isSubmitting}
-        title="Updating Campaign"
-      >
-        <div className="flex flex-col items-center space-y-4">
-          <Spinner size="large" />
-          <p className="text-gray-600 text-center">
-            Please wait while we update your campaign...
-          </p>
-        </div>
-      </Modal>
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="bg-white rounded-lg shadow p-8">
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Campaign details */}
+            <div className="space-y-4">
+              <div>
+                <label htmlFor="campaign_context" className="block text-sm font-medium text-gray-700">Campaign Context</label>
+                <textarea
+                  id="campaign_context"
+                  name="campaign_context"
+                  value={campaign.campaign_context}
+                  onChange={handleCampaignChange}
+                  rows={4}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  required
+                />
+              </div>
 
-      {/* Success Modal */}
-      <Modal 
-        isOpen={showSuccessModal}
-        title="Campaign Updated Successfully"
-      >
-        <div className="flex flex-col items-center space-y-4">
-          <CheckCircleIcon className="h-12 w-12 text-green-500" />
-          <p className="text-gray-600 text-center">
-            Your campaign has been updated successfully! Click the button below to return to the campaigns page.
-          </p>
-          <PrimaryButton
-            onClick={handleSuccessModalClose}
-            className="mt-4"
-          >
-            Return to Campaigns
-          </PrimaryButton>
+              <div>
+                <label htmlFor="job_description" className="block text-sm font-medium text-gray-700">Job Description</label>
+                <textarea
+                  id="job_description"
+                  name="job_description"
+                  value={campaign.job_description}
+                  onChange={handleCampaignChange}
+                  rows={4}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="max_user_submissions" className="block text-sm font-medium text-gray-700">Max Submissions</label>
+                  <input
+                    type="number"
+                    id="max_user_submissions"
+                    name="max_user_submissions"
+                    value={campaign.max_user_submissions}
+                    onChange={handleCampaignChange}
+                    min="1"
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+                <div>
+                  <label htmlFor="is_public" className="block text-sm font-medium text-gray-700">Visibility</label>
+                  <select
+                    id="is_public"
+                    name="is_public"
+                    value={campaign.is_public ? "true" : "false"}
+                    onChange={handleCampaignChange}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  >
+                    <option value="true">Public</option>
+                    <option value="false">Private</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Questions Section */}
+            <div className="mt-8">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold text-gray-900">Interview Questions</h2>
+                <button
+                  type="button"
+                  onClick={addQuestion}
+                  className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700 transition"
+                >
+                  Add Question
+                </button>
+              </div>
+
+              <div className="space-y-6">
+                {campaign.questions.map((question, index) => (
+                  <div key={index} className="bg-gray-50 p-6 rounded-lg">
+                    <div className="flex justify-between items-start mb-4">
+                      <h3 className="text-lg font-medium text-gray-900">Question {index + 1}</h3>
+                      <button
+                        type="button"
+                        onClick={() => removeQuestion(index)}
+                        className="text-red-600 hover:text-red-800"
+                      >
+                        Remove
+                      </button>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div>
+                        <label htmlFor={`question-${index}-title`} className="block text-sm font-medium text-gray-700">Question Title</label>
+                        <input
+                          type="text"
+                          id={`question-${index}-title`}
+                          value={question.title}
+                          onChange={(e) => handleQuestionChange(index, e)}
+                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label htmlFor={`question-${index}-body`} className="block text-sm font-medium text-gray-700">Question Body</label>
+                        <textarea
+                          id={`question-${index}-body`}
+                          value={question.body}
+                          onChange={(e) => handleQuestionChange(index, e)}
+                          rows={3}
+                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label htmlFor={`question-${index}-scoring_prompt`} className="block text-sm font-medium text-gray-700">Scoring Prompt</label>
+                        <div className="mt-1 flex gap-2">
+                          <textarea
+                            id={`question-${index}-scoring_prompt`}
+                            name="scoring_prompt"
+                            value={question.scoring_prompt}
+                            onChange={(e) => handleQuestionChange(index, e)}
+                            rows={3}
+                            className="block w-full rounded-md border border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                            required
+                            style={{ zIndex: 1, position: 'relative', background: 'white' }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => optimizePrompt(index)}
+                            className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-700 transition whitespace-nowrap"
+                          >
+                            Optimize
+                          </button>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label htmlFor={`question-${index}-max_points`} className="block text-sm font-medium text-gray-700">Max Points</label>
+                        <input
+                          type="number"
+                          id={`question-${index}-max_points`}
+                          value={question.max_points}
+                          onChange={(e) => handleQuestionChange(index, e)}
+                          min="1"
+                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                          required
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-4 mt-8">
+              <button
+                type="button"
+                onClick={() => router.push(`/campaigns/${campaignId}`)}
+                className="bg-gray-500 text-white px-6 py-2 rounded hover:bg-gray-700 transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="bg-blue-500 text-white px-6 py-2 rounded hover:bg-blue-700 transition"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </form>
         </div>
-      </Modal>
+      </div>
 
       {/* Delete Confirmation Modal */}
-      <Modal
-        isOpen={showDeleteModal}
-        title="Delete Campaign"
-      >
-        <div className="p-6">
-          <p className="text-gray-700 mb-4">
-            Are you sure you want to delete this campaign? This action cannot be undone and will delete all associated questions and submissions.
-          </p>
-          <div className="flex justify-end gap-4">
-            <button
-              onClick={() => setShowDeleteModal(false)}
-              className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300"
-              disabled={isDeleting}
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleDeleteCampaign}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2"
-              disabled={isDeleting}
-            >
-              <TrashIcon className="h-5 w-5" />
-              {isDeleting ? 'Deleting...' : 'Delete Campaign'}
-            </button>
+      {showDeleteModal && (
+        <Modal
+          isOpen={showDeleteModal}
+          onClose={() => setShowDeleteModal(false)}
+          title="Delete Campaign"
+        >
+          <div className="p-6">
+            <p className="text-gray-700 mb-4">
+              Are you sure you want to delete this campaign? This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-4">
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-700 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteCampaign}
+                className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition"
+                disabled={isDeleting}
+              >
+                {isDeleting ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
           </div>
-        </div>
-      </Modal>
+        </Modal>
+      )}
     </PageTemplate>
   );
 };
