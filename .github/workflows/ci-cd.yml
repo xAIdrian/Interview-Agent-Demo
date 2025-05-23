@@ -65,15 +65,17 @@ jobs:
           rm -rf deploy_backend/venv
       - name: Prepare frontend package
         run: |
-          rm -rf deploy_frontend
+          rm -r deploy_frontend
           cp -r frontend deploy_frontend
-          rm -rf deploy_frontend/node_modules deploy_frontend/.next
+          rm -r deploy_frontend/node_modules
+          rm -r deploy_frontend/.next
           // ... existing code ...
       - name: Prepare frontend package
         run: |
-          rm -rf deploy_frontend
+          rm -r deploy_frontend
           cp -r frontend deploy_frontend
-          rm -rf deploy_frontend/node_modules deploy_frontend/.next
+          rm -r deploy_frontend/node_modules
+          rm -r deploy_frontend/.next
           # Ensure version.json is included
           mkdir -p deploy_frontend/src/config
           cp frontend/src/config/version.json deploy_frontend/src/config/
