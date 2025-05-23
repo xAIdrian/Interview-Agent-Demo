@@ -1,142 +1,62 @@
-import smtplib
-from email.message import EmailMessage
-import os
-from dotenv import load_dotenv
+import brevo_python
+import requests
+import json
+from brevo_python.rest import ApiException
+from pprint import pprint
 
-# Load environment variables
-load_dotenv()
-
-# Get SMTP API key from environment
-SMTP_API_KEY = os.getenv("SMTP_API_KEY")
-
-
-def send_email(subject, body, to_email):
-    """
-    Send an email using Brevo's SMTP service.
-
-    Args:
-        subject: Email subject
-        body: Plain text email body
-        to_email: Recipient email address
-    """
-    msg = EmailMessage()
-    msg["Subject"] = subject
-    msg["From"] = "your_email@example.com"  # Use your verified Sendinblue sender
-    msg["To"] = to_email
-    msg.set_content(body)
-
-    try:
-        with smtplib.SMTP("smtp-relay.sendinblue.com", 587) as server:
-            server.starttls()
-            server.login("your_email@example.com", SMTP_API_KEY)
-            server.send_message(msg)
-            print(f"Email sent to {to_email}")
-    except Exception as e:
-        print(f"Error: {e}")
+# Configure API key authorization: api-key=***REMOVED***=***REMOVED***=***REMOVED*** 
+configuration = brevo_python.Configuration()
+configuration.api_key["api-key=***REMOVED***=***REMOVED***=***REMOVED*** "] = (
+    "xkeysib-***REMOVED******REMOVED******REMOVED***9e12dce1b8e4d31d94299f6b5d4d099ef0eaccd3b746bfd2ba7f25d80d5114aa-abTZVGJo4AMjJKxp"
+)
+# Uncomment below to setup prefix (e.g. Bearer) for API key, if needed
+# configuration.api_key_prefix['api-key=***REMOVED***=***REMOVED***=***REMOVED*** '] = 'Bearer'
+# Configure API key authorization: partner-key
+configuration = brevo_python.Configuration()
+configuration.api_key["partner-key"] = (
+    "xkeysib-***REMOVED******REMOVED******REMOVED***9e12dce1b8e4d31d94299f6b5d4d099ef0eaccd3b746bfd2ba7f25d80d5114aa-abTZVGJo4AMjJKxp"
+)
+# Uncomment below to setup prefix (e.g. Bearer) for API key, if needed
+# configuration.api_key_prefix['partner-key'] = 'Bearer'
 
 
-def send_email_with_html(subject, body, html_content, to_email):
-    """
-    Send an email with both plain text and HTML content.
-
-    Args:
-        subject: Email subject
-        body: Plain text email body
-        html_content: HTML version of the email
-        to_email: Recipient email address
-    """
-    msg = EmailMessage()
-    msg["Subject"] = subject
-    msg["From"] = "your_email@example.com"  # Use your verified Sendinblue sender
-    msg["To"] = to_email
-
-    # Set plain text content
-    msg.set_content(body)
-
-    # Add HTML content
-    msg.add_alternative(html_content, subtype="html")
+def get_account_info():
+    # create an instance of the API class
+    api_instance = brevo_python.AccountApi(brevo_python.ApiClient(configuration))
 
     try:
-        with smtplib.SMTP("smtp-relay.sendinblue.com", 587) as server:
-            server.starttls()
-            server.login("your_email@example.com", SMTP_API_KEY)
-            server.send_message(msg)
-            print(f"Email sent to {to_email}")
-    except Exception as e:
-        print(f"Error: {e}")
+        # Get your account information, plan and credits details
+        api_response = api_instance.get_account()
+        pprint(api_response)
+    except ApiException as e:
+        print("Exception when calling AccountApi->get_account: %s\n" % e)
 
 
-def send_interview_invitation(
-    recipient_email, recipient_name, campaign_title, interview_link
-):
-    """
-    Send an interview invitation email.
-    """
-    subject = f"Interview Invitation: {campaign_title}"
+def send_test_email():
+    print("Sending test email")
 
-    # Plain text version
-    body = f"""
-Dear {recipient_name},
+    url = "https://api.brevo.com/v3/smtp/email"
 
-You have been invited to participate in an interview for the {campaign_title} position.
+    headers = {
+        "accept": "application/json",
+        "api-key=***REMOVED***=***REMOVED***=***REMOVED*** ": "xkeysib-***REMOVED******REMOVED******REMOVED***9e12dce1b8e4d31d94299f6b5d4d099ef0eaccd3b746bfd2ba7f25d80d5114aa-abTZVGJo4AMjJKxp",
+        "content-type": "application/json",
+    }
 
-Please click the following link to start your interview:
-{interview_link}
+    payload = {
+        "sender": {"name": "Test Sender", "email": "test@example.com"},
+        "to": [{"email": "amohnacs@gmail.com", "name": "Test Recipient"}],
+        "subject": "Test Email from Interview Agent",
+        "htmlContent": "<html><head></head><body><p>Hello,</p><p>This is a test email sent from the Interview Agent system.</p></body></html>",
+    }
 
-Best regards,
-The Interview Team
-"""
-
-    # HTML version
-    html_content = f"""
-<html>
-<body>
-    <h2>Interview Invitation</h2>
-    <p>Dear {recipient_name},</p>
-    <p>You have been invited to participate in an interview for the <strong>{campaign_title}</strong> position.</p>
-    <p>Please click the following link to start your interview:</p>
-    <p><a href="{interview_link}">{interview_link}</a></p>
-    <p>Best regards,<br>The Interview Team</p>
-</body>
-</html>
-"""
-
-    send_email_with_html(subject, body, html_content, recipient_email)
-
-
-def send_interview_completion(
-    recipient_email, recipient_name, campaign_title, submission_link
-):
-    """
-    Send an interview completion notification email.
-    """
-    subject = f"Interview Completed: {campaign_title}"
-
-    # Plain text version
-    body = f"""
-Dear {recipient_name},
-
-Thank you for completing the interview for the {campaign_title} position.
-
-You can view your submission at:
-{submission_link}
-
-Best regards,
-The Interview Team
-"""
-
-    # HTML version
-    html_content = f"""
-<html>
-<body>
-    <h2>Interview Completed</h2>
-    <p>Dear {recipient_name},</p>
-    <p>Thank you for completing the interview for the <strong>{campaign_title}</strong> position.</p>
-    <p>You can view your submission at:</p>
-    <p><a href="{submission_link}">{submission_link}</a></p>
-    <p>Best regards,<br>The Interview Team</p>
-</body>
-</html>
-"""
-
-    send_email_with_html(subject, body, html_content, recipient_email)
+    try:
+        response = requests.post(url, headers=headers, data=json.dumps(payload))
+        response.raise_for_status()  # Raise an exception for bad status codes
+        print("Email sent successfully")
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"Error sending email: {str(e)}")
+        if hasattr(e.response, "text"):
+            print(f"Response text: {e.response.text}")
+        raise

@@ -28,3 +28,5 @@ pandas
 openai[datalib]
 openai[voice_helpers]
 supervisor
+brevo-python
+setuptools

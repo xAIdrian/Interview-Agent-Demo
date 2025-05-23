@@ -47,6 +47,7 @@ import random
 import string
 import logging
 from access_code_manager import AccessCodeManager
+from email_service import send_test_email
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -2796,3 +2797,10 @@ def validate_submitted_access_code(campaign_id):
     finally:
         if conn:
             conn.close()
+
+
+@api_bp.route("/test-email", methods=["GET"])
+def test_email():
+    print("Sending test email")
+    send_test_email()
+    return jsonify({"message": "Email sent successfully"}), 200
