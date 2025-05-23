@@ -33,15 +33,29 @@ jobs:
       - name: Install frontend deps
         run: |
           cd frontend
-          npm ci
+          npm install --legacy-peer-deps
       - name: Build frontend
         run: |
           cd frontend
           npm run build -- --no-lint
 
       # ── Version Management ────────────────────────────────────────
-      - name: Increment build number
-        run: node scripts/increment-version.js increment-build
+      - name: Determine version increment
+        id: version
+        run: |
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          if [[ $COMMIT_MSG == *"[major]"* ]] || [[ $COMMIT_MSG == *"[breaking]"* ]]; then
+            echo "increment=major" >> $GITHUB_OUTPUT
+          elif [[ $COMMIT_MSG == *"[minor]"* ]] || [[ $COMMIT_MSG == *"[feature]"* ]]; then
+            echo "increment=minor" >> $GITHUB_OUTPUT
+          elif [[ $COMMIT_MSG == *"[patch]"* ]] || [[ $COMMIT_MSG == *"[fix]"* ]]; then
+            echo "increment=patch" >> $GITHUB_OUTPUT
+          else
+            echo "increment=build" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Increment version
+        run: node scripts/increment-version.js ${{ steps.version.outputs.increment }}
 
       # Prepare deploy artifacts
       - name: Prepare backend package
