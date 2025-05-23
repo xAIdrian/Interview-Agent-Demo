@@ -60,19 +60,16 @@ jobs:
       # Prepare deploy artifacts
       - name: Prepare backend package
         run: |
-          rm -rf deploy_backend
           cp -r backend deploy_backend
           rm -rf deploy_backend/venv
       - name: Prepare frontend package
         run: |
-          rm -r deploy_frontend
           cp -r frontend deploy_frontend
           rm -r deploy_frontend/node_modules
           rm -r deploy_frontend/.next
           // ... existing code ...
       - name: Prepare frontend package
         run: |
-          rm -r deploy_frontend
           cp -r frontend deploy_frontend
           rm -r deploy_frontend/node_modules
           rm -r deploy_frontend/.next
