@@ -165,4 +165,26 @@ rsync -avz --progress -e "ssh -i NoorIA.pem" ./deploy_backend/ ec2-user@ec2-13-3
 
 # Deploy frontend changes
 rsync -avz --progress -e "ssh -i NoorIA.pem" ./deploy_frontend/ ec2-user@ec2-13-39-1-131.eu-west-3.compute.amazonaws.com:/home/ec2-user/noor_ui/
+```
+
+## Version Management
+
+### 1. Automatic Version Increment
+Before deployment, the build number is automatically incremented using the version manager:
+```bash
+# Increment build number
+node scripts/version-manager.js increment-build
+```
+
+### 2. Manual Version Updates (if needed)
+For major, minor, or patch updates:
+```bash
+# Increment major version (e.g., v1.0.0 -> v2.0.0)
+node scripts/version-manager.js increment-major
+
+# Increment minor version (e.g., v1.0.0 -> v1.1.0)
+node scripts/version-manager.js increment-minor
+
+# Increment patch version (e.g., v1.0.0 -> v1.0.1)
+node scripts/version-manager.js increment-patch
 ``` 

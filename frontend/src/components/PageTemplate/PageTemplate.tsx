@@ -4,6 +4,9 @@ import { useRouter } from 'next/router';
 import { useAuth } from '../../app/components/AuthProvider';
 import { AuthLogger } from '../../utils/logging';
 import Image from 'next/image';
+import VersionDisplay from '../VersionDisplay';
+import versionData from '../../config/version.json';
+
 interface PageTemplateProps {
   children: React.ReactNode;
   title?: string;
@@ -227,6 +230,9 @@ export const PageTemplate: React.FC<PageTemplateProps> = ({
       <main className={`max-w-${maxWidth} mx-auto ${centered ? 'flex items-center justify-center' : ''}`}>
         {children}
       </main>
+
+      {/* Version Display */}
+      <VersionDisplay version={versionData.version} />
     </div>
   );
 };
