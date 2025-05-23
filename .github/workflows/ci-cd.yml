@@ -68,6 +68,32 @@ jobs:
           rm -rf deploy_frontend
           cp -r frontend deploy_frontend
           rm -rf deploy_frontend/node_modules deploy_frontend/.next
+          // ... existing code ...
+      - name: Prepare frontend package
+        run: |
+          rm -rf deploy_frontend
+          cp -r frontend deploy_frontend
+          rm -rf deploy_frontend/node_modules deploy_frontend/.next
+          # Ensure version.json is included
+          mkdir -p deploy_frontend/src/config
+          cp frontend/src/config/version.json deploy_frontend/src/config/
+      
+      # Upload artifacts
+      - name: Upload backend artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: deploy-backend
+          path: deploy_backend
+      - name: Upload frontend artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: deploy-frontend
+          path: deploy_frontend
+      - name: Upload version artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: version-info
+          path: frontend/src/config/version.json
 
   deploy:
     needs: build-and-test
@@ -76,6 +102,23 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+
+      # Download artifacts
+      - name: Download backend artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: deploy-backend
+          path: deploy_backend
+      - name: Download frontend artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: deploy-frontend
+          path: deploy_frontend
+      - name: Download version artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: version-info
+          path: deploy_frontend/src/config
 
       # ── SSH setup ───────────────────────────────────────────────────
       - name: Start ssh-agent
