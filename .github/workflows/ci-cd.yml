@@ -181,12 +181,12 @@ jobs:
             pip install supervisor
 
             # Ensure supervisor config exists
-            if [ ! -f ~/noor_ai/supervisord.conf ]; then
-              echo "Supervisor config not found at ~/noor_ai/supervisord.conf"
+            if [ ! -f supervisord.conf ]; then
+              echo "Supervisor config not found at supervisord.conf"
               exit 1
             fi
 
             # Start supervisor and check status
-            supervisord -c ~/noor_ai/supervisord.conf
-            supervisorctl -c ~/noor_ai/supervisord.conf status
+            supervisord -c supervisord.conf
+            supervisorctl -c supervisord.conf status
           EOF
