@@ -2,6 +2,9 @@
 
 # AI Candidate Scoring
 
+![CI/CD](https://github.com/KwiksFRC/NOORAIVISIO/actions/workflows/ci-cd.yml/badge.svg)
+
+
 ## Using the Application
 
 Curl command to create a new admin user:

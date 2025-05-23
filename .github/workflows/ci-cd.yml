@@ -1,0 +1,94 @@
+name: CI/CD Pipeline
+
+# Trigger on merges to main and allow manual run
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # ── Python: install & test ─────────────────────────────────────
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+      - name: Install Python deps
+        run: pip install -r requirements.txt
+      - name: Run tests
+        run: pytest --maxfail=1 --disable-warnings -q
+
+      # ── Node.js: install & build frontend ──────────────────────────
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      - name: Install frontend deps
+        run: |
+          cd frontend
+          npm ci
+      - name: Build frontend
+        run: |
+          cd frontend
+          npm run build -- --no-lint
+
+      # Prepare deploy artifacts
+      - name: Prepare backend package
+        run: |
+          rm -rf deploy_backend
+          cp -r backend deploy_backend
+          rm -rf deploy_backend/venv
+      - name: Prepare frontend package
+        run: |
+          rm -rf deploy_frontend
+          cp -r frontend deploy_frontend
+          rm -rf deploy_frontend/node_modules deploy_frontend/.next
+
+  deploy:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # ── SSH setup ───────────────────────────────────────────────────
+      - name: Start ssh-agent
+        uses: webfactory/ssh-agent@v0.9.1
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+      - name: Add server to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+
+      # ── Deploy with rsync (skip secrets & DB) ───────────────────────
+      - name: Deploy backend to EC2
+        run: |
+          rsync -avz \
+            --delete \
+            --exclude='.env' \
+            --exclude='interview_agent.db' \
+            deploy_backend/ \
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/home/${{ secrets.SSH_USER }}/noor_ai/
+
+      - name: Deploy frontend to EC2
+        run: |
+          rsync -avz \
+            --delete \
+            --exclude='node_modules' \
+            --exclude='.next' \
+            deploy_frontend/ \
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/home/${{ secrets.SSH_USER }}/noor_ui/
+
+      # ── Restart services on the server ───────────────────────────────
+      - name: Restart Supervisor services
+        run: |
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+            supervisorctl -c ~/noor_ai/supervisord.conf restart all
+          EOF
