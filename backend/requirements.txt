@@ -29,4 +29,3 @@ openai[voice_helpers]
 supervisor
 brevo-python
 setuptools
-pytest

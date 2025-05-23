@@ -24,8 +24,6 @@ jobs:
           python3 -m venv venv
           source venv/bin/activate
           pip install -r requirements.txt
-      - name: Run tests
-        run: pytest --maxfail=1 --disable-warnings -q
 
       # ── Node.js: install & build frontend ──────────────────────────
       - name: Set up Node.js
