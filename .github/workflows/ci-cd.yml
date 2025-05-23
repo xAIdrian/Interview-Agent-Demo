@@ -67,7 +67,7 @@ jobs:
           cp -r frontend deploy_frontend
           rm -r deploy_frontend/node_modules
           rm -r deploy_frontend/.next
-          // ... existing code ...
+
       - name: Prepare frontend package
         run: |
           cp -r frontend deploy_frontend
