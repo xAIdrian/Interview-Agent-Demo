@@ -22,7 +22,6 @@ flask-limiter
 gunicorn
 gevent
 pymysql
-mariadb
 bcrypt
 pandas
 openai[datalib]
