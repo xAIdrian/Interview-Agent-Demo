@@ -179,6 +179,7 @@ jobs:
             cd ~/noor_ai
             source venv/bin/activate
             pip install supervisor
+            cd ..
 
             # Ensure supervisor config exists
             if [ ! -f supervisord.conf ]; then
