@@ -143,6 +143,31 @@ jobs:
             deploy_frontend/ \
             ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/home/${{ secrets.SSH_USER }}/noor_ui/
 
+      # ── Reinitialize Dependencies ───────────────────────────────────
+      - name: Reinitialize dependencies
+        run: |
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+            # Backend dependencies
+            cd ~/noor_ai
+            if [ -d "venv" ]; then
+              rm -rf venv
+            fi
+            python3 -m venv venv
+            source venv/bin/activate
+            pip install -r requirements.txt
+
+            # Frontend dependencies
+            cd ~/noor_ui
+            if [ -d "node_modules" ]; then
+              rm -rf node_modules
+            fi
+            if [ -d ".next" ]; then
+              rm -rf .next
+            fi
+            npm install --legacy-peer-deps
+            npm run build -- --no-lint
+          EOF
+
       # ── Restart services on the server ───────────────────────────────
       - name: Restart Supervisor services
         run: |
