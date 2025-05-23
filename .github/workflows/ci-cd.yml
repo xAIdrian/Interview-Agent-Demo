@@ -55,7 +55,7 @@ jobs:
           fi
 
       - name: Increment version
-        run: node scripts/increment-version.js ${{ steps.version.outputs.increment }}
+        run: node scripts/increment-version.js increment-${{ steps.version.outputs.increment }}
 
       # Prepare deploy artifacts
       - name: Prepare backend package
