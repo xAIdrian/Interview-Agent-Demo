@@ -54,3 +54,5 @@ NoorIA.pem
 backend/interview_agent.db
 node_modules
 deploy_backend/
+gh_deploy_key.pub
+gh_deploy_key

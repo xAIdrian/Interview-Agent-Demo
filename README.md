@@ -2,6 +2,16 @@
 
 # AI Candidate Scoring
 
+![CI/CD](https://github.com/KwiksFRC/NOORAIVISIO/actions/workflows/ci-cd.yml/badge.svg)
+
+## Version Increment Rules:
+
+[major] or [breaking] in commit message → Increment major version
+[minor] or [feature] in commit message → Increment minor version
+[patch] or [fix] in commit message → Increment patch version
+No special tag → Increment build number
+
+
 ## Using the Application
 
 Curl command to create a new admin user:
