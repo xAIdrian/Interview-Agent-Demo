@@ -1,23 +1,16 @@
 import brevo_python
 import requests
 import json
+import os
 from brevo_python.rest import ApiException
 from pprint import pprint
 
-# Configure API key authorization: api-key=***REMOVED***=***REMOVED***=***REMOVED*** 
+# Configure API key authorization
 configuration = brevo_python.Configuration()
-configuration.api_key["api-key=***REMOVED***=***REMOVED***=***REMOVED*** "] = (
-    "xkeysib-***REMOVED******REMOVED******REMOVED***9e12dce1b8e4d31d94299f6b5d4d099ef0eaccd3b746bfd2ba7f25d80d5114aa-abTZVGJo4AMjJKxp"
-)
-# Uncomment below to setup prefix (e.g. Bearer) for API key, if needed
-# configuration.api_key_prefix['api-key=***REMOVED***=***REMOVED***=***REMOVED*** '] = 'Bearer'
+configuration.api_key["api-key"] = os.environ.get("BREVO_API_KEY")
+
 # Configure API key authorization: partner-key
-configuration = brevo_python.Configuration()
-configuration.api_key["partner-key"] = (
-    "xkeysib-***REMOVED******REMOVED******REMOVED***9e12dce1b8e4d31d94299f6b5d4d099ef0eaccd3b746bfd2ba7f25d80d5114aa-abTZVGJo4AMjJKxp"
-)
-# Uncomment below to setup prefix (e.g. Bearer) for API key, if needed
-# configuration.api_key_prefix['partner-key'] = 'Bearer'
+configuration.api_key["partner-key"] = os.environ.get("BREVO_API_KEY")
 
 
 def get_account_info():
@@ -39,7 +32,7 @@ def send_test_email():
 
     headers = {
         "accept": "application/json",
-        "api-key=***REMOVED***=***REMOVED***=***REMOVED*** ": "xkeysib-***REMOVED******REMOVED******REMOVED***9e12dce1b8e4d31d94299f6b5d4d099ef0eaccd3b746bfd2ba7f25d80d5114aa-abTZVGJo4AMjJKxp",
+        "api-key": os.environ.get("BREVO_API_KEY"),
         "content-type": "application/json",
     }
 

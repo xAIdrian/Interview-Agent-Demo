@@ -59,7 +59,7 @@ This project is an AI-powered candidate scoring system that allows administrator
     LIVEKIT_API_KEY=your_livekit_api_key
     LIVEKIT_API_SECRET=your_livekit_api_secret
     AWS_ACCESS_KEY_ID=your_aws_access_key
-    AWS_SECRET_ACCESS_KEY=***REMOVED***=***REMOVED***=your_aws_secret_key
+    AWS_SECRET_ACCESS_KEY=your_aws_secret_key
     AWS_SESSION_TOKEN=your_aws_session_token
     ```
 
