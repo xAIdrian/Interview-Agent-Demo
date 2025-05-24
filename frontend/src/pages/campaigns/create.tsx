@@ -353,7 +353,9 @@ const CreateCampaignPage = () => {
         education_level: campaign.education_level.trim() || null,
         experience: campaign.experience.trim() || null,
         salary: campaign.salary.trim() || null,
-        contract: campaign.contract.trim() || null
+        contract: campaign.contract.trim() || null,
+        // Include candidate emails if provided
+        candidate_emails: candidateEmails.trim() || null
       };
 
       console.log('Sending campaign payload:', campaignPayload); // Debug log

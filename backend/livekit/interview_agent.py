@@ -9,8 +9,11 @@ import requests
 import json
 from typing import Dict, Any
 
-API_BASE_URL = "https://api.kwiks.io"
-# API_BASE_URL = "http://127.0.0.1:5001"
+# Load environment variables
+load_dotenv()
+
+# Get API URL from environment variable with fallback
+API_BASE_URL = os.getenv("FLASK_API_BASE_URL", "http://127.0.0.1:5001")
 
 # Add the backend directory to the Python path
 backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -20,9 +23,6 @@ from database import get_db_connection, map_row_to_dict
 from interview_api import AssistantFnc
 from prompts import INTERVIEW_PROMPT_TEMPLATE, INTERVIEW_PROMPT_TEMPLATE_EN
 import logging
-
-# Load environment variables
-load_dotenv()
 
 # Configure logging
 logger = logging.getLogger("interview-agent")
