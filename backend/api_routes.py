@@ -2307,6 +2307,58 @@ def test_create_campaign():
             access_manager = AccessCodeManager(conn)
             access_code = access_manager.create_access_code(campaign_id)
 
+            # Send invitations if emails were provided
+            invitation_results = None
+            if data.get("candidate_emails"):
+                try:
+                    # Parse emails using multiple delimiters
+                    email_string = data["candidate_emails"]
+                    email_string = (
+                        email_string.replace(",", " ")
+                        .replace("\n", " ")
+                        .replace(";", " ")
+                    )
+                    email_list = [
+                        email.strip() for email in email_string.split() if email.strip()
+                    ]
+
+                    # Validate and clean emails
+                    valid_emails = []
+                    invalid_emails = []
+
+                    for email in email_list:
+                        try:
+                            validated_email = email_validator.validate_email(
+                                email, check_deliverability=False
+                            )
+                            normalized_email = validated_email.normalized
+                            if normalized_email not in valid_emails:
+                                valid_emails.append(normalized_email)
+                        except email_validator.EmailNotValidError:
+                            invalid_emails.append(email)
+
+                    # Generate interview link
+                    base_url = request.host_url.rstrip("/")
+                    interview_link = f"{base_url}/live-interview/{campaign_id}"
+
+                    # Send invitations
+                    send_interview_invitations(
+                        emails=valid_emails,
+                        campaign_title=data.get("title"),
+                        interview_link=interview_link,
+                        access_code=access_code,
+                    )
+
+                    invitation_results = {
+                        "total_processed": len(email_list),
+                        "valid_emails": len(valid_emails),
+                        "invalid_emails": len(invalid_emails),
+                        "invalid_email_list": invalid_emails,
+                    }
+                except Exception as e:
+                    print(f"Error sending invitations: {str(e)}")
+                    invitation_results = {"error": str(e), "status": "failed"}
+
             # Commit the transaction
             conn.commit()
 
@@ -2344,6 +2396,7 @@ def test_create_campaign():
                         "questions": questions_created,
                         "direct_access_url": direct_access_url,
                         "access_code": access_code,
+                        "invitation_results": invitation_results,
                     },
                 }
             )
