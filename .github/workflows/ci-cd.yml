@@ -60,22 +60,59 @@ jobs:
       # Prepare deploy artifacts
       - name: Prepare backend package
         run: |
-          rm -rf deploy_backend
           cp -r backend deploy_backend
-          rm -rf deploy_backend/venv
       - name: Prepare frontend package
         run: |
-          rm -rf deploy_frontend
           cp -r frontend deploy_frontend
-          rm -rf deploy_frontend/node_modules deploy_frontend/.next
+
+      - name: Prepare frontend package
+        run: |
+          cp -r frontend deploy_frontend
+          # Ensure version.json is included
+          mkdir -p deploy_frontend/src/config
+          cp frontend/src/config/version.json deploy_frontend/src/config/
+      
+      # Upload artifacts
+      - name: Upload backend artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: deploy-backend
+          path: deploy_backend
+      - name: Upload frontend artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: deploy-frontend
+          path: deploy_frontend
+      - name: Upload version artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: version-info
+          path: frontend/src/config/version.json
 
   deploy:
     needs: build-and-test
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    # if: github.ref == 'refs/heads/main'
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+
+      # Download artifacts
+      - name: Download backend artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: deploy-backend
+          path: deploy_backend
+      - name: Download frontend artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: deploy-frontend
+          path: deploy_frontend
+      - name: Download version artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: version-info
+          path: deploy_frontend/src/config
 
       # ── SSH setup ───────────────────────────────────────────────────
       - name: Start ssh-agent
@@ -106,9 +143,55 @@ jobs:
             deploy_frontend/ \
             ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/home/${{ secrets.SSH_USER }}/noor_ui/
 
+      # ── Reinitialize Dependencies ───────────────────────────────────
+      - name: Reinitialize dependencies
+        run: |
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+            # Backend dependencies
+            cd ~/noor_ai
+            if [ -d "venv" ]; then
+              rm -rf venv
+            fi
+            python3 -m venv venv
+            source venv/bin/activate
+            pip install -r requirements.txt
+
+            # Frontend dependencies
+            cd ~/noor_ui
+            if [ -d "node_modules" ]; then
+              rm -rf node_modules
+            fi
+            if [ -d ".next" ]; then
+              rm -rf .next
+            fi
+            npm install --legacy-peer-deps
+            npm run build -- --no-lint
+          EOF
+
       # ── Restart services on the server ───────────────────────────────
       - name: Restart Supervisor services
         run: |
           ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
-            supervisorctl -c ~/noor_ai/supervisord.conf restart all
+
+            # Install supervisor in the virtual environment
+            cd ~/noor_ai
+            source venv/bin/activate
+            pip install supervisor
+            cd ..
+
+            # Stop all supervisor processes
+            supervisorctl -c supervisord.conf stop all || true
+            pkill supervisord || true
+
+            # Ensure supervisor config exists
+            if [ ! -f supervisord.conf ]; then
+              echo "Supervisor config not found at supervisord.conf"
+              exit 1
+            fi
+
+            # Start supervisor and check status
+            supervisord -c supervisord.conf
+            supervisorctl -c supervisord.conf status
           EOF
+
+      
