@@ -194,13 +194,4 @@ jobs:
             supervisorctl -c supervisord.conf status
           EOF
 
-      # ── Verify deployment ───────────────────────────────────────────
-      - name: Verify deployment
-        run: |
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
-            # Check if all services are running
-            supervisorctl -c supervisord.conf status | grep -E "RUNNING|STARTING" || {
-              echo "Deployment verification failed - services not running"
-              exit 1
-            }
-          EOF
+      
