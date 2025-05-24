@@ -172,7 +172,8 @@ jobs:
       - name: Restart Supervisor services
         run: |
           ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
-            # Stop any existing supervisor processes
+            # Stop all supervisor processes
+            supervisorctl -c supervisord.conf stop all || true
             pkill supervisord || true
 
             # Install supervisor in the virtual environment
@@ -190,4 +191,21 @@ jobs:
             # Start supervisor and check status
             supervisord -c supervisord.conf
             supervisorctl -c supervisord.conf status
+
+            # Verify all services are running
+            if ! supervisorctl -c supervisord.conf status | grep -q "RUNNING"; then
+              echo "Services failed to start properly"
+              exit 1
+            fi
+          EOF
+
+      # ── Verify deployment ───────────────────────────────────────────
+      - name: Verify deployment
+        run: |
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+            # Check if all services are running
+            supervisorctl -c supervisord.conf status | grep "RUNNING" || {
+              echo "Deployment verification failed - services not running"
+              exit 1
+            }
           EOF
