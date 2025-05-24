@@ -172,15 +172,16 @@ jobs:
       - name: Restart Supervisor services
         run: |
           ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
-            # Stop all supervisor processes
-            supervisorctl -c supervisord.conf stop all || true
-            pkill supervisord || true
 
             # Install supervisor in the virtual environment
             cd ~/noor_ai
             source venv/bin/activate
             pip install supervisor
             cd ..
+
+            # Stop all supervisor processes
+            supervisorctl -c supervisord.conf stop all || true
+            pkill supervisord || true
 
             # Ensure supervisor config exists
             if [ ! -f supervisord.conf ]; then
