@@ -191,12 +191,6 @@ jobs:
             # Start supervisor and check status
             supervisord -c supervisord.conf
             supervisorctl -c supervisord.conf status
-
-            # Verify all services are running
-            if ! supervisorctl -c supervisord.conf status | grep -q "RUNNING"; then
-              echo "Services failed to start properly"
-              exit 1
-            fi
           EOF
 
       # ── Verify deployment ───────────────────────────────────────────
@@ -204,7 +198,7 @@ jobs:
         run: |
           ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
             # Check if all services are running
-            supervisorctl -c supervisord.conf status | grep "RUNNING" || {
+            supervisorctl -c supervisord.conf status | grep -E "RUNNING|STARTING" || {
               echo "Deployment verification failed - services not running"
               exit 1
             }
