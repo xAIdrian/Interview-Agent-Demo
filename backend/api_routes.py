@@ -47,7 +47,8 @@ import random
 import string
 import logging
 from access_code_manager import AccessCodeManager
-from email_service import send_test_email
+from email_service import send_interview_invitation
+import email_validator
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -2804,3 +2805,109 @@ def test_email():
     print("Sending test email")
     send_test_email()
     return jsonify({"message": "Email sent successfully"}), 200
+
+
+@api_bp.route("/campaigns/<string:campaign_id>/send-invitations", methods=["POST"])
+def send_campaign_invitations(campaign_id):
+    """
+    Send interview invitations to multiple email addresses.
+    Accepts emails in various formats (comma-separated, newline-separated, space-separated).
+    Requires access_code in the request body.
+    """
+    try:
+        # Get campaign details
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT title FROM campaigns WHERE id = ?", (campaign_id,))
+        campaign = cursor.fetchone()
+
+        if not campaign:
+            return jsonify({"error": "Campaign not found"}), 404
+
+        campaign_title = campaign[0]
+
+        # Get the raw email string and access code from request
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+
+        if "emails" not in data:
+            return jsonify({"error": "No emails provided"}), 400
+
+        if "access_code" not in data:
+            return jsonify({"error": "No access code provided"}), 400
+
+        email_string = data["emails"]
+        access_code = data["access_code"]
+
+        # Parse emails using multiple delimiters
+        # First, replace all common delimiters with spaces
+        email_string = (
+            email_string.replace(",", " ").replace("\n", " ").replace(";", " ")
+        )
+        # Then split by spaces and filter out empty strings
+        email_list = [email.strip() for email in email_string.split() if email.strip()]
+
+        # Validate and clean emails
+        valid_emails = []
+        invalid_emails = []
+
+        for email in email_list:
+            try:
+                # Validate and normalize email
+                validated_email = email_validator.validate_email(
+                    email, check_deliverability=False
+                )
+                normalized_email = validated_email.normalized
+                if normalized_email not in valid_emails:  # Avoid duplicates
+                    valid_emails.append(normalized_email)
+            except email_validator.EmailNotValidError:
+                invalid_emails.append(email)
+
+        # Generate interview link
+        base_url = request.host_url.rstrip("/")
+        interview_link = f"{base_url}/live-interview/{campaign_id}"
+
+        # Send invitations to valid emails
+        results = []
+        for email in valid_emails:
+            try:
+                send_interview_invitation(
+                    recipient_email=email,
+                    campaign_title=campaign_title,
+                    interview_link=interview_link,
+                    access_code=access_code,
+                )
+                results.append(
+                    {
+                        "email": email,
+                        "status": "sent",
+                        "message": "Invitation sent successfully",
+                    }
+                )
+            except Exception as e:
+                results.append({"email": email, "status": "failed", "message": str(e)})
+
+        return (
+            jsonify(
+                {
+                    "success": True,
+                    "message": "Invitations processed",
+                    "results": {
+                        "total_processed": len(email_list),
+                        "valid_emails": len(valid_emails),
+                        "invalid_emails": len(invalid_emails),
+                        "invalid_email_list": invalid_emails,
+                        "invitation_results": results,
+                    },
+                }
+            ),
+            200,
+        )
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if "conn" in locals():
+            conn.close()
