@@ -100,46 +100,93 @@ def send_email_with_html(subject, body, html_content, to_email, to_name=None):
         raise
 
 
-def send_interview_invitation(
-    recipient_email, campaign_title, interview_link, access_code
-):
+def send_batch_emails(subject, base_html_content, message_versions):
     """
-    Send an interview invitation email.
+    Send multiple emails in a single API call using Brevo's batch sending functionality.
+
+    Args:
+        subject: Default subject line
+        base_html_content: Base HTML template
+        message_versions: List of dictionaries containing recipient-specific content
+    """
+    url = "https://api.brevo.com/v3/smtp/email"
+
+    headers = {
+        "accept": "application/json",
+        "api-key": BREVO_API_KEY,
+        "content-type": "application/json",
+    }
+
+    payload = {
+        "sender": {"name": BREVO_SENDER_NAME, "email": BREVO_SENDER_EMAIL},
+        "subject": subject,
+        "htmlContent": base_html_content,
+        "messageVersions": message_versions,
+    }
+
+    try:
+        print(f"Sending batch email with {len(message_versions)} versions")
+        print(f"Using API key: {BREVO_API_KEY[:5]}...")
+        print(f"Request headers: {headers}")
+        print(f"Request payload: {json.dumps(payload, indent=2)}")
+
+        response = requests.post(url, headers=headers, data=json.dumps(payload))
+        response.raise_for_status()
+        print(f"Batch email sent successfully")
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"Error sending batch email: {str(e)}")
+        if hasattr(e, "response") and e.response is not None:
+            print(f"Response status code: {e.response.status_code}")
+            print(f"Response headers: {e.response.headers}")
+            print(f"Response text: {e.response.text}")
+        raise
+
+
+def send_interview_invitations(emails, campaign_title, interview_link, access_code):
+    """
+    Send interview invitations to multiple recipients in a single batch.
+
+    Args:
+        emails: List of email addresses
+        campaign_title: Title of the campaign
+        interview_link: Link to the interview
+        access_code: Access code for the interview
     """
     subject = f"NoorAI Interview Invitation: {campaign_title}"
-    recipient_name = recipient_email.split("@")[0].replace(".", " ").title()
 
-    # Plain text version
-    body = f"""
-You have been invited to participate in an interview for the {campaign_title} position.
+    # Base HTML template with variables
+    base_html_content = """
+    <!DOCTYPE html>
+    <html>
+    <body>
+        <h2>Interview Invitation</h2>
+        <p>You have been invited to participate in an interview for the <strong>{{params.campaign_title}}</strong> position.</p>
+        <p>Please click the following link to start your interview:</p>
+        <p><a href="{{params.interview_link}}">{{params.interview_link}}</a></p>
+        <p>Here is your access code: <strong>{{params.access_code}}</strong></p>
+        <p>Best regards,<br>The Interview Team</p>
+    </body>
+    </html>
+    """
 
-Please click the following link to start your interview:
-{interview_link}
+    # Create message versions for each email
+    message_versions = []
+    for email in emails:
+        recipient_name = email.split("@")[0].replace(".", " ").title()
+        message_versions.append(
+            {
+                "to": [{"email": email, "name": recipient_name}],
+                "params": {
+                    "recipient_name": recipient_name,
+                    "campaign_title": campaign_title,
+                    "interview_link": interview_link,
+                    "access_code": access_code,
+                },
+            }
+        )
 
-Here is your access code: {access_code}
-
-Best regards,
-The Interview Team
-"""
-
-    # HTML version
-    html_content = f"""
-<html>
-<body>
-    <h2>Interview Invitation</h2>
-    <p>Dear {recipient_name},</p>
-    <p>You have been invited to participate in an interview for the <strong>{campaign_title}</strong> position.</p>
-    <p>Please click the following link to start your interview:</p>
-    <p><a href="{interview_link}">{interview_link}</a></p>
-    <p>Here is your access code: <strong>{access_code}</strong></p>
-    <p>Best regards,<br>The Interview Team</p>
-</body>
-</html>
-"""
-
-    return send_email_with_html(
-        subject, body, html_content, recipient_email, recipient_name
-    )
+    return send_batch_emails(subject, base_html_content, message_versions)
 
 
 def send_interview_completion(recipient_email, campaign_title, submission_link):
@@ -149,31 +196,26 @@ def send_interview_completion(recipient_email, campaign_title, submission_link):
     subject = f"Interview Completed: {campaign_title}"
     recipient_name = recipient_email.split("@")[0].replace(".", " ").title()
 
-    # Plain text version
-    body = f"""
-Thank you for completing the interview for the {campaign_title} position.
-
-You can view your submission at:
-{submission_link}
-
-Best regards,
-The Interview Team
-"""
-
     # HTML version
     html_content = f"""
-<html>
-<body>
-    <h2>Interview Completed</h2>
-    <p>Dear {recipient_name},</p>
-    <p>Thank you for completing the interview for the <strong>{campaign_title}</strong> position.</p>
-    <p>You can view your submission at:</p>
-    <p><a href="{submission_link}">{submission_link}</a></p>
-    <p>Best regards,<br>The Interview Team</p>
-</body>
-</html>
-"""
+    <!DOCTYPE html>
+    <html>
+    <body>
+        <h2>Interview Completed</h2>
+        <p>Thank you for completing the interview for the <strong>{campaign_title}</strong> position.</p>
+        <p>You can view your submission at:</p>
+        <p><a href="{submission_link}">{submission_link}</a></p>
+        <p>Best regards,<br>The Interview Team</p>
+    </body>
+    </html>
+    """
 
-    return send_email_with_html(
-        subject, body, html_content, recipient_email, recipient_name
-    )
+    # Create a single message version for completion email
+    message_versions = [
+        {
+            "to": [{"email": recipient_email, "name": recipient_name}],
+            "htmlContent": html_content,
+        }
+    ]
+
+    return send_batch_emails(subject, html_content, message_versions)

@@ -47,7 +47,7 @@ import random
 import string
 import logging
 from access_code_manager import AccessCodeManager
-from email_service import send_interview_invitation
+from email_service import send_interview_invitations
 import email_validator
 
 # Configure logging
@@ -2869,25 +2869,27 @@ def send_campaign_invitations(campaign_id):
         base_url = request.host_url.rstrip("/")
         interview_link = f"{base_url}/live-interview/{campaign_id}"
 
-        # Send invitations to valid emails
-        results = []
-        for email in valid_emails:
-            try:
-                send_interview_invitation(
-                    recipient_email=email,
-                    campaign_title=campaign_title,
-                    interview_link=interview_link,
-                    access_code=access_code,
-                )
-                results.append(
-                    {
-                        "email": email,
-                        "status": "sent",
-                        "message": "Invitation sent successfully",
-                    }
-                )
-            except Exception as e:
-                results.append({"email": email, "status": "failed", "message": str(e)})
+        # Send invitations using batch sending
+        try:
+            send_interview_invitations(
+                emails=valid_emails,
+                campaign_title=campaign_title,
+                interview_link=interview_link,
+                access_code=access_code,
+            )
+            results = [
+                {
+                    "email": email,
+                    "status": "sent",
+                    "message": "Invitation sent successfully",
+                }
+                for email in valid_emails
+            ]
+        except Exception as e:
+            results = [
+                {"email": email, "status": "failed", "message": str(e)}
+                for email in valid_emails
+            ]
 
         return (
             jsonify(
